@@ -1,0 +1,32 @@
+using Murmur.Core;
+int count = 0;
+void Check(bool pass, string name) { if (!pass) throw new Exception(name); Console.WriteLine("PASS " + name); count++; }
+var preferences = new Preferences();
+Check(TextPipeline.Apply("Um, review codex with github.", preferences) == "review Codex with GitHub.", "Fillers and explicit vocabulary");
+Check(TextPipeline.Apply("Keep `um github` and https://example.com/um plus foo_bar.", preferences) == "Keep `um github` and https://example.com/um plus foo_bar.", "Protected code paths and URLs");
+Check(TextPipeline.Apply("euh, corrige le PowerShell.", preferences) == "corrige le PowerShell.", "French filler and technical term");
+Check(TextPipeline.Apply("review my changes.", preferences) == preferences.Snippets[0].Expansion, "Explicit full utterance snippet");
+Check(TextPipeline.Apply("Do not review my changes.", preferences) == "Do not review my changes.", "Snippet embedded in speech does not expand");
+Check(TextPipeline.Apply("Use A. correction: Use B.", preferences) == "Use B.", "Explicit correction marker");
+Check(TextPipeline.Apply("Actually use A, no, use B.", preferences) == "Actually use A, no, use B.", "Ambiguous correction is retained for review");
+preferences.Style = "Verbatim";
+Check(TextPipeline.Apply("Um, github.", preferences) == "Um, github.", "Verbatim preserves original words");
+preferences.Style = "Notes";
+Check(TextPipeline.Apply("First. new paragraph Second.", preferences).Contains("\n\n"), "Notes paragraph command");
+var s = new DictationSession(); Check(!s.Stop(), "Cannot stop idle session"); Check(s.Begin() && !s.Begin(), "No duplicate recording"); Check(s.Stop(), "Recording to transcription"); s.Cancel(); Check(!s.Complete("late", "late") && s.State == SessionState.Cancelled, "Cancelled completion ignored");
+var d = new DictationSession(); d.Begin(); d.Stop(); d.Complete("original", "draft"); Check(d.MarkInserted() && !d.MarkInserted(), "Duplicate insertion refused"); Check(d.Original == "original", "Original transcript retained after insertion");
+var empty = new DictationSession(); empty.Begin(); empty.Stop(); Check(!empty.Complete("", "") && empty.State == SessionState.Failed, "Empty output cannot insert");
+var path = Path.Combine(Path.GetTempPath(), "murmur-settings-" + Guid.NewGuid() + ".json"); preferences.Save(path); Check(Preferences.Load(path).Style == "Notes", "Saved preferences read back"); File.Delete(path);
+File.WriteAllText(path, "{\"Vocabulary\":null,\"Snippets\":null,\"Language\":null,\"Style\":\"unsafe\",\"Device\":999}");
+var repaired = Preferences.Load(path); Check(repaired.Vocabulary.Count > 0 && repaired.Snippets.Count > 0 && repaired.Language == "auto" && repaired.Style == "Clean" && repaired.Device == -1, "Null structures and invalid preferences normalize");
+File.WriteAllText(path, "{\"Vocabulary\":[null,{\"Spoken\":null,\"Written\":\"bad\"},{\"Spoken\":\"good\",\"Written\":\"GOOD\"}],\"Snippets\":[null]}");
+repaired = Preferences.Load(path); Check(repaired.Vocabulary.Count == 1 && repaired.Vocabulary[0].Written == "GOOD" && repaired.Snippets.Count == 0, "Null list entries normalize without losing valid replacements"); File.Delete(path);
+var rules = VocabularyRules.Parse("FooBar\npower shell = PowerShell");
+Check(rules.Terms.SequenceEqual(new[] { "FooBar" }) && rules.Replacements.Single() == new Replacement("power shell", "PowerShell"), "Recognition hint and explicit replacement have separate records");
+preferences = new Preferences { Terms = rules.Terms, Vocabulary = rules.Replacements };
+Check(TextPipeline.Apply("foo bar with power shell", preferences) == "foo bar with PowerShell", "Recognition hint does not invent a spelling replacement");
+bool InvalidVocabulary(string text) { try { VocabularyRules.Parse(text); return false; } catch (FormatException) { return true; } }
+Check(InvalidVocabulary("FooBar\nfoobar = FooBar"), "Conflicting hint and correction are rejected");
+Check(InvalidVocabulary("term = " + new string('a', 121)), "Overlong vocabulary cannot silently disappear on reload");
+preferences.Save(path); Check(Preferences.Load(path).Terms.SequenceEqual(rules.Terms), "Exact vocabulary hint persists"); File.Delete(path);
+Console.WriteLine($"{count} checks passed.");

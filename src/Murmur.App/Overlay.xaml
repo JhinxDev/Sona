@@ -1,0 +1,5 @@
+<Window x:Class="Murmur.App.Overlay" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{StaticResource {x:Type Window}}" Width="334" Height="70" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ShowActivated="False" Topmost="True" IsHitTestVisible="False">
+  <Border CornerRadius="22" BorderBrush="#8B70AF" BorderThickness="1" Background="#F21D172B" Padding="20,15">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="45"/></Grid.ColumnDefinitions><Ellipse x:Name="Dot" Fill="#CAAAFC" Width="10" Height="10" HorizontalAlignment="Left"/><StackPanel Grid.Column="1"><TextBlock x:Name="Label" Text="Listening" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="Hint" Text="Esc to cancel" FontSize="11" Foreground="#C4B5D9"/></StackPanel><TextBlock x:Name="Time" Grid.Column="2" Text="0:00" VerticalAlignment="Center" FontSize="12"/></Grid>
+  </Border>
+</Window>

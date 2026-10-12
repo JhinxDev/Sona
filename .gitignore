@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+*.wav
+*.bin
+*.zip
+*.part
+.env*
+settings.json

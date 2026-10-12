@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><AssemblyName>Murmur</AssemblyName><Version>0.1.0</Version><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/Murmur.ico</ApplicationIcon></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Murmur.Core/Murmur.Core.csproj"/><PackageReference Include="NAudio" Version="2.2.1"/></ItemGroup>
+  <ItemGroup><Using Remove="System.Windows.Forms"/><Using Remove="System.Drawing"/></ItemGroup>
+  <ItemGroup><Resource Include="Assets/Murmur.ico"/></ItemGroup>
+</Project>
