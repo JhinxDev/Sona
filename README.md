@@ -76,6 +76,12 @@ $sonaDotnet = Join-Path $env:SONA_RUNTIME 'sdk\dotnet.exe'
 & $sonaDotnet list .\src\Murmur.App\Murmur.App.csproj package --vulnerable --include-transitive
 ```
 
+To open the built app in the same PowerShell session:
+
+```powershell
+& $sonaDotnet run --project .\src\Murmur.App -c Release --no-build
+```
+
 The repository's `tools/build.ps1` and smoke-test helpers use the owner's
 `E:\DevelopmentTools\local-dictation` layout. That path is a development
 convenience, not a requirement for every Windows machine. Legacy internal

@@ -1,4 +1,4 @@
-# Murmur project owner
+# Sona project owner
 
 Read C:/Users/qazws/AGENTS.md and the E:/Projects adapter. Source owner is chat 01a12f45-d73e-7191-ad2a-56a050b8dce2. Private source and new Projects/local-dictation docs belong to this owner; do not mutate Hush or shared Tool Shed/Vault Git files without coordination.
 

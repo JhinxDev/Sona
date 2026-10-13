@@ -1,5 +1,25 @@
 # Candidate verification
 
+## Installed 0.3.1 readback, October 13
+
+Installed source c0e1a0d50105209c33f42fdf7bed5b9317ca51cf matched all
+27 package files. The maintained encrypted updater confirmed the current draft
+transfer, without microphone capture or global test input. The app reports 0.3.1
+and its current-user agent remains available. This successful update does not
+retroactively recover the unconfirmed original 0.3.0 draft loss described below.
+
+Owner settings read back clipboard backup enabled, combined Hold mode, only the
+three ChatGPT/Codex executable/package identities watched, 52 imported project
+and technical terms and all five previous corrections retained. No personal
+vocabulary is committed into generic application defaults or showcase images.
+Discord reports connected, enabled, unpaused, owns no changes, and Ready.
+
+The manual GitHub check completed with "No public release is available yet."
+Automatic checks were then enabled for this owner; new installations remain
+opt-in. There is no published release, signed binary or automatic installation.
+Owner physical hold/double-tap, focus-changed clipboard and Discord restoration
+remain pending, separate from native fixture proof.
+
 ## 0.3.1 qualification, October 13
 
 The combined physical Ctrl+Win gesture supports hold/release and two quick taps
