@@ -1,7 +1,25 @@
-# Sona project owner
+# Working on Sona
 
-Read C:/Users/qazws/AGENTS.md and the E:/Projects adapter. Source and trailer owner is chat 01a13603-8a77-7c52-9c2b-29ff13e454bf, "Sona judge and trailer", created at the owner's explicit request with GPT-6.1 Sol and maximum effort. Resume from docs/JUDGE-TRAILER-HANDOFF.md and the outgoing chat's verified activation receipt. The former owner 01a12f45-d73e-7191-ad2a-56a050b8dce2 retires from source mutation after that receipt. Private source and new Projects/local-dictation docs belong to the active owner; do not mutate Hush or shared Tool Shed/Vault Git files without coordination. Keep owner updates in the active Sona chat, with no Discord notifications.
+Sona is an early native Windows dictation app. Read README.md, docs/DESIGN.md,
+docs/IMPLEMENTATION.md and docs/PREVIEW-VALIDATION.md before substantial changes.
+Respect the active user's model choices, working changes and explicit scope.
 
-Use E:/DevelopmentTools/local-dictation for SDK, NuGet and model caches. No heavy output belongs in the synced Vault. Preserve current dictation availability, no startup by default, no microphone outside a deliberate user gesture, no automatic submission, no background transcript logging or cloud requests. Preserve the owner's explicitly enabled settings and private draft.
-
-Build with the isolated SDK and --disable-build-servers -p:UseSharedCompilation=false. Set DOTNET_CLI_HOME, NUGET_PACKAGES and telemetry opt out to the documented task-owned paths. Run meaningful tests from tests/Murmur.Tests, then affected native tests. See docs/DESIGN.md and docs/IMPLEMENTATION.md for finite gates. Never claim actual Windows/Codex acceptance from a build or a replay. Keep physical owner proof open until tested. A docs-only handoff does not require another app installation or unchanged QA replay.
+- Keep microphone recording behind an intentional user gesture. Never start a
+  live microphone, inject global keys, submit a message or connect a call as part
+  of an unattended test.
+- Preserve the owner's profile, draft, clipboard and enabled preferences. Native
+  UI tests use a separate test profile; fixture replay does not prove live input.
+- Speech and optional cleanup stay local. New profiles start without saved
+  history, startup, clipboard backup, cleanup, call protection or update checks.
+- Keep SDKs, NuGet caches, model weights, recordings and renders outside this
+  repository. Use the documented SONA_RUNTIME and isolated SDK settings. Do not
+  change a user's global SDK, driver, startup registration or font installation.
+- Build with --disable-build-servers -p:UseSharedCompilation=false. Run the
+  relevant checks from tests/Murmur.Tests and affected native tools after source
+  changes. A documentation-only change does not need an unchanged full replay.
+- Preserve upstream licenses and notices, pinned sizes/hashes and local download
+  boundaries. Review dependency changes and every scoped Git diff before syncing.
+- Distinguish builds, fake-system tests, file replay and real microphone/target-app
+  acceptance. Keep missing personal or physical-device proof explicit.
+- Stage only owned paths and preserve concurrent work. Public source does not
+  authorize uploading videos, publishing binary releases or messaging others.

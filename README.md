@@ -1,168 +1,168 @@
 # Sona
 
-**Local voice dictation for Windows, with a draft you stay in control of.**
+**Local voice dictation for Windows. Speak, review the text, and send it yourself.**
 
-Speak into a focused text field, review your words, and send them yourself.
-Sona runs Parakeet or Whisper on your computer, keeps the selected model warm between
-dictations, optionally polishes your text locally, and can protect your Discord
-call while you record.
+Sona turns speech into text in your focused app using Parakeet or Whisper on
+your own computer. Keep a model warm for quick reuse, polish wording locally,
+add your vocabulary, and mute your Discord microphone while you dictate.
+No Sona account or subscription is required.
 
-Sona began with a simple frustration: dictation subscriptions and usage limits
-can get in the way of an everyday tool. The goal is a quiet Windows app that
-uses your own hardware, needs no Sona account, and fits into your writing and
-agent workflows. Local dictation already has good alternatives; Sona focuses
-on this particular combination of native Windows UI, careful draft insertion,
-and call protection. [Compare the approaches](docs/ALTERNATIVES.md).
+It started with a frustration: subscriptions and quotas can make an everyday
+dictation tool feel harder to use than it should. Sona is an early open-source
+attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Private preview.** Version 0.4.0 adds NVIDIA Parakeet v3 beside Whisper,
-with CPU/GPU execution, warm residency and an English-focused comparison.
-On one RTX 4080 SUPER, Parakeet's median warm request was 21 ms versus Whisper
-Turbo's 144 ms, with slightly fewer word errors on eight English clips.
-These are speech-only measurements on a small test set. [Results and limits](docs/PARAKEET.md).
-Optional local text polishing supports GPU acceleration. Source and native
-fixture checks are separate from owner testing.
-There is no published binary download yet. Source and private packages remain
-separate from a public release.
+**Early preview: 0.4.0.** Build from source below. There is no published binary
+download yet. Feedback, bug reports, contributions and feature suggestions are
+welcome.
 
-![Sona Home with a sample editable draft](docs/images/sona-home.png)
+![Sona with a sample editable draft](docs/images/sona-home.png)
 
-## What Sona does
+Screenshots use the real 0.4.0 interface with an isolated profile and synthetic text.
 
-- **Dictate without submitting.** Hold Ctrl + Windows and release to finish,
-  or double-tap the combination to start hands-free recording and tap once to
-  stop. This combined mode is called Hold / double-tap; the legacy Toggle mode
-  also remains available. Esc cancels. Sona never presses
-  Enter to send your message.
-- **Keep your draft.** Home has an editable result and its original text.
-  Focus changes preserve the draft instead of inserting into a different field.
-  Optionally copy completed dictation to the clipboard; this starts off by
-  default and can be enabled in Settings.
-- **See the recording.** Choose Panel or Capsule, with measured microphone
-  levels, elapsed time, stop/cancel controls, and the captured target app name.
-- **Choose your local model.** NVIDIA Parakeet v3 runs through NeMo-Speech.cpp;
-  Tiny, Base, Small, Medium, Large v3 Turbo and Large v3 remain six Whisper
-  choices. Model and needed engine downloads are explicit and checked against
-  pinned sizes and hashes. Model selection and residency are shown separately.
-- **Avoid repeated loading.** One selected model stays resident until unload,
-  a model switch, quit, or the idle timeout. The default is 10 minutes;
-  Keep until quit is also available.
-- **Polish without a cloud service.** Optional Spokenly Cleanup 1 fixes
-  punctuation, fillers, repetition and spoken corrections. Choose Polished,
-  Casual or Lowercase formatting, prefer NVIDIA GPU/VRAM or choose CPU/RAM,
-  and keep the separate cleanup model warm with its own idle timeout.
-  Your original transcript remains available. [Setup and limits](docs/LOCAL-CLEANUP.md).
-- **Protect a Discord call.** Optionally mute Discord while Sona or a watched
-  app records, with separate incoming-audio protection. Overlapping recordings
-  share protection and manual mute/deafen choices are preserved.
-- **Make it yours.** Eight original light/dark themes that save as you choose
-  them, bundled Inter typography, Clean/Verbatim/Notes modes, vocabulary hints,
-  corrections and snippets.
-- **Use your tools.** `sona-agent` provides JSON CLI commands and an MCP stdio
-  interface for status, validated settings, model management and call protection.
-- **Check for updates when you choose.** Optional GitHub update checks run at
-  startup and every 12 hours. They need no account and never install automatically.
-  An unavailable private release endpoint means no public release is available,
-  not that you need to sign in.
+## Everyday dictation
 
-![Sona Dictation Models with Parakeet and Whisper choices](docs/images/sona-models.png)
+- **Hold Ctrl + Windows** to record, then release to finish. Double-tap the
+  combination for hands-free recording and tap once to stop. Esc cancels.
+  Sona writes into the text field you're using. It never presses Send or Enter
+  to submit a message; you review and send it yourself.
+- **Keep control of your words.** Home retains the original transcript and an
+  editable result. A focus change preserves the draft instead of inserting it
+  into a different field. Clipboard backup is optional.
+- **Choose local recognition.** NVIDIA Parakeet v3 and six Whisper models
+  offer CPU or NVIDIA CUDA options. Explicit downloads use pinned sizes and
+  hashes. Selected and actually loaded models are shown separately.
+- **Keep models ready.** One speech worker stays resident for the configured
+  idle timeout, until a switch, explicit unload or quit. Keep until quit is
+  available; unloading keeps the downloads.
+- **Polish locally.** Optional Spokenly Cleanup 1 handles punctuation, fillers,
+  repetition and spoken corrections with Polished, Casual or Lowercase styles.
+  It has separate CPU/GPU and idle controls. Verbatim and exact snippets bypass
+  the model; your original transcript remains available.
+- **Add your vocabulary.** Recognition hints, corrections and snippets help
+  with project names, terminology and recurring text.
+- **Keep dictation out of Discord calls.** Optional protection mutes your microphone while
+  Sona or a watched ChatGPT/Codex app records, so others do not hear your
+  dictation. Incoming audio can also be silenced. Overlapping recordings share
+  protection, and restoration respects manual mute/deafen choices.
+- **Fit your workspace.** Eight light/dark themes, Inter typography, Panel or
+  Capsule recording displays, microphone level bars and local WAV transcription.
+- **Connect your tools.** A JSON CLI and stdio MCP interface manage status,
+  validated settings, models and call protection without remote microphone control.
 
-## Start from source
+![Parakeet and Whisper model choices](docs/images/sona-models.png)
 
-You need Windows x64, PowerShell, a microphone for live dictation, and .NET 8
-with Windows desktop support. Initial SDK, engine, model and NuGet downloads
-need network access. After setup, speech transcription runs locally. CUDA
-requires a compatible NVIDIA driver and portable engine. Choosing Parakeet's
-Download or Use model action installs its pinned CPU or CUDA engine when needed;
-startup never downloads models. Whisper CUDA setup remains separate.
+## Build and run
 
-From the repository root, prepare the pinned CPU engine, Small model and SDK:
+You need Windows x64 and PowerShell. A microphone is needed for live dictation.
+Initial SDK, NuGet, engine and model downloads need internet access. The setup
+script below provisions the pinned .NET 8 SDK, Whisper CPU engine and Small
+model into a directory you choose.
+
+Clone the repository, then run these commands from its root:
 
 ```powershell
+git clone https://github.com/JhinxDev/Sona.git
+cd Sona
+
 $env:SONA_RUNTIME = Join-Path $env:LOCALAPPDATA 'Sona\runtime'
 .\tools\setup-runtime.ps1 -RuntimeRoot $env:SONA_RUNTIME -BuildTools
 $env:DOTNET_CLI_HOME = Join-Path $env:SONA_RUNTIME 'dotnet-home'
 $env:NUGET_PACKAGES = Join-Path $env:SONA_RUNTIME 'nuget'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $sonaDotnet = Join-Path $env:SONA_RUNTIME 'sdk\dotnet.exe'
+
 & $sonaDotnet build .\src\Murmur.App\Murmur.App.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
 & $sonaDotnet build .\src\Sona.Agent\Sona.Agent.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
-& $sonaDotnet run --project .\tests\Murmur.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
-& $sonaDotnet run --project .\tests\Murmur.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
-& $sonaDotnet list .\src\Murmur.App\Murmur.App.csproj package --vulnerable --include-transitive
+& .\src\Murmur.App\bin\Release\net8.0-windows\Sona.exe
 ```
 
-To open the built app in the same PowerShell session:
+Keep `SONA_RUNTIME` set when launching this source build so Sona finds these
+assets. Internal `Murmur` names preserve source and preference compatibility.
+
+In **Dictation Models**, choose **Download** for Parakeet v3, then **Use model**.
+Its CPU or CUDA runtime is installed explicitly when needed. For CPU execution,
+choose **CPU only** and save model preferences before downloading. CUDA requires a compatible NVIDIA
+driver; Sona does not install a driver or global CUDA toolkit. Whisper CUDA
+uses a separate setup script:
 
 ```powershell
-& $sonaDotnet run --project .\src\Murmur.App -c Release --no-build
+.\tools\setup-cuda-runtime.ps1 -RuntimeRoot $env:SONA_RUNTIME
 ```
 
-The repository's `tools/build.ps1` and smoke-test helpers use the owner's
-`E:\DevelopmentTools\local-dictation` layout. That path is a development
-convenience, not a requirement for every Windows machine. Legacy internal
-Murmur names preserve source and preference compatibility.
-
-Qualified private packages use `tools/install.ps1`; upgrades use
-`tools/upgrade.ps1 -PackageDirectory <package> -ProcessId <Sona PID>` to preserve
-an idle app's draft through an encrypted checkpoint. The installer verifies
-package files, creates a Start shortcut and stable `sona-agent` user-PATH entry.
-Startup is opt in. Engine/model/CUDA files are separate downloads. A small,
-reviewed MIT/Apache-licensed ggml scheduler compatibility DLL is bundled for
-the Parakeet runtime; its source patch and rebuild instructions are included.
+In **Settings → Text cleanup**, set up the selected backend, enable cleanup and
+save preferences. See [cleanup setup](docs/LOCAL-CLEANUP.md) and
+[model details](docs/PARAKEET.md).
 
 ## CLI and MCP
 
+With Sona running, use the CLI built above:
+
 ```powershell
-sona-agent status
-sona-agent models list
-sona-agent models install tiny
-sona-agent cleanup status
-sona-agent protection status
-sona-agent settings patch '{"language":"fr","shortcutMode":"Toggle"}'
+$sonaAgent = '.\src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
+& $sonaAgent status
+& $sonaAgent models list
+& $sonaAgent cleanup status
+& $sonaAgent protection status
 ```
 
-The running app exposes a current-user-only named pipe. `sona-agent --mcp`
-serves its named operations over stdio. Credentials, history and starting the
-microphone are outside this interface.
-[Agent setup and MCP configuration](docs/AGENT-INTERFACE.md).
+Use the absolute path of `sona-agent.exe` with `--mcp` in an MCP-capable client.
+The desktop connection is a current-user-only named pipe; MCP runs over stdio.
+The interface does not expose credentials, transcript export or microphone-start
+  commands. [Commands and MCP configuration](docs/AGENT-INTERFACE.md).
 
-## Privacy and current limits
+## Privacy and preview limits
 
-No cloud speech provider, BYOK, sign-in, sync, analytics or background audio
-upload is implemented. History is memory-only by default; optional local text
-saving is capped at 200 entries and stores no audio. Local transcription needs
-no Sona subscription and has no subscription word quota, but recordings are
-limited to 120 seconds and transcription requests to 90 seconds.
+Speech recognition and text cleanup run locally. Model/runtime downloads,
+optional GitHub update checks and an enabled Discord connection use the network.
+Cloud speech, sign-in, sync and analytics are not implemented.
 
-Clean/Notes retain their basic deterministic rules. The optional local cleanup
-stage adds a small language model; Verbatim and explicit snippets bypass it.
-It starts disabled on new installations. Names and literal code are protected,
-but a model can still change meaning, so the original transcript is retained.
-See [cleanup qualification](docs/LOCAL-CLEANUP.md) and the earlier
-[CPU feasibility study](docs/CLEANUP-RESEARCH.md).
+Startup, saved transcript history, clipboard backup, local model cleanup,
+Discord protection and update checking start disabled on new profiles.
+Optional local history is capped at 200 text entries and stores no audio.
 
-This preview targets Windows only. Medium, Turbo and Large require the
-separately installed CUDA engine. File transcription accepts short 16 kHz mono
-PCM WAVs. Accuracy and speed depend on the model, hardware, language and audio;
-only Small CPU and Turbo CUDA have measured project benchmarks.
+Recordings are bounded to 120 seconds and speech requests to 90 seconds.
+Long Parakeet recordings use independent segments of at most 25 seconds.
+File transcription accepts short 16 kHz mono PCM WAVs. Medium, Turbo and Large
+Whisper require the separately installed CUDA engine. Cleanup is limited to
+4000 input characters and a 20-second inference deadline; model loading has
+separate limits. Cleanup can change meaning despite preservation checks, so
+review your result and use the original when needed.
 
-Discord protection requires your own authorized Discord developer app/tester
-setup or a reviewed Hush import. Sona ships no shared credentials. Pause and
-quit Hush before connecting Sona so only one app controls Discord.
-Call protection currently supports Discord only; adapters for other call
-platforms are future work and are not implemented.
+On one RTX 4080 SUPER, eight English clips gave Parakeet v3 5.13% word error
+rate and a 21 ms median warm speech request, versus Whisper Turbo's 5.77% and
+144 ms. This small licensed fixture excludes recording, cleanup and insertion;
+it does not predict your voice or end-to-end delay. The pinned Whisper CUDA
+runtime also crashed in a mixed English/French resident sequence. Personal
+microphone and target-app acceptance for the new Parakeet integration remain
+open. [Measurements and known limits](docs/PARAKEET.md).
 
-Builds, synthetic replay and native test instances do not establish live
-microphone, target-app insertion or real-call acceptance. Current evidence and
-remaining checks are in [verification](docs/VERIFICATION.md) and the
-[owner test guide](tools/owner-test.md).
+Discord protection currently supports Discord only and requires your own
+authorized Discord developer application setup. Sona ships no shared credentials.
+Connect and enable it in Settings. If another app controls Discord muting, pause
+that app first so both do not change the same call state.
 
+## Contributing
+
+Try it on your hardware and tell us what works, what fails, and what would make
+dictation more useful. Include your Windows version, selected model/backend and
+steps to reproduce a bug. Keep private transcripts and credentials out of reports.
+
+For the maintained regression checks, from the same PowerShell session:
+
+```powershell
+& $sonaDotnet run --project .\tests\Murmur.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet run --project .\tests\Murmur.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
+```
+
+These checks do not establish real microphone, target-app insertion or call
+acceptance. [Preview validation](docs/PREVIEW-VALIDATION.md) ·
+[Contributing](CONTRIBUTING.md) · [Verification](docs/VERIFICATION.md) ·
 [Design](docs/DESIGN.md) · [Implementation](docs/IMPLEMENTATION.md) ·
-[Integration plans](docs/INTEGRATED-SONA.md) ·
-[Third-party notices](THIRD-PARTY-NOTICES.md)
+[Alternatives](docs/ALTERNATIVES.md)
 
 ## License
 
-Sona's source is licensed under [MIT](LICENSE). Third-party engines, models,
-fonts and redistributables retain their own terms; see
-[third-party notices](THIRD-PARTY-NOTICES.md).
+Sona's original source is [MIT licensed](LICENSE). Engines, models, fonts and
+redistributables retain their own terms, including Parakeet's CC-BY-4.0 weights.
+The bundled Parakeet scheduler repair includes its source patch, rebuild
+instructions and license notices. [Third-party notices](THIRD-PARTY-NOTICES.md).
