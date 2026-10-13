@@ -1,6 +1,23 @@
 # Candidate verification
 
-## 0.3.2 local cleanup qualification, October 13
+## 0.3.2 private installation and local cleanup, October 13
+
+The first qualified 0.3.2 update at source
+40577a32bc4deed59fcfa51fe380ea77e899d4f0 used the maintained encrypted updater
+and confirmed the owner's draft transfer. All 29 installed package files,
+stable CLI/startup paths, 52 vocabulary terms, five prior corrections, three
+watched identities and the existing clipboard/theme/history/model preferences
+verified. The owner profile enabled formal cleanup on the actual CUDA backend
+with a ten-minute idle timeout and a 604.15 MiB model-weight buffer. Discord
+remained connected, enabled, unpaused and owned no voice changes.
+
+Actual installed UI readback found that the memory-status accessible name was
+a static description rather than its visible text. The final narrow correction
+binds that name to current text and adds a polite live-region hint. A warning-free
+affected WPF build and 13 native checks pass, including actual accessible memory
+state. The cleanup worker, rules and timing evidence below remain unchanged.
+Final installed identity is recorded in `E:/Temp/qazws/sona032-installed-readback.json`;
+personal microphone/formatting acceptance remains separate.
 
 The owner requested the small local formatting model and GPU/VRAM preference
 with a CPU/RAM alternative. The source adds optional Spokenly Cleanup 1,
@@ -8,7 +25,7 @@ default off for new installations, with protected vocabulary/literals,
 raw-original retention, Verbatim/snippet bypass, bounded cancellation/fallback,
 separate warm residency and Settings/CLI/MCP controls. WAV transcription shares
 the same processing stage. The owner configuration will be enabled only after
-the qualified update; this section alone does not claim installation.
+the qualified update. The installed owner profile is enabled; new users remain off.
 
 The consolidated source gate passed 256 Core and 47 Windows checks with zero
 warnings/errors and no reported vulnerable NuGet dependencies. A real-runtime
@@ -43,7 +60,9 @@ Evidence: `E:/Temp/qazws/sona032-build-release.log`,
 `sona032-cleanup-ui-visible/cleanup-ui-smoke.json` and
 `sona032-cleanup-ui-compact-visible/cleanup-ui-smoke.json`.
 See [Local cleanup](LOCAL-CLEANUP.md) for exact asset pins and model limitations.
-Installation and personal microphone/formatting acceptance are separate gates.
+The accessibility follow-up is `sona032-accessibility-build.log` and
+`sona032-cleanup-ui-accessible/cleanup-ui-smoke.json`. Personal microphone,
+formatting and end-to-end delay remain owner acceptance checks.
 
 ## Installed 0.3.1 readback, October 13
 

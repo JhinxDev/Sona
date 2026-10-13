@@ -64,6 +64,8 @@ try{
     Verify ($taskAgentSettings.data.cleanupEnabled-and $taskAgentSettings.data.cleanupEngine-eq 'Cpu'-and $taskAgentSettings.data.cleanupTone-eq 'casual'-and $taskAgentSettings.data.cleanupIdleMinutes-eq 0) 'CLI agrees with UI-saved cleanup settings'
     $taskCleanup=Agent @('cleanup','status')
     Verify ($taskCleanup.ok-and !$taskCleanup.data.processId-and !$taskCleanup.data.installing) 'UI-only verification starts no cleanup worker or download'
+    $taskMemory=Native @('ui','get-value','CleanupMemory','-a',"$($taskProcess.Id)")
+    Verify ($taskMemory.text-match 'Installed|Set up'-and $taskMemory.text-ne 'Cleanup model memory status') 'Assistive tools read the actual cleanup memory state'
     $taskCursor=Element 'CleanupEnabled'; $taskScroll=$null
     while($taskCursor){$taskPattern=$null;if($taskCursor.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern,[ref]$taskPattern)){$taskScroll=$taskPattern;break};$taskCursor=[System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($taskCursor)}
     if(!$taskScroll){throw 'Settings scroll container unavailable.'}

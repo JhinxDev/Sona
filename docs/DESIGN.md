@@ -5,7 +5,8 @@ semantic brushes, Inter typography, row spacing and wrapping controls. It offers
 an explicit enable switch, three formatting choices, GPU/VRAM or CPU/RAM,
 separate idle residency and setup/load/unload/cancel-retry actions. Memory status
 only labels GPU use after CUDA model-layer and VRAM-buffer proof, and reports
-model-weight MiB separately from total memory. New installations default off;
+model-weight MiB separately from total memory. Its accessible name follows the
+current text with a polite live-region hint. New installations default off;
 the owner requested GPU processing and warm residency. Native layout is checked
 at 1000x700 and 740x530 DIP without microphone capture.
 
