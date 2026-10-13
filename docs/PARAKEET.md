@@ -64,7 +64,7 @@ correctness review after integration. No shared Vault writer or public release.
   native model-picker proof at 1000x700 and 740x530 DIP. Update actual measurements
   and choose owner default by English results; retain Whisper selectable. Do
   not infer owner's personal accent accuracy from the small corpus.
-- [ ] Review scoped diff, close real findings, commit/fast-forward push privately,
+- [x] Review scoped diff, close real findings, commit/fast-forward push privately,
   package the exact source and use the encrypted draft-preserving updater.
   Compare installed/member/source hashes and saved Amethyst, clipboard, startup,
   vocabulary and call state. Verify the chosen actual GPU worker and no leftover
@@ -144,3 +144,23 @@ per-model measurements beside it, `sona040-gpu-paired-memory.json`,
 The negative Whisper VRAM deltas in the initial benchmark are invalid for model
 attribution because its baseline still included the previous Parakeet worker;
 the separate paired-memory fixture supplies the table's corrected loading deltas.
+
+## Installed target receipt
+
+Sona 0.4.0 was installed from qualified source
+`aaeb9f2196301b46c514c5e083dcf34c23969080` with the encrypted updater; its draft
+readback matched. All 35 package members and 36 CUDA runtime members matched
+their receipts. Parakeet was selected and loaded by an actual `cuda:0` worker.
+Only the requested Model preference changed. Amethyst, clipboard backup, 52
+recognition terms, five corrections, three watched identities, 10-minute residency,
+startup, tray behavior and GPU cleanup were preserved. Discord returned connected,
+unpaused and Ready without owned mute/deafen changes. About/sidebar report 0.4.0;
+the three compact cleanup selectors still measure 32x176 DIP.
+
+`E:/Temp/qazws/sona040-installed-readback.json` records exact readback and the
+preservation checksum; the installed settings/model screenshots were inspected.
+Eight retired diagnostic/failed-build trees were removed (314673144 bytes);
+accepted native source/build, original archives, benchmark/failure evidence,
+every installed model and the 0.3.3 recovery installation remain. The final
+documentation/screenshot commit does not change the installed product source tree.
+Live personal microphone acceptance remains the owner's next Ctrl+Win exercise.

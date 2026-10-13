@@ -62,6 +62,26 @@ Additional evidence: `sona040-windows-final.log`, `sona040-agent-final/agent-smo
 `sona040-models-normal-qualified/models-ui-smoke.json`,
 `sona040-models-compact-verified/models-ui-smoke.json` and their screenshots.
 
+Installed 0.4.0 source/package identity is
+`aaeb9f2196301b46c514c5e083dcf34c23969080`, with 35 package and 36 CUDA runtime
+members independently matched. The encrypted updater confirmed the existing draft.
+Saved Model is now parakeet-v3 and a real cuda:0 resident worker became ready.
+Every other preference has the same before/after logical checksum
+`110E2F925168CDE87B21A28A26EAFB60F069DB6EFB319B8DF1C9815A2C815C86`.
+Amethyst, clipboard backup, vocabulary, watched app identities, 10-minute idle
+policy, tray/startup behavior and GPU cleanup remain. Actual native About/sidebar
+are 0.4.0; compact cleanup controls are still 32x176 DIP. Discord is connected,
+unpaused, Ready and owns no changes. Screenshot inspection confirmed the loaded
+Parakeet row and preserved styling. Eight retired build/diagnostic copies reclaimed
+314673144 bytes; accepted source/build, originals, receipts, all model choices and
+0.3.3 recovery remain. No test process remains; idle production workers may unload
+normally. Later documentation-only Git convergence preserves the installed `src`
+tree and does not require a second app update.
+
+Exact target receipts: `E:/Temp/qazws/sona040-installed-readback.json`,
+`sona040-upgrade.log`, `sona040-retired-build-cleanup.json`,
+`sona040-installed-models.png`, `sona040-installed-settings.png`.
+
 ## 0.3.3 compact controls and saved appearance, October 13
 
 The owner rejected the oversized local-cleanup selectors and reported Amethyst
