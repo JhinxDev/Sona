@@ -64,7 +64,7 @@ public partial class MainWindow : Window
         RefreshDevices();
         RefreshEditors(); RestoreTransferredDraft();
         RefreshModelCards();
-        InitializeAppearance();
+        InitializeAppearance(); InitializeCleanup();
         overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
         if (arguments.Contains("--test-ui")) Title = "Sona (UI test)";
@@ -86,7 +86,7 @@ public partial class MainWindow : Window
             try { Startup.MigrateLegacy(preferences.Startup); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
             InitializeProtection();
-            modelIdleTimer.Start(); modelPreparation = WarmSelectedAsync();
+            modelIdleTimer.Start(); modelPreparation = WarmAllSelectedAsync();
             try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest)); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
@@ -197,13 +197,16 @@ public partial class MainWindow : Window
             await ReleaseOwnProtectionAsync();
             var original = await transcriber.RunAsync(wav, preferences, cancellation!.Token);
             if (current.State == SessionState.Cancelled || !ReferenceEquals(current, session)) return;
-            if (!current.Complete(original, TextPipeline.Apply(original, preferences))) { Render(current); return; }
+            var cleanupResult = await PolishAsync(original, cancellation!.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(current, session) || current.State == SessionState.Cancelled) return;
+            if (!current.Complete(original, cleanupResult.Text)) { Render(current); return; }
             Render(current); AddHistory(current);
-            var clipboardDetail = "";
+            var clipboardDetail = cleanupResult.Applied ? " Polished locally." : "";
             if (preferences.CopyToClipboard)
             {
-                try { Clipboard.SetText(current.Draft); clipboardDetail = " Copied to clipboard."; }
-                catch (COMException) { clipboardDetail = " Clipboard is busy; use Copy draft to retry."; }
+                try { Clipboard.SetText(current.Draft); clipboardDetail += " Copied to clipboard."; }
+                catch (COMException) { clipboardDetail += " Clipboard is busy; use Copy draft to retry."; }
             }
             if (preferences.AutoInsert && target != null)
             {
@@ -248,13 +251,16 @@ public partial class MainWindow : Window
     {
         // Deterministic file test. Never captures a microphone or inserts into any destination.
         processing = true;
-        cancellation = new(); session = new(); session.Begin(); session.Stop();
+        cancellation = new(); var current = session = new(); current.Begin(); current.Stop();
         try
         {
             escape.Arm(true);
             Status.Text = "Testing local transcription";
             var raw = await transcriber.RunAsync(await File.ReadAllBytesAsync(path), preferences, cancellation.Token);
-            session.Complete(raw, TextPipeline.Apply(raw, preferences)); Render(session); AddHistory(session);
+            var polished = await PolishAsync(raw, cancellation.Token, "Sona");
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (session != current || current.State == SessionState.Cancelled) return;
+            current.Complete(raw, polished.Text); Render(current); AddHistory(current);
             Status.Text = "File test complete"; StatusDetail.Text = "No microphone was opened and nothing was inserted.";
             if (arguments.Contains("--test-ui"))
             {
@@ -306,9 +312,10 @@ public partial class MainWindow : Window
             preferences.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
             preferences.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";
             preferences.ModelIdleMinutes = int.Parse((string)((ComboBoxItem)ModelIdleChoice.SelectedItem).Tag);
+            SaveCleanupPreferences();
             preferences.Save(preferencesPath);
             ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
-            RefreshModelCards(); modelPreparation = WarmSelectedAsync();
+            RefreshModelCards(); modelPreparation = WarmAllSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();
             if (!priorKeepHistory && preferences.KeepHistory)
             {
@@ -349,6 +356,15 @@ public partial class MainWindow : Window
         if (transcriber.CleanupPending) { ShowCleanupFailure("Temporary recording needs cleanup", "Recording files remain on this computer. Try Quit again to retry cleanup."); return; }
         try { await modelPreparation.WaitAsync(TimeSpan.FromSeconds(7)); await transcriber.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is IOException or TimeoutException) { ShowCleanupFailure("Model memory needs cleanup", "Try Quit again once the local model is released."); return; }
+        try { await cleanupPreparation.WaitAsync(TimeSpan.FromSeconds(7)); await cleanupModel.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
+        catch (Exception ex) when (ex is IOException or TimeoutException) { ShowCleanupFailure("Cleanup memory needs attention", "Try Quit again once the cleanup model is released."); return; }
+        cleanupInstallCancellation?.Cancel();
+        try { await cleanupInstallOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
+        catch (TimeoutException) { ShowCleanupFailure("Waiting for cleanup setup", "Try Quit again shortly."); return; }
+        try { await CleanupAssets.RetryCleanupAsync(); }
+        catch (IOException) { ShowCleanupFailure("Cleanup setup needs attention", "A setup file is still locked. Try Quit again shortly."); return; }
+        if (CleanupAssets.CleanupPending) { ShowCleanupFailure("Cleanup setup needs attention", "Try Quit again to release remaining setup files."); return; }
         modelDownloadCancellation?.Cancel();
         try { await modelDownloadOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }

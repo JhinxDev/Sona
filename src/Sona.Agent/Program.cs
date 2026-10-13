@@ -4,7 +4,7 @@ using Murmur.Core;
 if (args.Contains("--mcp")) { await Mcp.RunAsync(); return; }
 if (args.Length == 0 || args.Contains("--help"))
 {
-    Console.WriteLine("sona-agent status | doctor | settings get | settings patch <JSON> | models list | models info/install/verify <id> | models cancel/load/unload | protection status/pause/resume | request <method> [JSON] | --mcp\nAll results are JSON. Requires running Sona. Local current-user pipe; no account or microphone control."); return;
+    Console.WriteLine("sona-agent status | doctor | settings get | settings patch <JSON> | models list | models info/install/verify <id> | models cancel/load/unload | cleanup status/install/cancel/load/unload | protection status/pause/resume | request <method> [JSON] | --mcp\nAll results are JSON. Requires running Sona. Local current-user pipe; no account or microphone control."); return;
 }
 try
 {
@@ -14,6 +14,7 @@ try
     else if (command[0] == "request" && command.Length is 2 or 3) { method = command[1]; if (command.Length == 3) json = command[2]; }
     else if (command[0] == "settings" && command.Length >= 2) { method = "settings." + command[1]; if (command[1] == "patch" && command.Length == 3) json = command[2]; else if (command[1] != "get") throw new ArgumentException(); }
     else if (command[0] == "models" && command.Length is 2 or 3) { method = "models." + command[1]; if (command.Length == 3) json = JsonSerializer.Serialize(new { id = command[2] }); }
+    else if (command[0] == "cleanup" && command.Length == 2) method = "cleanup." + command[1];
     else if (command[0] == "protection" && command.Length == 2) method = "protection." + command[1];
     else throw new ArgumentException();
     if (json.Length > AgentProtocol.MaximumBytes) throw new ArgumentException();

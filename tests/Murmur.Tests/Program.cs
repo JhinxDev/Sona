@@ -219,12 +219,29 @@ Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDispla
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))
 {
     var fullSettings = AgentSettings.Apply(new Preferences(), fullSettingsPatch.RootElement);
-    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete seventeen-field settings response round trips through a validated agent patch");
+    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete twenty-one-field settings response round trips through a validated agent patch");
 }
 using (var clipboardPatch = System.Text.Json.JsonDocument.Parse("{\"copyToClipboard\":true}"))
 {
     var originalClipboard = new Preferences(); var clipboardSettings = AgentSettings.Apply(originalClipboard, clipboardPatch.RootElement);
     Check(clipboardSettings.CopyToClipboard && !originalClipboard.CopyToClipboard, "Clipboard backup is explicitly configurable and does not mutate the old settings");
+}
+CleanupRulesChecks.Run(Check);
+var cleanupPrefs = new Preferences { CleanupEnabled = true, Terms = ["Sona"] };
+var modelCalls = 0;
+var intact = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => { modelCalls++; return Task.FromResult("Keep [TERM_0]."); }, CancellationToken.None);
+Check(intact.Applied && intact.Text == "Keep Sona." && modelCalls == 1, "Production cleanup processor restores terms after polishing");
+var drift = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => Task.FromResult("Keep another app."), CancellationToken.None);
+Check(!drift.Applied && drift.Text == "um keep Sona" && drift.Outcome == "preserved", "Protected-content drift falls back to the untouched original");
+var verbatim = await CleanupProcessor.RunAsync("um keep Sona", new Preferences { CleanupEnabled = true, Style = "Verbatim" }, "Codex", (prompt, ct) => throw new Exception("Verbatim called model"), CancellationToken.None);
+Check(!verbatim.Applied && verbatim.Text == "um keep Sona", "Verbatim never invokes the cleanup model");
+var unavailableCleanup = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => throw new IOException("fixture failure"), CancellationToken.None);
+Check(!unavailableCleanup.Applied && unavailableCleanup.Outcome == "unavailable", "Model failure retains a usable basic draft");
+using (var lateCancel = new CancellationTokenSource())
+{
+    var rejected = false;
+    try { await CleanupProcessor.RunAsync("keep Sona", cleanupPrefs, "Codex", (prompt, ct) => { lateCancel.Cancel(); return Task.FromResult("Keep [TERM_0]."); }, lateCancel.Token); } catch (OperationCanceledException) { rejected = true; }
+    Check(rejected, "Cancellation after inference cannot return a late polished result");
 }
 ReleaseVersionChecks.Run(Check);
 Console.WriteLine($"{count} checks passed.");

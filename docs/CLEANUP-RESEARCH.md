@@ -1,5 +1,9 @@
 # Local cleanup feasibility, October 13, 2026
 
+Historical CPU feasibility study. The later optional Sona 0.3.2 integration and
+GPU qualification are documented in [Local cleanup](LOCAL-CLEANUP.md). The
+0.3.1 installed boundary and pilot failures below remain historical evidence.
+
 The owner tested hold/release and hands-free recording in 0.3.1 and reported
 that it broadly worked, then requested investigation of cleaner text without
 losing local execution or speed. This is research and an isolated pilot;

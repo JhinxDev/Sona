@@ -1,5 +1,14 @@
 # Sona design
 
+October 13, 0.3.2: TEXT CLEANUP is a grouped Settings section using existing
+semantic brushes, Inter typography, row spacing and wrapping controls. It offers
+an explicit enable switch, three formatting choices, GPU/VRAM or CPU/RAM,
+separate idle residency and setup/load/unload/cancel-retry actions. Memory status
+only labels GPU use after CUDA model-layer and VRAM-buffer proof, and reports
+model-weight MiB separately from total memory. New installations default off;
+the owner requested GPU processing and warm residency. Native layout is checked
+at 1000x700 and 740x530 DIP without microphone capture.
+
 October 13, 0.3.1: model rows use 20 DIP margins, a 60 DIP leading column
 and an original 44 DIP rounded vector waveform badge. The provider remains
 explicit text, not a borrowed official logo. Both recording displays identify

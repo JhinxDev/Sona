@@ -1,5 +1,50 @@
 # Candidate verification
 
+## 0.3.2 local cleanup qualification, October 13
+
+The owner requested the small local formatting model and GPU/VRAM preference
+with a CPU/RAM alternative. The source adds optional Spokenly Cleanup 1,
+default off for new installations, with protected vocabulary/literals,
+raw-original retention, Verbatim/snippet bypass, bounded cancellation/fallback,
+separate warm residency and Settings/CLI/MCP controls. WAV transcription shares
+the same processing stage. The owner configuration will be enabled only after
+the qualified update; this section alone does not claim installation.
+
+The consolidated source gate passed 256 Core and 47 Windows checks with zero
+warnings/errors and no reported vulnerable NuGet dependencies. A real-runtime
+synthetic fixture passed 48 checks, including confirmed CUDA model offload,
+11 short English/French/technical cases, three formatting choices, a 134-word
+paragraph, resident reuse, queued/in-flight cancellation, idle expiry, Keep until
+quit, disabling cleanup and GPU-to-CPU release. No microphone, owner text or
+global input was used. Eleven short GPU requests took 41–98 ms; the longer
+paragraph took 373 ms. GPU preparation was 2.27 s with filesystem cache warm,
+model-weight VRAM 604.15 MiB, peak host working set 1115.65 MiB. These are
+cleanup-only samples, not complete live dictation timing or semantic guarantees.
+
+The actual CLI/MCP smoke passed 17 checks for 18 named tools and 21 supported
+settings. Twelve affected native control/version checks passed at each of
+1000x700 and 740x530 DIP, including UI-save/CLI readback. Both cleanup screenshots
+were visually inspected. The first visual harness relied on an unreliable WPF
+IsOffscreen value and captured the top of Settings; the repaired maintained
+test uses actual control/window bounds and scrolls the cleanup group into view.
+The earlier valid preference checks remain separate from that missing visual
+proof. Unchanged theme, waveform, speech and encrypted-update evidence is reused.
+
+Two correctness-review findings were fixed and closed: retry retained setup
+partials before setup, provide a retry action and prevent quit while release is
+pending; and unload the old worker when selecting an unavailable backend.
+Interoperability failures are retained: the pinned runtime needs log verbosity 4
+to emit model-buffer proof, and uses modern stop_type=eos/truncated completion
+fields rather than the legacy stopped_limit field. Focused parser tests cover
+both formats and reject contradictory or truncated output.
+
+Evidence: `E:/Temp/qazws/sona032-build-release.log`,
+`sona032-cleanup-final.json`, `sona032-agent/agent-smoke.json`,
+`sona032-cleanup-ui-visible/cleanup-ui-smoke.json` and
+`sona032-cleanup-ui-compact-visible/cleanup-ui-smoke.json`.
+See [Local cleanup](LOCAL-CLEANUP.md) for exact asset pins and model limitations.
+Installation and personal microphone/formatting acceptance are separate gates.
+
 ## Installed 0.3.1 readback, October 13
 
 Installed source c0e1a0d50105209c33f42fdf7bed5b9317ca51cf matched all

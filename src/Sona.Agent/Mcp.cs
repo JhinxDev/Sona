@@ -8,7 +8,7 @@ internal static class Mcp
     {
         ["sona_status"] = "status", ["sona_settings_get"] = "settings.get", ["sona_settings_patch"] = "settings.patch",
         ["sona_models_list"] = "models.list", ["sona_models_info"] = "models.info", ["sona_models_install"] = "models.install",
-        ["sona_models_verify"] = "models.verify", ["sona_models_cancel"] = "models.cancel", ["sona_models_load"] = "models.load", ["sona_models_unload"] = "models.unload", ["sona_protection_status"] = "protection.status", ["sona_protection_pause"] = "protection.pause", ["sona_protection_resume"] = "protection.resume"
+        ["sona_models_verify"] = "models.verify", ["sona_models_cancel"] = "models.cancel", ["sona_models_load"] = "models.load", ["sona_models_unload"] = "models.unload", ["sona_protection_status"] = "protection.status", ["sona_protection_pause"] = "protection.pause", ["sona_protection_resume"] = "protection.resume", ["sona_cleanup_status"] = "cleanup.status", ["sona_cleanup_install"] = "cleanup.install", ["sona_cleanup_cancel"] = "cleanup.cancel", ["sona_cleanup_load"] = "cleanup.load", ["sona_cleanup_unload"] = "cleanup.unload"
     };
     public static async Task RunAsync()
     {
@@ -37,7 +37,7 @@ internal static class Mcp
                 }
                 else if (method == "ping") Result(id, new { });
                 else if (!initialized) Error(id, -32000, "Initialize first.");
-                else if (method == "tools/list") Result(id, new { tools = Methods.Select(pair => new { name = pair.Key, description = Describe(pair.Value), inputSchema = Schema(pair.Value), annotations = new { readOnlyHint = pair.Value is "status" or "settings.get" or "models.list" or "models.info" or "models.verify" or "protection.status", destructiveHint = false, openWorldHint = pair.Value == "models.install" || pair.Value.StartsWith("protection.") && pair.Value != "protection.status" } }).ToArray() });
+                else if (method == "tools/list") Result(id, new { tools = Methods.Select(pair => new { name = pair.Key, description = Describe(pair.Value), inputSchema = Schema(pair.Value), annotations = new { readOnlyHint = pair.Value is "status" or "settings.get" or "models.list" or "models.info" or "models.verify" or "protection.status" or "cleanup.status", destructiveHint = false, openWorldHint = pair.Value is "models.install" or "cleanup.install" || pair.Value.StartsWith("protection.") && pair.Value != "protection.status" } }).ToArray() });
                 else if (method == "tools/call")
                 {
                     var name = parameters.GetProperty("name").GetString();
@@ -78,6 +78,11 @@ internal static class Mcp
         "models.info" => "Read exact model metadata, license, source revision and installed state.",
         "models.install" => "Explicitly download one pinned model from Hugging Face. Check status for progress and use models.cancel to cancel.",
         "models.verify" => "Check an existing model against its pinned size and SHA256.",
+        "cleanup.status" => "Read local cleanup availability, resident backend and installation progress. No transcripts.",
+        "cleanup.install" => "Explicitly download the pinned cleanup model and selected GPU/CPU runtime. Poll status for progress.",
+        "cleanup.cancel" => "Cancel cleanup setup and remove partial downloads.",
+        "cleanup.load" => "Warm the enabled cleanup model without capturing a microphone.",
+        "cleanup.unload" => "Release cleanup RAM/VRAM without deleting downloaded files.",
         "protection.status" => "Read local Discord protection status without credentials.",
         "protection.pause" => "Pause Discord protection and restore only Sona-owned voice changes.",
         "protection.resume" => "Resume Discord protection and reconcile currently active watched microphones.",
@@ -91,6 +96,7 @@ internal static class Mcp
             language = new { type = "string", @enum = new[] { "auto", "en", "fr" } }, engine = new { type = "string", @enum = new[] { "Auto", "FastCpu" } },
             model = new { type = "string", @enum = ModelCatalog.All.Select(m => m.Id).Prepend("auto").ToArray() }, shortcutMode = new { type = "string", @enum = new[] { "Hold", "Toggle" } },
             theme = new { type = "string", @enum = ThemeCatalog.All.Select(t => t.Id).ToArray() }, recordingDisplay = new { type = "string", @enum = new[] { "Panel", "Capsule" } }, modelIdleMinutes = new { type = "integer", minimum = 0, maximum = 240 },
+            cleanupEnabled = new { type = "boolean" }, cleanupTone = new { type = "string", @enum = new[] { "formal", "casual", "very casual" } }, cleanupEngine = new { type = "string", @enum = new[] { "Auto", "Cpu" } }, cleanupIdleMinutes = new { type = "integer", minimum = 0, maximum = 240 },
             style = new { type = "string", @enum = new[] { "Clean", "Verbatim", "Notes" } }, device = new { type = "integer", minimum = -1, maximum = 255 },
             autoInsert = new { type = "boolean" }, copyToClipboard = new { type = "boolean" }, closeToTray = new { type = "boolean" }, protectionEnabled = new { type = "boolean" }, silenceIncoming = new { type = "boolean" }, protectionReleaseDelayMs = new { type = "integer", minimum = 0, maximum = 5000 }, protectionShortcut = new { type = "string", maxLength = 64 }, watchedApps = new { type = "array", maxItems = 50, items = new { type = "string", maxLength = 160 } }
         }, additionalProperties = false };

@@ -47,10 +47,10 @@ public static class AgentProtocol
 public static class AgentSettings
 {
     // No credentials, transcripts, microphone start, paths or startup registration.
-    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.Device, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
+    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.CleanupEnabled, p.CleanupTone, p.CleanupEngine, p.CleanupIdleMinutes, p.Device, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
-        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 17) throw new ArgumentException("Settings must be a bounded JSON object.");
+        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 21) throw new ArgumentException("Settings must be a bounded JSON object.");
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
@@ -65,6 +65,10 @@ public static class AgentSettings
                 case "recordingDisplay": next.RecordingDisplay = Choice(property.Value, "Panel", "Capsule"); break;
                 case "theme": next.Theme = Choice(property.Value, ThemeCatalog.All.Select(t => t.Id).ToArray()); break;
                 case "shortcutMode": next.ShortcutMode = Choice(property.Value, "Hold", "Toggle"); break;
+                case "cleanupEnabled": next.CleanupEnabled = Boolean(property.Value); break;
+                case "cleanupTone": next.CleanupTone = Choice(property.Value, "formal", "casual", "very casual"); break;
+                case "cleanupEngine": next.CleanupEngine = Choice(property.Value, "Auto", "Cpu"); break;
+                case "cleanupIdleMinutes": if (!property.Value.TryGetInt32(out var cleanupMinutes) || cleanupMinutes is < 0 or > 240) throw new ArgumentException("Invalid cleanup idle timeout."); next.CleanupIdleMinutes = cleanupMinutes; break;
                 case "style": next.Style = Choice(property.Value, "Clean", "Verbatim", "Notes"); break;
                 case "device": if (!property.Value.TryGetInt32(out var device) || device is < -1 or > 255) throw new ArgumentException("Invalid device."); next.Device = device; break;
                 case "autoInsert": next.AutoInsert = Boolean(property.Value); break;

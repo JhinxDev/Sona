@@ -6,6 +6,11 @@ using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
 ProcessStartInfo Self(params string[] args) { var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true }; foreach (var arg in args) info.ArgumentList.Add(arg); return info; }
+if (args.Length == 2 && args[0] == "--cleanup-fixture")
+{
+    BoundedProcess.ContainApplication();
+    await CleanupIntegrationChecks.RunAsync(args[1]); return;
+}
 if (args.Length > 0 && args[0] == "--held-file")
 {
     using var held = new FileStream(args[1], FileMode.Create, FileAccess.ReadWrite, FileShare.None);
@@ -251,6 +256,7 @@ try
     finally { if (!parent.HasExited) { parent.Kill(true); await parent.WaitForExitAsync(); } }
 }
 finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+CleanupModelChecks.Pure(Check);
 Console.WriteLine(JsonSerializer.Serialize(new { Passed = passed.Count, Checks = passed, MicrophoneOpened = false, GlobalInputSent = false }));
 
 sealed class TestClock : TimeProvider

@@ -18,13 +18,16 @@ sample size and hardware/method context, not invented rankings. Other models
 remain explicitly unmeasured until tested. Medium and Large may exceed the
 bounded worker allocation and must report failure without damaging the draft.
 
-## Local text cleanup research
+## Optional local text cleanup
 
-The October 13 [local cleanup pilot](CLEANUP-RESEARCH.md) measures an openly
-licensed small language model on synthetic English/French/technical text.
-It is separate from installed 0.3.1 behavior. Consult its latency, fidelity
-limitations, protected-term pilot and implementation boundary before extending
-the production text pipeline.
+Sona 0.3.2 integrates the openly licensed 0.6B Spokenly Cleanup 1 model as an
+optional stage after speech transcription, including local WAV transcription.
+GPU is preferred when its runtime is installed, with an explicit CPU option.
+New users start with cleanup off; residency is bounded by a separate idle timeout.
+Verbatim/snippets bypass it, original text remains available, and failed
+preservation checks keep the original wording. The [cleanup guide](LOCAL-CLEANUP.md)
+records qualified synthetic GPU/CPU behavior and semantic limits. The earlier
+[CPU pilot](CLEANUP-RESEARCH.md) remains research evidence, not owner acceptance.
 
 ## Agent integration
 

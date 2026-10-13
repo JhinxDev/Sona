@@ -14,6 +14,10 @@ public sealed class Preferences
     public string ShortcutMode { get; set; } = "Hold";
     public bool KeepHistory { get; set; }
     public string Style { get; set; } = "Clean";
+    public bool CleanupEnabled { get; set; }
+    public string CleanupTone { get; set; } = "formal";
+    public string CleanupEngine { get; set; } = "Auto";
+    public int CleanupIdleMinutes { get; set; } = 10;
     public int Device { get; set; } = -1;
     public bool AutoInsert { get; set; } = true;
     public bool CopyToClipboard { get; set; }
@@ -43,6 +47,9 @@ public sealed class Preferences
         if (RecordingDisplay is not ("Panel" or "Capsule")) RecordingDisplay = "Capsule";
         Theme = ThemeCatalog.Resolve(Theme).Id;
         if (ShortcutMode is not ("Hold" or "Toggle")) ShortcutMode = "Hold";
+        if (CleanupTone is not ("formal" or "casual" or "very casual")) CleanupTone = "formal";
+        if (CleanupEngine is not ("Auto" or "Cpu")) CleanupEngine = "Auto";
+        CleanupIdleMinutes = Math.Clamp(CleanupIdleMinutes, 0, 240);
         if (Style is not ("Clean" or "Verbatim" or "Notes")) Style = "Clean";
         if (Device < -1 || Device > 255) Device = -1;
         ProtectionReleaseDelayMs = Math.Clamp(ProtectionReleaseDelayMs, 0, 5000);

@@ -1,11 +1,19 @@
 # Sona agent interface
 
-0.3.0 adds `theme` (eight catalog IDs), `recordingDisplay` (Panel/Capsule), and
+0.3.2 adds optional local cleanup controls: `cleanupEnabled` (boolean),
+`cleanupTone` (`formal`, `casual`, `very casual`), `cleanupEngine` (`Auto`, `Cpu`),
+and `cleanupIdleMinutes` (integer 0..240, zero Keep until quit). Defaults are
+off, formal, GPU preferred and 10 minutes. `Auto` prefers the installed CUDA
+runtime; with only a CPU runtime installed, it uses CPU. A failed CUDA worker
+does not silently fall back to CPU. Choose `Cpu` explicitly when needed.
+
+0.3.0 added `theme` (eight catalog IDs), `recordingDisplay` (Panel/Capsule), and
 `modelIdleMinutes` (integer 0..240, zero Keep until quit) to validated patches.
 `sona-agent models load` prepares the selected model asynchronously; poll status.
 `sona-agent models unload` releases it while idle without deleting its files.
 Status exposes `loadedModel`, `residentProcessId`, and the selected next-use model.
-MCP exposes 13 named tools, including the load/unload pair. No microphone-start,
+MCP exposes 18 named tools, including separate speech and cleanup management.
+No microphone-start,
 credential or transcript-export capability is added. A bounded internal resident
 worker uses a private randomized loopback route; it is not the agent API.
 
@@ -27,6 +35,12 @@ sona-agent status
 sona-agent models verify tiny
 sona-agent settings patch '{"model":"tiny","engine":"FastCpu"}'
 sona-agent models cancel
+sona-agent cleanup status
+sona-agent settings patch '{"cleanupEnabled":true,"cleanupEngine":"Auto","cleanupTone":"formal","cleanupIdleMinutes":10}'
+sona-agent cleanup install
+sona-agent cleanup load
+sona-agent cleanup unload
+sona-agent cleanup cancel
 sona-agent protection status
 sona-agent protection pause
 sona-agent protection resume
@@ -40,11 +54,22 @@ and busy dictation are rejected. Settings commits preserve active values if savi
 fails. Protection uses the same controller as the UI. Pausing restores only owned
 voice changes; resuming reconciles current watched microphone activity.
 
+Cleanup installation downloads the pinned model and selected portable runtime;
+poll `cleanup status` for `installing`, `percent` and `outcome`. Status also
+reports the confirmed resident `backend`, `processId`, `modelVramMiB` (GPU model
+weights only), worker release state and retained setup cleanup state. Cancel
+stops an active setup, or retries retained partial cleanup while idle. Load
+requires cleanup to be enabled; unload preserves downloaded files. Disabled
+cleanup and Verbatim release its worker. There is no transcript cleanup/export
+endpoint. [Local cleanup details](LOCAL-CLEANUP.md).
+
 Version 0.3.1 adds `copyToClipboard` as a validated boolean. It copies a
 completed dictation, including when focus changes, without pressing Enter.
 It defaults off for new installations and is enabled for the owner on request.
 
-Supported settings: `language`, `engine`, `model`, `shortcutMode`, `style`,
+Supported settings: `language`, `engine`, `model`, `modelIdleMinutes`, `theme`,
+`recordingDisplay`, `shortcutMode`, `style`, `cleanupEnabled`, `cleanupTone`,
+`cleanupEngine`, `cleanupIdleMinutes`,
 `device`, `autoInsert`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
 `protectionReleaseDelayMs`, `protectionShortcut`, `watchedApps`. Credential setup, transcript/history
 export and microphone capture are intentionally outside this API. A same-user
@@ -72,8 +97,9 @@ Add the installed full path of `sona-agent.exe` to any MCP-capable client:
 ```
 
 Negotiated protocol versions: 2025-11-25, 2025-06-18 and 2025-03-26. Named tools
-expose status, settings get/patch, model list/info/install/verify/cancel and
-protection status/pause/resume. Responses include structured JSON and compatible
+expose status, settings get/patch, model list/info/install/verify/cancel/load/unload,
+cleanup status/install/cancel/load/unload and protection status/pause/resume.
+Responses include structured JSON and compatible
 text content. Logs and errors must never pollute protocol stdout. Unknown methods
 and malformed/oversized messages receive JSON-RPC errors. This bounded server
 implements tools and ping, not resources, sampling or remote HTTP transport.

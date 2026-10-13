@@ -31,6 +31,17 @@ try
     try{$taskLockedPatch=Agent @('settings','patch','{"language":"en"}');Verify (-not $taskLockedPatch.ok) 'Unwritable preferences reject settings commit'}finally{$taskLock.Dispose()}
     $taskRead=Agent @('settings','get')
     Verify ($taskRead.data.language -eq 'fr') 'Rejected write preserves active settings'
+    Verify (-not $taskRead.data.cleanupEnabled -and $taskRead.data.cleanupEngine -eq 'Auto' -and $taskRead.data.cleanupTone -eq 'formal' -and $taskRead.data.cleanupIdleMinutes -eq 10) 'New installations keep optional cleanup off with GPU preference and a finite idle timeout'
+    $taskCleanupPatch=Agent @('settings','patch','{"cleanupEnabled":true,"cleanupTone":"casual","cleanupEngine":"Cpu","cleanupIdleMinutes":0}')
+    Verify ($taskCleanupPatch.ok -and $taskCleanupPatch.data.cleanupEnabled -and $taskCleanupPatch.data.cleanupTone -eq 'casual' -and $taskCleanupPatch.data.cleanupEngine -eq 'Cpu' -and $taskCleanupPatch.data.cleanupIdleMinutes -eq 0) 'Four cleanup settings round trip through validated agent patches'
+    $taskCleanupRejected=Agent @('settings','patch','{"cleanupIdleMinutes":241}')
+    Verify (-not $taskCleanupRejected.ok -and (Agent @('settings','get')).data.cleanupIdleMinutes -eq 0) 'Out-of-range cleanup timeout preserves active settings'
+    $taskCleanupStatus=Agent @('cleanup','status')
+    Verify ($taskCleanupStatus.ok -and $taskCleanupStatus.data.enabled -and -not $taskCleanupStatus.data.processId -and -not $taskCleanupStatus.data.modelVramMiB) 'Microphone-free UI testing never warms a cleanup worker or advertises GPU memory'
+    $taskCleanupCancel=Agent @('cleanup','cancel')
+    Verify ($taskCleanupCancel.ok -and -not $taskCleanupCancel.data.setupCleanupPending) 'Cleanup cancel also retries retained setup cleanup while idle'
+    $taskCleanupUnload=Agent @('cleanup','unload')
+    Verify ($taskCleanupUnload.ok -and -not $taskCleanupUnload.data.backend) 'Cleanup unload is safe without a resident worker'
     $taskInfo=[Diagnostics.ProcessStartInfo]::new($taskAgent)
     $taskInfo.ArgumentList.Add('--mcp');$taskInfo.UseShellExecute=$false;$taskInfo.CreateNoWindow=$true
     $taskInfo.RedirectStandardInput=$true;$taskInfo.RedirectStandardOutput=$true;$taskInfo.RedirectStandardError=$true
@@ -42,8 +53,10 @@ try
     $taskMcp.StandardInput.Close();$taskMcpOutput=$taskMcp.StandardOutput.ReadToEndAsync()
     if(-not $taskMcp.WaitForExit(20000)){$taskMcp.Kill();throw 'MCP smoke exceeded deadline'}
     $taskReplies=@($taskMcpOutput.GetAwaiter().GetResult().Split("`n",[StringSplitOptions]::RemoveEmptyEntries) | ForEach-Object{$_|ConvertFrom-Json})
-    Verify ($taskReplies.Count -eq 3 -and $taskReplies[0].result.protocolVersion -eq '2025-11-25' -and $taskReplies[1].result.tools.Count -eq 13) 'MCP stdio negotiates protocol and exposes named tools'
+    Verify ($taskReplies.Count -eq 3 -and $taskReplies[0].result.protocolVersion -eq '2025-11-25' -and $taskReplies[1].result.tools.Count -eq 18) 'MCP stdio negotiates protocol and exposes eighteen named tools'
     Verify ($taskReplies[2].result.structuredContent.ok -and $taskReplies[2].result.structuredContent.data.language -eq 'fr' -and -not $taskReplies[2].result.isError) 'MCP tool calls use the same live validated settings layer'
+    $taskMcpSettings=@($taskReplies[1].result.tools | Where-Object name -eq 'sona_settings_patch')[0].inputSchema.properties
+    Verify ($taskMcpSettings.cleanupEnabled.type -eq 'boolean' -and $taskMcpSettings.cleanupTone.enum.Count -eq 3 -and $taskMcpSettings.cleanupEngine.enum.Count -eq 2 -and $taskMcpSettings.cleanupIdleMinutes.maximum -eq 240) 'MCP publishes the same bounded cleanup settings contract'
     if($DownloadTiny)
     {
         $taskDownload=Agent @('models','install','tiny');Verify ($taskDownload.ok -and $taskDownload.data.accepted) 'Explicit Tiny model installation starts through the desktop service'

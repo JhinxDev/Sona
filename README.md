@@ -4,7 +4,8 @@
 
 Speak into a focused text field, review your words, and send them yourself.
 Sona runs Whisper on your computer, keeps the selected model warm between
-dictations, and can protect your Discord call while you record.
+dictations, optionally polishes your text locally, and can protect your Discord
+call while you record.
 
 Sona began with a simple frustration: dictation subscriptions and usage limits
 can get in the way of an everyday tool. The goal is a quiet Windows app that
@@ -13,7 +14,8 @@ agent workflows. Local dictation already has good alternatives; Sona focuses
 on this particular combination of native Windows UI, careful draft insertion,
 and call protection. [Compare the approaches](docs/ALTERNATIVES.md).
 
-**Private preview.** Version 0.3.1 has passed source and native fixture checks; live behavior still needs owner testing.
+**Private preview.** Version 0.3.2 adds optional local text polishing with GPU
+acceleration. Source and native fixture checks are separate from owner testing.
 There is no published binary download yet. Source and private packages remain
 separate from a public release.
 
@@ -39,6 +41,11 @@ separate from a public release.
 - **Avoid repeated loading.** One selected model stays resident until unload,
   a model switch, quit, or the idle timeout. The default is 10 minutes;
   Keep until quit is also available.
+- **Polish without a cloud service.** Optional Spokenly Cleanup 1 fixes
+  punctuation, fillers, repetition and spoken corrections. Choose Polished,
+  Casual or Lowercase formatting, prefer NVIDIA GPU/VRAM or choose CPU/RAM,
+  and keep the separate cleanup model warm with its own idle timeout.
+  Your original transcript remains available. [Setup and limits](docs/LOCAL-CLEANUP.md).
 - **Protect a Discord call.** Optionally mute Discord while Sona or a watched
   app records, with separate incoming-audio protection. Overlapping recordings
   share protection and manual mute/deafen choices are preserved.
@@ -99,6 +106,7 @@ Startup is opt in. Engine/model/CUDA files are not bundled in the app package.
 sona-agent status
 sona-agent models list
 sona-agent models install tiny
+sona-agent cleanup status
 sona-agent protection status
 sona-agent settings patch '{"language":"fr","shortcutMode":"Toggle"}'
 ```
@@ -116,9 +124,12 @@ saving is capped at 200 entries and stores no audio. Local transcription needs
 no Sona subscription and has no subscription word quota, but recordings are
 limited to 120 seconds and transcription requests to 90 seconds.
 
-The current Clean/Notes modes use deterministic rules. A separate local language
-model cleanup stage has been [benchmarked](docs/CLEANUP-RESEARCH.md), with promising
-latency and an observed mixed-language meaning error; it is not integrated yet.
+Clean/Notes retain their basic deterministic rules. The optional local cleanup
+stage adds a small language model; Verbatim and explicit snippets bypass it.
+It starts disabled on new installations. Names and literal code are protected,
+but a model can still change meaning, so the original transcript is retained.
+See [cleanup qualification](docs/LOCAL-CLEANUP.md) and the earlier
+[CPU feasibility study](docs/CLEANUP-RESEARCH.md).
 
 This preview targets Windows only. Medium, Turbo and Large require the
 separately installed CUDA engine. File transcription accepts short 16 kHz mono

@@ -16,7 +16,7 @@ public partial class MainWindow
     private int downloadPercent;
     private string downloadOutcome = "idle";
     private bool preferencesApplying;
-    private bool SettingsBusy => processing || recorder != null || shutdownPending || preferencesApplying || preparing || session?.State == SessionState.Recording;
+    private bool SettingsBusy => processing || recorder != null || shutdownPending || cleanupInstalling || preferencesApplying || preparing || session?.State == SessionState.Recording;
     private readonly Dictionary<string, TextBlock> modelStateLabels = new();
 
     private void RefreshModelCards()
