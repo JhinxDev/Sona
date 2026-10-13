@@ -14,8 +14,9 @@ agent workflows. Local dictation already has good alternatives; Sona focuses
 on this particular combination of native Windows UI, careful draft insertion,
 and call protection. [Compare the approaches](docs/ALTERNATIVES.md).
 
-**Private preview.** Version 0.3.2 adds optional local text polishing with GPU
-acceleration. Source and native fixture checks are separate from owner testing.
+**Private preview.** Version 0.3.3 keeps appearance choices saved immediately
+and refines the compact local-cleanup controls. Optional local text polishing
+supports GPU acceleration. Source and native fixture checks are separate from owner testing.
 There is no published binary download yet. Source and private packages remain
 separate from a public release.
 
@@ -49,8 +50,9 @@ separate from a public release.
 - **Protect a Discord call.** Optionally mute Discord while Sona or a watched
   app records, with separate incoming-audio protection. Overlapping recordings
   share protection and manual mute/deafen choices are preserved.
-- **Make it yours.** Eight original light/dark themes, bundled Inter typography,
-  Clean/Verbatim/Notes modes, vocabulary hints, corrections and snippets.
+- **Make it yours.** Eight original light/dark themes that save as you choose
+  them, bundled Inter typography, Clean/Verbatim/Notes modes, vocabulary hints,
+  corrections and snippets.
 - **Use your tools.** `sona-agent` provides JSON CLI commands and an MCP stdio
   interface for status, validated settings, model management and call protection.
 - **Check for updates when you choose.** Optional GitHub update checks run at

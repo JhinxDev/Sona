@@ -1,5 +1,15 @@
 # Sona design
 
+October 13, 0.3.3: the three TEXT CLEANUP selectors use the named SettingChoice
+style: 176 DIP wide, exactly 32 DIP tall, vertically centered in 48 DIP rows,
+with aligned right edges and 8 DIP above and below each control. The compact
+GPU / VRAM label has a tooltip explaining NVIDIA CUDA and the CPU alternative.
+Appearance changes commit only the chosen theme immediately. A failed write
+restores the prior selection and palette and reports the error; unrelated
+unsaved form choices still require Save preferences. General Save commits its
+candidate before updating active settings, so failed form edits cannot leak
+into a later theme save. Native layout/persistence proof is in VERIFICATION.md.
+
 October 13, 0.3.2: TEXT CLEANUP is a grouped Settings section using existing
 semantic brushes, Inter typography, row spacing and wrapping controls. It offers
 an explicit enable switch, three formatting choices, GPU/VRAM or CPU/RAM,

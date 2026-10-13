@@ -76,8 +76,13 @@ try{
         if((VisibleBounds 'CleanupEnabled')-and (VisibleBounds 'CleanupIdleChoice')-and (Element 'CleanupEnabled').Current.BoundingRectangle.Top-le ($taskWindow.Top+100)){break}
     }
     Verify ((VisibleBounds 'CleanupEnabled')-and (VisibleBounds 'CleanupIdleChoice')) 'Cleanup controls have visible bounds inside the Settings viewport'
-    $taskBounds=(Element 'CleanupEngineChoice').Current.BoundingRectangle
-    Verify ($taskBounds.Width-ge 180) 'Processing choices keep their full layout width'
+    $taskWindowBounds=[System.Windows.Automation.AutomationElement]::FromHandle($taskProcess.MainWindowHandle).Current.BoundingRectangle
+    $taskScale=$taskWindowBounds.Width / $(if($Compact){740}else{1000})
+    $taskChoiceBounds=@('CleanupToneChoice','CleanupEngineChoice','CleanupIdleChoice') | ForEach-Object{(Element $_).Current.BoundingRectangle}
+    Verify (@($taskChoiceBounds | Where-Object{[math]::Abs($_.Height/$taskScale-32)-gt 1-or [math]::Abs($_.Width/$taskScale-176)-gt 1}).Count-eq 0) 'All cleanup selectors share compact 32 DIP height and 176 DIP width at this DPI'
+    Verify ([math]::Abs($taskChoiceBounds[0].Right-$taskChoiceBounds[1].Right)-le 1-and [math]::Abs($taskChoiceBounds[1].Right-$taskChoiceBounds[2].Right)-le 1) 'Cleanup selectors align along one right edge'
+    Verify (($taskChoiceBounds[1].Top-$taskChoiceBounds[0].Bottom)/$taskScale-ge 12-and ($taskChoiceBounds[2].Top-$taskChoiceBounds[1].Bottom)/$taskScale-ge 12) 'Compact selectors leave visible breathing room between rows'
+    Choose 'CleanupToneChoice' 'Polished'; Choose 'CleanupEngineChoice' 'GPU / VRAM'; Choose 'CleanupIdleChoice' '10 minutes'
     Native @('ui','screenshot','-a',"$($taskProcess.Id)",'--output',(Join-Path $OutputDirectory 'cleanup-settings.png')) | Out-Null
     $taskStatus=Agent @('status'); $taskAbout=Native @('ui','get-property','AboutVersion','-a',"$($taskProcess.Id)")
     Verify ($taskAbout.properties.Name-eq ('Sona '+$taskStatus.data.version)) 'Cleanup Settings About agrees with the running version'

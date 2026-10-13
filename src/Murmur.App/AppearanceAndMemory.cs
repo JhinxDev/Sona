@@ -38,7 +38,30 @@ public partial class MainWindow
     }
     private void ThemeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (appearanceInitialized && !SettingsBusy && ThemeChoice.SelectedItem is ThemeDefinition selected) ThemeManager.Apply(selected.Id);
+        if (!appearanceInitialized || ThemeChoice.SelectedItem is not ThemeDefinition selected || selected.Id == preferences.Theme) return;
+        if (SettingsBusy) { RestoreSavedThemeChoice(); SettingsResult.Text = "Finish the current operation before changing appearance."; return; }
+        var next = System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(preferences))!;
+        next.Theme = selected.Id;
+        try
+        {
+            // Commit just the theme from active preferences. Other unsaved
+            // form choices remain untouched until Save preferences is used.
+            next.Save(preferencesPath);
+            preferences.Theme = next.Theme;
+            ThemeManager.Apply(preferences.Theme);
+            SettingsResult.Text = "Appearance saved.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RestoreSavedThemeChoice();
+            SettingsResult.Text = "Appearance could not be saved. Your previous theme is retained.";
+        }
+    }
+    private void RestoreSavedThemeChoice()
+    {
+        appearanceInitialized = false;
+        try { ThemeChoice.SelectedItem = ThemeCatalog.Resolve(preferences.Theme); }
+        finally { appearanceInitialized = true; }
     }
     private void DisplayChanged(object sender, RoutedEventArgs e)
     {

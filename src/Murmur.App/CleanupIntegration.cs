@@ -29,12 +29,12 @@ public partial class MainWindow
         Choose(CleanupToneChoice, preferences.CleanupTone); Choose(CleanupEngineChoice, preferences.CleanupEngine);
         Choose(CleanupIdleChoice, preferences.CleanupIdleMinutes.ToString());
     }
-    private void SaveCleanupPreferences()
+    private void ReadCleanupPreferences(Preferences next)
     {
-        preferences.CleanupEnabled = CleanupEnabled.IsChecked == true;
-        preferences.CleanupTone = (string)((ComboBoxItem)CleanupToneChoice.SelectedItem).Tag;
-        preferences.CleanupEngine = (string)((ComboBoxItem)CleanupEngineChoice.SelectedItem).Tag;
-        preferences.CleanupIdleMinutes = int.Parse((string)((ComboBoxItem)CleanupIdleChoice.SelectedItem).Tag);
+        next.CleanupEnabled = CleanupEnabled.IsChecked == true;
+        next.CleanupTone = (string)((ComboBoxItem)CleanupToneChoice.SelectedItem).Tag;
+        next.CleanupEngine = (string)((ComboBoxItem)CleanupEngineChoice.SelectedItem).Tag;
+        next.CleanupIdleMinutes = int.Parse((string)((ComboBoxItem)CleanupIdleChoice.SelectedItem).Tag);
     }
     private void InitializeCleanup()
     {

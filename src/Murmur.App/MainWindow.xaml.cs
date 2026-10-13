@@ -300,20 +300,37 @@ public partial class MainWindow : Window
         {
             if (SettingsBusy) { SettingsResult.Text = "Finish or cancel your current operation before changing preferences."; return; }
             var priorKeepHistory = preferences.KeepHistory;
-            var startup = StartWithWindows.IsChecked == true;
-            if (startup != preferences.Startup) Startup.Set(startup);
-            preferences.Language = (string)((ComboBoxItem)SpeechLanguage.SelectedItem).Tag;
-            preferences.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
-            preferences.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
-            preferences.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
-            preferences.AutoInsert = AutoInsert.IsChecked == true; preferences.CopyToClipboard = CopyToClipboard.IsChecked == true; preferences.CheckForUpdates = CheckUpdates.IsChecked == true; preferences.CloseToTray = CloseToTray.IsChecked == true; preferences.Startup = startup;
-            preferences.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
-            preferences.KeepHistory = KeepHistory.IsChecked == true;
-            preferences.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
-            preferences.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";
-            preferences.ModelIdleMinutes = int.Parse((string)((ComboBoxItem)ModelIdleChoice.SelectedItem).Tag);
-            SaveCleanupPreferences();
-            preferences.Save(preferencesPath);
+            var next = System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(preferences))!;
+            next.Language = (string)((ComboBoxItem)SpeechLanguage.SelectedItem).Tag;
+            next.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
+            next.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
+            next.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
+            next.AutoInsert = AutoInsert.IsChecked == true; next.CopyToClipboard = CopyToClipboard.IsChecked == true; next.CheckForUpdates = CheckUpdates.IsChecked == true; next.CloseToTray = CloseToTray.IsChecked == true; next.Startup = StartWithWindows.IsChecked == true;
+            next.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
+            next.KeepHistory = KeepHistory.IsChecked == true;
+            next.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
+            next.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";
+            next.ModelIdleMinutes = int.Parse((string)((ComboBoxItem)ModelIdleChoice.SelectedItem).Tag);
+            ReadCleanupPreferences(next);
+            var startupChanged = next.Startup != preferences.Startup;
+            if (startupChanged) Startup.Set(next.Startup);
+            try { next.Save(preferencesPath); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                if (startupChanged)
+                {
+                    try { Startup.Set(preferences.Startup); }
+                    catch (Exception restore) when (restore is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+                    { throw new IOException("Preferences could not be saved, and Windows startup could not be restored. Check Launch at startup before trying again.", restore); }
+                }
+                throw;
+            }
+            // Keep active preferences committed: a failed Save must not leak
+            // unsaved form values into a later theme-only save or dictation.
+            preferences.Language = next.Language; preferences.Engine = next.Engine; preferences.Style = next.Style; preferences.Device = next.Device;
+            preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CheckForUpdates = next.CheckForUpdates; preferences.CloseToTray = next.CloseToTray; preferences.Startup = next.Startup;
+            preferences.ShortcutMode = next.ShortcutMode; preferences.KeepHistory = next.KeepHistory; preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
+            preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes;
             ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
             RefreshModelCards(); modelPreparation = WarmAllSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();

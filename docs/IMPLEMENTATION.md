@@ -10,7 +10,7 @@ The primary owner executes the tightly coupled app work. The notification diagno
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Create reviewed private Git history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current candidate identity is Sona 0.3.2; internal Murmur namespaces/data paths preserve compatibility. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current candidate identity is Sona 0.3.3; internal Murmur namespaces/data paths preserve compatibility. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 Optional cleanup uses shared Core preservation rules and processing orchestration,
 one contained llama.cpp worker, pinned separately downloaded assets, and the same
@@ -19,5 +19,9 @@ from the Windows test executable against caller-provisioned verified runtimes.
 `tools/cleanup-ui-smoke.ps1` checks affected native controls at normal and compact
 sizes; `tools/agent-smoke.ps1` checks the live 18-tool/21-setting contract. Reuse
 unchanged speech, theme and update-recovery evidence rather than repeating it.
+
+`tools/theme-persistence-smoke.ps1` owns immediate appearance saves, relaunch,
+failed general/theme-save recovery, and preservation of unrelated unsaved form
+values. It uses a separate profile and disables microphone/startup control.
 
 Remaining strategic boundaries are optional cloud authentication/spend and owner live microphone/real-call/creative acceptance. A build or synthetic replay is not completion of those gates.

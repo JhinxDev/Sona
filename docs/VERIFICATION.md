@@ -1,5 +1,47 @@
 # Candidate verification
 
+## 0.3.3 compact controls and saved appearance, October 13
+
+The owner rejected the oversized local-cleanup selectors and reported Amethyst
+reverting after updates. The prior ThemeChanged handler applied a palette only
+as a preview; native reproduction selected Amethyst while both active and disk
+preferences still said charcoal. The update was faithfully loading that saved
+value. Theme selection now commits immediately without saving unrelated form
+edits. A write failure restores the prior selection and palette.
+
+The three cleanup selectors are exactly 32x176 DIP, centered with 8 DIP vertical
+space in each 48 DIP row and a shared right edge. Normal 1000x700 and minimum
+740x530 native fixtures each passed 15 affected checks. Both Settings screenshots
+were inspected; the values fit without clipping or filling the row. The short
+GPU / VRAM label retains an explanatory NVIDIA tooltip.
+
+A narrow review found that general Save mutated active preferences before the
+file commit. General Save now commits a cloned candidate first and copies only
+its changed form fields into active preferences after success. Startup is
+restored if its change preceded a failed file save; restoration failure is
+reported. The reviewer closed this finding from the repaired source.
+
+The maintained theme fixture passed 12 native checks: immediate theme save,
+unsaved-field preservation, actual relaunch, failed general Save leaving active
+and persisted settings intact, a later theme save preserving those values,
+failed theme write rollback, and successful retry. No microphone, global input
+or Discord connection was used. Earlier fixture failures were harness errors:
+WPF InvokePattern queues Click, so the file lock must remain until the handler
+reports its result; Windows reports a generic access-denied message. Failed
+evidence is retained and is not a product regression pass.
+
+Affected builds were warning/error free. The 256 Core checks pass with matching
+0.3.3 App/Agent versions; speech, cleanup runtime, measured timing, MCP and
+encrypted-update behavior are unchanged and their prior evidence is reused.
+Evidence: `E:/Temp/qazws/sona033-settings-repair-build.log`, `sona033-core.log`,
+`sona033-cleanup-ui-final/cleanup-ui-smoke.json`,
+`sona033-cleanup-ui-compact/cleanup-ui-smoke.json`, and
+`sona033-theme-verified/theme-persistence-smoke.json`.
+Owner theme-only restoration is recorded in
+`E:/Temp/qazws/sona033-owner-theme-before-update.json` without personal text.
+Installation/source identity and actual update readback remain a separate gate;
+personal visual acceptance remains the owner's test.
+
 ## 0.3.2 private installation and local cleanup, October 13
 
 The first qualified 0.3.2 update at source
