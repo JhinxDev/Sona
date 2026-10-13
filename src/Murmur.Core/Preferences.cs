@@ -6,6 +6,9 @@ public sealed record Snippet(string Trigger, string Expansion);
 public sealed class Preferences
 {
     public string Language { get; set; } = "auto";
+    public string Engine { get; set; } = "Auto";
+    public string ShortcutMode { get; set; } = "Hold";
+    public bool KeepHistory { get; set; }
     public string Style { get; set; } = "Clean";
     public int Device { get; set; } = -1;
     public bool AutoInsert { get; set; } = true;
@@ -23,6 +26,8 @@ public sealed class Preferences
     public void Normalize()
     {
         if (Language is not ("auto" or "en" or "fr")) Language = "auto";
+        if (Engine is not ("Auto" or "FastCpu")) Engine = "Auto";
+        if (ShortcutMode is not ("Hold" or "Toggle")) ShortcutMode = "Hold";
         if (Style is not ("Clean" or "Verbatim" or "Notes")) Style = "Clean";
         if (Device < -1 || Device > 255) Device = -1;
         Terms = (Terms ?? []).Where(x => !string.IsNullOrWhiteSpace(x) && x.Length <= 120).Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToList();

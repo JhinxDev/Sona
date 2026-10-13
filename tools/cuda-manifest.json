@@ -1,0 +1,202 @@
+{
+  "Release": "b5454",
+  "Archives": [
+    {
+      "Id": "Whisper",
+      "Name": "whisper-b5454-cuda11.8-x64.zip",
+      "URL": "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-win-cuda-11.8.0-x64.zip",
+      "Bytes": 284761231,
+      "SHA256": "e81c86c542be6e3d7b7245392d4e1c52ab6e5c61dbe38721754bc0ab59d4d027"
+    },
+    {
+      "Id": "Cublas",
+      "Name": "libcublas-11.11.3.6-windows-x64.zip",
+      "URL": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-11.11.3.6-archive.zip",
+      "Bytes": 420850025,
+      "SHA256": "67b0934a6359e4ee26fff823c356021589d392c4fd49ca12624f570edc08e2b9"
+    }
+  ],
+  "Model": {
+    "Name": "ggml-large-v3-turbo-q5_0.bin",
+    "URL": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+    "Bytes": 574041195,
+    "SHA256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"
+  },
+  "EngineFiles": [
+    {
+      "Name": "cublas64_11.dll",
+      "Archive": "Cublas",
+      "Member": "libcublas-windows-x86_64-11.11.3.6-archive/bin/cublas64_11.dll",
+      "Bytes": 88668160,
+      "SHA256": "8ca516b96b29c2fba2344909a896bc1cd7951f6cd11fe595a8a3929c02cccbed"
+    },
+    {
+      "Name": "cublasLt64_11.dll",
+      "Archive": "Cublas",
+      "Member": "libcublas-windows-x86_64-11.11.3.6-archive/bin/cublasLt64_11.dll",
+      "Bytes": 544070144,
+      "SHA256": "3d06ca4e4893adb7a153ecd23a540e92817c967312b44646d8c3f91b089196e6"
+    },
+    {
+      "Name": "cudart32_110.dll",
+      "Archive": "Whisper",
+      "Member": "Release/cudart32_110.dll",
+      "Bytes": 467456,
+      "SHA256": "b8bfc244dd0916ddf7b45e39c101f165a0d9f4846616eaf34336a2c374409408"
+    },
+    {
+      "Name": "cudart64_110.dll",
+      "Archive": "Whisper",
+      "Member": "Release/cudart64_110.dll",
+      "Bytes": 526848,
+      "SHA256": "ba5c2fb526c4ee4bb218ceb3fa5e8bfde89ce474f38711fdcce802549bf9fc6f"
+    },
+    {
+      "Name": "cuinj64_118.dll",
+      "Archive": "Whisper",
+      "Member": "Release/cuinj64_118.dll",
+      "Bytes": 1317376,
+      "SHA256": "b97f3becdfa7d5652b456377ced74766f5e21cb52d2d6edac5bc6114d786f040"
+    },
+    {
+      "Name": "ggml-base.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-base.dll",
+      "Bytes": 677376,
+      "SHA256": "d4c84248be354504b3ec9bc09b2cfcc58d1c310e5c3bee6a0409a0d7ed699714"
+    },
+    {
+      "Name": "ggml-cpu-alderlake.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-alderlake.dll",
+      "Bytes": 1004544,
+      "SHA256": "03f9bedce35659705fa9190b43b9f5b0ee3f03c64381ad6d93d2f502f7fcd246"
+    },
+    {
+      "Name": "ggml-cpu-cannonlake.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-cannonlake.dll",
+      "Bytes": 1047040,
+      "SHA256": "9b8380a17728eb917314268278296136de1c33419eb9cb3714ec80ecbd194535"
+    },
+    {
+      "Name": "ggml-cpu-cascadelake.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-cascadelake.dll",
+      "Bytes": 1045504,
+      "SHA256": "abea9a8e91e56cc71e6d71d430336dd091b21933f3f0c796dd4b1a12d4ac84a6"
+    },
+    {
+      "Name": "ggml-cpu-haswell.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-haswell.dll",
+      "Bytes": 1005568,
+      "SHA256": "2ebc77e22e2d75968a0122a4c967abbdf0bc8a822da31882dd5e635a9e08cb21"
+    },
+    {
+      "Name": "ggml-cpu-icelake.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-icelake.dll",
+      "Bytes": 1045504,
+      "SHA256": "0ca38623160bab59473f497f32d05c58e18300d9b4680d8996ac6d0adcb5a93e"
+    },
+    {
+      "Name": "ggml-cpu-sandybridge.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-sandybridge.dll",
+      "Bytes": 1001472,
+      "SHA256": "b9d3f59381fd7a742edea83ec95ce1a83e7648561e79857e7212a9281897cfc9"
+    },
+    {
+      "Name": "ggml-cpu-skylakex.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-skylakex.dll",
+      "Bytes": 1047040,
+      "SHA256": "9c87d468d758400e53f4efcb0e71ffcee98a7beffe5b588839d9bc7e60508b2b"
+    },
+    {
+      "Name": "ggml-cpu-sse42.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-sse42.dll",
+      "Bytes": 838656,
+      "SHA256": "7a7bcf3a60e18a100c5eb23b90a4e4c49f388a73620195d0ffe8eb6363b87504"
+    },
+    {
+      "Name": "ggml-cpu-x64.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cpu-x64.dll",
+      "Bytes": 839168,
+      "SHA256": "dedae238216ef7094e7f2cab1a08c4804f2efb0c551ca70e5f8d24d75c3b3044"
+    },
+    {
+      "Name": "ggml-cuda.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml-cuda.dll",
+      "Bytes": 571467776,
+      "SHA256": "cd8686d659f3d86130a7ef4b397b2aac57c50783c4af6a6cc816ccb139e2a51e"
+    },
+    {
+      "Name": "ggml.dll",
+      "Archive": "Whisper",
+      "Member": "Release/ggml.dll",
+      "Bytes": 60928,
+      "SHA256": "42520bbdd998be8efffc358c108c7dbdae79b78bb0ec2dd8ab96b1428b537a13"
+    },
+    {
+      "Name": "LICENSE",
+      "Archive": "Cublas",
+      "Member": "libcublas-windows-x86_64-11.11.3.6-archive/LICENSE",
+      "Bytes": 61498,
+      "SHA256": "b9ee12782ca117b887588d99ae1b8c24deb59105e05417fe28ffbd7a55896dd1"
+    },
+    {
+      "Name": "llama.dll",
+      "Archive": "Whisper",
+      "Member": "Release/llama.dll",
+      "Bytes": 2755072,
+      "SHA256": "2424c416b75d9dc4ef0ff99c47f12f9e14f9f01c05703a2e67489fa02a0685ab"
+    },
+    {
+      "Name": "nvrtc-builtins64_118.dll",
+      "Archive": "Whisper",
+      "Member": "Release/nvrtc-builtins64_118.dll",
+      "Bytes": 7909888,
+      "SHA256": "8642cd940445f0eb79ae73c04b3dfb8c8e61fc3aca191dc2239b28a9cb6964d8"
+    },
+    {
+      "Name": "nvrtc64_112_0.dll",
+      "Archive": "Whisper",
+      "Member": "Release/nvrtc64_112_0.dll",
+      "Bytes": 40629248,
+      "SHA256": "7a1d6c894d9db5f043e7cca5ea328bc4f29c45aa7af3f0dd1bde1f31f02b41bd"
+    },
+    {
+      "Name": "parakeet.dll",
+      "Archive": "Whisper",
+      "Member": "Release/parakeet.dll",
+      "Bytes": 571904,
+      "SHA256": "e99f11d1d6e5fac40c312b6c1cb41dec47b594128cca661314d3df19bfea1d1d"
+    },
+    {
+      "Name": "SDL2.dll",
+      "Archive": "Whisper",
+      "Member": "Release/SDL2.dll",
+      "Bytes": 2500096,
+      "SHA256": "de23db1694a3c7a4a735e7ecd3d214b2023cc2267922c6c35d30c7fc7370d677"
+    },
+    {
+      "Name": "whisper-cli.exe",
+      "Archive": "Whisper",
+      "Member": "Release/whisper-cli.exe",
+      "Bytes": 490496,
+      "SHA256": "80fe839a13f5fd70d7511e6f714498de12522e59da2a5333c6efea40fe05ee51"
+    },
+    {
+      "Name": "whisper.dll",
+      "Archive": "Whisper",
+      "Member": "Release/whisper.dll",
+      "Bytes": 1312256,
+      "SHA256": "d8eb92588ee9aa850150703828ce6890dee4a9991cd68c8da1ae1e162a089742"
+    }
+  ]
+}

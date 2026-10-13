@@ -11,10 +11,14 @@ public sealed class Transcriber
     public bool CleanupPending { get { lock (cleanupGate) return retained.Count > 0; } }
     public static string ScratchRoot => Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Murmur"), "scratch");
     public static string RuntimeRoot => Path.Combine(Environment.GetEnvironmentVariable("MURMUR_RUNTIME") ?? "E:\\DevelopmentTools\\local-dictation");
-    public bool Available => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe")) && File.Exists(Path.Combine(RuntimeRoot, "models", "ggml-small-q5_1.bin"));
+    private static bool CpuAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe")) && File.Exists(Path.Combine(RuntimeRoot, "models", "ggml-small-q5_1.bin"));
+    private static bool CudaAvailable => new[] { "whisper-cli.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name))) && File.Exists(Path.Combine(RuntimeRoot, "models", "ggml-large-v3-turbo-q5_0.bin"));
+    public bool Available => CpuAvailable || CudaAvailable;
+    public bool AvailableFor(Preferences preferences) => preferences.Engine == "FastCpu" ? CpuAvailable : Available;
     public async Task<string> RunAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
     {
-        if (!Available) throw new IOException("The local transcription engine is missing. Run setup-runtime.ps1.");
+        if (!AvailableFor(preferences)) throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1.");
+        var useCuda = preferences.Engine != "FastCpu" && CudaAvailable;
         var work = Path.Combine(ScratchRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
@@ -22,12 +26,13 @@ public sealed class Transcriber
             await File.WriteAllTextAsync(Path.Combine(work, "owner.marker"), "Murmur scratch v1", cancellation).ConfigureAwait(false);
             var audio = Path.Combine(work, "audio.wav");
             await File.WriteAllBytesAsync(audio, wav, cancellation).ConfigureAwait(false);
-            var info = new ProcessStartInfo(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe"));
-            var args = new[] { "-m", Path.Combine(RuntimeRoot, "models", "ggml-small-q5_1.bin"), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", "1", "-bo", "1", "-nf", "-sns", "-ng", "-oj", "-of", Path.Combine(work, "result") };
+            var info = new ProcessStartInfo(Path.Combine(RuntimeRoot, useCuda ? "whisper-cuda" : "whisper", "Release", "whisper-cli.exe"));
+            var args = new[] { "-m", Path.Combine(RuntimeRoot, "models", useCuda ? "ggml-large-v3-turbo-q5_0.bin" : "ggml-small-q5_1.bin"), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", useCuda ? "5" : "1", "-bo", useCuda ? "5" : "1", "-nf", "-sns", "-oj", "-of", Path.Combine(work, "result") };
             foreach (var arg in args) info.ArgumentList.Add(arg);
+            if (!useCuda) info.ArgumentList.Add("-ng");
             var prompt = string.Join(", ", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Written)).Distinct().Take(30));
             if (!string.IsNullOrEmpty(prompt)) { info.ArgumentList.Add("--prompt"); info.ArgumentList.Add(prompt); }
-            using var worker = new BoundedProcess(info);
+            using var worker = new BoundedProcess(info, useCuda ? 3072 : 1536);
             var stdout = worker.Process.StandardOutput.ReadToEndAsync(cancellation);
             var stderr = worker.Process.StandardError.ReadToEndAsync(cancellation);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -35,7 +40,8 @@ public sealed class Transcriber
             try { await worker.Process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { throw new IOException("Transcription reached the 90 second limit. Try a shorter recording."); }
             await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-            if (worker.Process.ExitCode != 0) throw new IOException("Local transcription failed. Your draft was left untouched.");
+            if (worker.Process.ExitCode != 0) throw new IOException(useCuda ? "GPU transcription is unavailable. Choose Lightweight CPU in Dictation Models and try again. Your draft was left untouched." : "Local transcription failed. Your draft was left untouched.");
+            if (useCuda && !(await stderr.ConfigureAwait(false)).Contains("using CUDA0 backend", StringComparison.Ordinal)) throw new IOException("The GPU engine did not use your GPU. Choose Lightweight CPU in Dictation Models or repair its local runtime.");
             using var result = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(work, "result.json"), cancellation).ConfigureAwait(false));
             return string.Join("", result.RootElement.GetProperty("transcription").EnumerateArray().Select(x => x.GetProperty("text").GetString())).Trim();
         }
@@ -87,4 +93,4 @@ public sealed class Transcriber
         }
     }
 }
-public sealed class ScratchCleanupException(Exception cause) : IOException("Windows is still holding temporary recording files. Murmur will remain open so cleanup can be retried.", cause);
+public sealed class ScratchCleanupException(Exception cause) : IOException("Windows is still holding temporary recording files. Sona will remain open so cleanup can be retried.", cause);

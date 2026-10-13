@@ -20,6 +20,23 @@ if (args.Length > 0 && args[0] == "--contain-parent")
 }
 var passed = new List<string>();
 void Check(bool condition, string label) { if (!condition) throw new Exception(label); passed.Add(label); Console.WriteLine("PASS " + label); }
+Exception? shortcutFailure = null; var shortcutStarted = false; var shortcutStopped = false; var shortcutCallbacks = 0;
+var shortcutTest = new Thread(() =>
+{
+    try
+    {
+        using var window = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Murmur shortcut lifecycle test") { WindowStyle = 0, Width = 1, Height = 1 });
+        using var hotkeys = new Hotkeys(window.Handle, _ => { shortcutCallbacks++; return false; }, () => shortcutCallbacks++, () => shortcutCallbacks++, () => shortcutCallbacks++, false);
+        shortcutStarted = hotkeys.ListenerAlive;
+        hotkeys.ResetBaseline(); hotkeys.Recording(false); hotkeys.Dispose(); shortcutStopped = !hotkeys.ListenerAlive;
+    }
+    catch (Exception ex) { shortcutFailure = ex; }
+}) { IsBackground = true };
+shortcutTest.SetApartmentState(ApartmentState.STA); shortcutTest.Start();
+if (!shortcutTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Shortcut listener lifecycle test exceeded six seconds");
+if (shortcutFailure != null) throw new Exception("Native shortcut listener test failed", shortcutFailure);
+Check(shortcutStarted, "Dedicated native keyboard hook and message timer initialize without a microphone");
+Check(shortcutStopped && shortcutCallbacks == 0, "Shortcut reset and disposal stop the listener without starting capture or sending input");
 var time = new TestClock(); var capture = new FakeCapture();
 using (var recorder = new Recorder(_ => capture, time))
 {

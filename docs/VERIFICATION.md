@@ -1,23 +1,29 @@
 # Candidate verification
 
-2026-10-12, Windows x64. Ryzen 9 7900X, 31.66 GiB RAM, RTX 4080 SUPER; the candidate is CPU-only and does not allocate GPU model memory.
+October 12, 2026, Windows x64. Sona 0.1.1 is a renamed/rebuilt candidate; Murmur 0.1.0 at source 20655f65 is retained as recovery history. Running old0.1.0 did not implement Ctrl+Win, explaining the owner's repeated no-op. Do not call a source build installed until its versioned receipt and actual running executable agree.
 
-## Passed
+## Current automated scope
 
-- Warning-free native .NET 8 WPF build, locked NAudio 2.2.1 dependencies, no known NuGet advisory reported.
-- 24 Core checks: session cancellation/duplicates, original retention, literal/code preservation, conservative bilingual edits, exact snippets, malformed preferences, separate vocabulary hints/replacements and persistence.
-- 17 Windows checks with fake capture and injected input sink: spontaneous/errorless stop, stalled input, silent input, disposal, final-focus cancellation, focus drift and newline rejection; inherited job containment, held-audio cleanup, persistent-lock recovery, and abrupt parent exit with no orphan worker. No live microphone or input was used.
-- 10 native UI checks: no-mic test mode, accessible selected-tab controls, native vocabulary save/relaunch, clean close, active file replay worker creation, quit with worker/audio removal. The first native run exposed an asynchronous save receipt; the maintained test now waits for it.
-- Integrated correctness review's five initial and two follow-up findings repaired. Tray cleanup failure now shows the existing nonactivating window so retained-audio notices are visible.
+Warning-free .NET 8 build; 113 Core checks cover text/session safety, side-aware hold/toggle admission, queued release/cancellation/reset, preference persistence, lossless snippet encoding and bounded history search/storage. 19 Windows checks cover real hidden hook initialization/disposal with no capture, fake-capture disconnect/stall/silence, final-focus cancellation, containment and audio cleanup/recovery/abrupt-exit worker lifetime. Locked NAudio 2.2.1 audit reports no known advisories from its configured NuGet feed.
 
-## Measured ASR candidate
+20 checks in `tools/native-smoke.ps1` verify isolated disabled-mic mode, the capsule, prepared harmless text and retention of the prior unsent draft, vocabulary add/duplicate/correction, snippet add/edit/delete, relaunch persistence, UI-saved Toggle/history opt-in, searchable loaded synthetic history, opening without automatic insertion, and clearing saved history while preserving the current draft. Exact evidence is outside the Vault under `E:/Temp/qazws/local-dictation-build`; preserve failed runs. Test isolation is data-root scoped and has a 180-second deadline. Compact mode uses `--test-ui --compact` at the app's own DIP dimensions.
 
-whisper.cpp release `b5454`, commit `d1be6fde11ac6e0407606b4e42fe72d34add8037`; multilingual `ggml-small-q5_1.bin`, 190,085,487 bytes, SHA256 `ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb`. CPU six threads, beam/best-of one, worker exits after each request. Process memory ceiling 1.5 GiB, transcription deadline 90 seconds, intentional recording limit 120 seconds, stalled capture feedback after five seconds.
+Earlier integrated review repairs include paired shortcut release/watchdog handling, snippet Windows-path/newline/delimiter corruption, revocable Toggle admission during target capture, delayed quick-tap delivery, legacy Run ownership/migration, and orderly draft transfer. A guarded update passes draft/original only through the child process environment, clears it before worker creation, and reports only lengths/hashes. It never writes owner text into a receipt, clipboard or command line.
 
-Three synthetic English SAPI fixtures had exact case-insensitive expected words: 5.12 to 6.025 seconds of speech, 3.217 to 3.323 seconds of transcription, sampled worker peak 367.02 to 367.08 MiB. One 1.054-second French phrase took 1.663 seconds, 366.58 MiB. French source: [LoquaxFR, faire des phrases, CC BY 4.0](https://commons.wikimedia.org/wiki/File:LL-Q150_(fra)-LoquaxFR-faire_des_phrases.wav); original SHA256 `44eadad85313d26dcdd469011fe675685c9697e95df0c9794bee879e2edfcfdc`.
+## Licensed corpus evidence reused
 
-After a first native replay the app used about 135 MiB working set and 96 MiB private memory. This single sample does not establish stable idle or long-session behavior. Fixtures, receipts and failed-run repair evidence are retained under `E:/Temp/qazws/local-dictation-build`. Unchanged ASR fixtures were reused; they were not rerun to inflate confidence.
+Google FLEURS CC BY 4.0, pinned revision `70bb2e84b976b7e960aa89f1c648e09c59f894dd`: first eight distinct transcript IDs in archive order for French and English, no outcome-based selection. Public fixture/provenance and original failed runs remain outside source.
+
+| Engine | French WER / median latency | English WER / median latency |
+| --- | --- | --- |
+| Small q5_1 CPU | 38/232, 16.38%, 3.2705 s | 14/156, 8.97%, 3.244 s |
+| Turbo requested GPU, actual CPU fallback | 27/232, 11.64%, 15.351 s | 9/156, 5.77%, 15.615 s |
+| Turbo CUDA, beam/best-of 5 | 23/232, 9.91%, 0.9025 s | 9/156, 5.77%, 0.81 s |
+
+True CUDA logs establish CUDA0 for all 16 fixtures. Worker working set sampled near 367 MiB, peak job commit about 1979 MiB, with roughly 1 GiB device-wide VRAM delta. The initial 1.5 GiB GPU job failed allocation; the finite 3 GiB rerun passed. NVIDIA DLLs are not Authenticode signed; provenance uses published download/member SHA256 and the packaged NVIDIA license. This is not comprehensive vulnerability clearance. One French case still has substantive errors, and strict WER includes number/name formatting differences. No corpus result establishes personal Québec/mixed/noisy dictation.
+
+GPU engine and model profiles remain unchanged by the Sona UI/rename. Reuse `benchmark-fleurs-turbo-cuda-search5-3g.json`, CPU/UTF8-rescore receipts and production French replay/worker/audio cleanup evidence. Do not rerun the corpus solely to increase check counts.
 
 ## Required owner proof
 
-Personal English, French and mixed speech; actual Codex draft insertion/no submission/readback; clipboard preservation; held-modifier Esc, focus changes and duplicates; microphone changes/unplug and sleep/resume; Hush ducking/restoration in a real owner-started call; creative usability. See `tools/owner-test.md`. Do not call the project complete or accepted before those results.
+Actual installed-version physical Ctrl+Win Hold/Toggle, visible capsule and focus retention; Codex unsent insertion/no duplicate and intact clipboard; English/French/mixed microphone speech; held-modifier Esc; focus/device/sleep behavior; Hush's Sona.exe recognition and real-call mute/restoration; owner visual/usability acceptance. See `tools/owner-test.md`. Technical proof, installation and acceptance stay distinct.

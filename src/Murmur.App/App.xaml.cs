@@ -10,11 +10,17 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        single = new Mutex(true, "Local\\Murmur-" + Environment.UserName, out var created);
+        var test = e.Args.Contains("--test-ui");
+        var testData = Environment.GetEnvironmentVariable("MURMUR_DATA");
+        if (test && string.IsNullOrWhiteSpace(testData)) { Shutdown(2); return; }
+        var testScope = test ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(System.IO.Path.GetFullPath(testData!))))[..16] : "";
+        var mutexName = test ? "Local\\Murmur-ui-" + testScope : "Local\\Murmur-" + Environment.UserName;
+        var openName = test ? mutexName + "-open" : "Local\\Murmur-open-" + Environment.UserName;
+        single = new Mutex(true, mutexName, out var created);
         ownsMutex = created;
         if (!created)
         {
-            if (!e.Args.Contains("--start-hidden")) { try { using var signal = EventWaitHandle.OpenExisting("Local\\Murmur-open-" + Environment.UserName); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { } }
+            if (!e.Args.Contains("--start-hidden")) { try { using var signal = EventWaitHandle.OpenExisting(openName); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { } }
             Shutdown(); return;
         }
         global::Murmur.App.Windows.BoundedProcess.ContainApplication();
@@ -22,7 +28,7 @@ public partial class App : Application
         Audio.Transcriber.CleanupAbandoned();
         var main = new MainWindow(e.Args);
         MainWindow = main;
-        open = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\Murmur-open-" + Environment.UserName);
+        open = new EventWaitHandle(false, EventResetMode.AutoReset, openName);
         openWait = ThreadPool.RegisterWaitForSingleObject(open, (_, _) => Dispatcher.BeginInvoke(() => { main.Show(); main.WindowState = WindowState.Normal; main.Activate(); }), null, Timeout.Infinite, false);
         if (e.Args.Contains("--start-hidden")) { main.ShowActivated = false; main.Show(); main.Hide(); }
         else main.Show();

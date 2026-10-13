@@ -1,0 +1,96 @@
+namespace Murmur.Core;
+
+public enum HoldAction { None, Begin, Finish, Cancel }
+public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false);
+
+// Only current physical down-state, never typed text or key history. One listener
+// thread advances this reducer; the UI reads only the admitted generation.
+public sealed class HoldGesture
+{
+    private readonly bool[] down = new bool[256];
+    private long generation;
+    private long current;
+    private long due;
+    private bool arming;
+    private bool holding;
+    private bool draining;
+    private bool latched;
+    private bool toggleGesture;
+    private long pendingToggle;
+    public long PendingToggle => Interlocked.Read(ref pendingToggle);
+    public bool ConsumeToggle(long token) => Interlocked.CompareExchange(ref pendingToggle, 0, token) == token;
+    public long Current => Interlocked.Read(ref current);
+    private bool Control => down[0xA2] || down[0xA3];
+    private bool Windows => down[0x5B] || down[0x5C];
+    private bool Other { get { for (var key = 0; key < down.Length; key++) if (down[key] && key is not (0xA2 or 0xA3 or 0x5B or 0x5C)) return true; return false; } }
+    private static int Normalize(int key) => key switch { 0x11 => 0xA2, 0x10 => 0xA0, 0x12 => 0xA4, _ => key };
+    public void Baseline(IEnumerable<int> pressed)
+    {
+        Array.Clear(down);
+        foreach (var key in pressed.Select(Normalize).Where(x => x >= 0 && x < 256)) down[key] = true;
+        Invalidate();
+    }
+    public void Invalidate()
+    {
+        Interlocked.Exchange(ref current, 0); Interlocked.Exchange(ref pendingToggle, 0); arming = holding = false;
+        draining = Control || Windows; latched = latched && draining;
+    }
+    public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false)
+    {
+        key = Normalize(key);
+        if (injected || key < 0 || key >= 256) return default;
+        var repeat = pressed && down[key];
+        if (repeat) return new(HoldAction.None, generation, latched && key is (0x5B or 0x5C));
+        down[key] = pressed;
+        if (PendingToggle != 0 && pressed && Other)
+        {
+            var token = PendingToggle; Invalidate();
+            return new(HoldAction.Cancel, token, Toggle: true);
+        }
+        if (draining)
+        {
+            if (!Control && !Windows) { draining = false; latched = false; }
+            return default;
+        }
+        if (arming || holding)
+        {
+            if (!Control || !Windows || Other)
+            {
+                var action = holding ? (Other ? HoldAction.Cancel : HoldAction.Finish) : HoldAction.None;
+                var token = generation;
+                if (toggleGesture && !Other)
+                {
+                    Interlocked.Exchange(ref current, 0); arming = holding = false;
+                    draining = Control || Windows; latched = latched && draining;
+                }
+                else Invalidate();
+                return new(action, token, Toggle: toggleGesture);
+            }
+            return default;
+        }
+        if (Control && Windows && Other) { draining = true; return default; }
+        if (Control && Windows && !Other)
+        {
+            if (PendingToggle != 0) { var pending = PendingToggle; Invalidate(); return new(HoldAction.Cancel, pending, Toggle: true); }
+            arming = latched = true; due = milliseconds + 200;
+            toggleGesture = toggle;
+            Interlocked.Exchange(ref current, ++generation);
+            if (toggle) { arming = false; holding = true; Interlocked.Exchange(ref pendingToggle, generation); return new(HoldAction.Begin, generation, Toggle: true); }
+        }
+        return default;
+    }
+    public HoldChange Tick(long milliseconds)
+    {
+        if (!arming || milliseconds < due) return default;
+        arming = false; holding = true;
+        return new(HoldAction.Begin, generation);
+    }
+    public HoldChange Reconcile(long admittedGeneration, bool physicalChord)
+    {
+        // A normal release revokes Current before its terminal action reaches the
+        // UI. Reconciliation must not replace that already queued Finish.
+        if (Current != admittedGeneration || physicalChord) return default;
+        Invalidate();
+        return new(HoldAction.Cancel, admittedGeneration);
+    }
+}

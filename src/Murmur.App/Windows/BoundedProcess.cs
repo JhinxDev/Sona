@@ -10,11 +10,11 @@ public sealed class BoundedProcess : IDisposable
     {
         if (applicationJob != 0) return;
         var ownerJob = CreateJobObject(0, null);
-        var limits = new ExtendedLimit { Basic = new BasicLimit { Flags = 0x2000 | 0x100 }, ProcessMemory = (nuint)(1536L * 1024 * 1024) };
+        var limits = new ExtendedLimit { Basic = new BasicLimit { Flags = 0x2000 | 0x100 }, ProcessMemory = (nuint)(3072L * 1024 * 1024) };
         if (ownerJob == 0 || !SetInformationJobObject(ownerJob, 9, ref limits, (uint)Marshal.SizeOf<ExtendedLimit>()) || !AssignProcessToJobObject(ownerJob, GetCurrentProcess()))
         {
             if (ownerJob != 0) CloseHandle(ownerJob);
-            throw new IOException("Windows worker containment is unavailable. Murmur cannot start safely.");
+            throw new IOException("Windows worker containment is unavailable. Sona cannot start safely.");
         }
         // Deliberately retained until OS process exit. CreateProcess children inherit this
         // non-breakaway job atomically, before any per-operation job assignment.
@@ -22,12 +22,13 @@ public sealed class BoundedProcess : IDisposable
     }
     public static bool InApplicationJob(nint process) => applicationJob != 0 && IsProcessInJob(process, applicationJob, out var member) && member;
     public Process Process { get; }
-    public BoundedProcess(ProcessStartInfo info)
+    public BoundedProcess(ProcessStartInfo info, int memoryMiB = 1536)
     {
+        if (memoryMiB is not (1536 or 3072)) throw new ArgumentOutOfRangeException(nameof(memoryMiB));
         if (applicationJob == 0) throw new IOException("Application worker containment was not initialized.");
         job = CreateJobObject(nint.Zero, null);
         if (job == 0) throw new System.ComponentModel.Win32Exception();
-        var limits = new ExtendedLimit { Basic = new BasicLimit { Flags = 0x2000 | 0x100 }, ProcessMemory = (nuint)(1536L * 1024 * 1024) };
+        var limits = new ExtendedLimit { Basic = new BasicLimit { Flags = 0x2000 | 0x100 }, ProcessMemory = (nuint)((long)memoryMiB * 1024 * 1024) };
         if (!SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf<ExtendedLimit>())) { CloseHandle(job); throw new System.ComponentModel.Win32Exception(); }
         info.CreateNoWindow = true; info.UseShellExecute = false; info.RedirectStandardOutput = true; info.RedirectStandardError = true;
         Process = new Process { StartInfo = info };
