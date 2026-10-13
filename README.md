@@ -116,6 +116,10 @@ saving is capped at 200 entries and stores no audio. Local transcription needs
 no Sona subscription and has no subscription word quota, but recordings are
 limited to 120 seconds and transcription requests to 90 seconds.
 
+The current Clean/Notes modes use deterministic rules. A separate local language
+model cleanup stage has been [benchmarked](docs/CLEANUP-RESEARCH.md), with promising
+latency and an observed mixed-language meaning error; it is not integrated yet.
+
 This preview targets Windows only. Medium, Turbo and Large require the
 separately installed CUDA engine. File transcription accepts short 16 kHz mono
 PCM WAVs. Accuracy and speed depend on the model, hardware, language and audio;
