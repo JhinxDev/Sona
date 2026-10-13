@@ -30,14 +30,21 @@ public partial class MainWindow
             var active = Transcriber.SelectedModel(preferences) == model.Id;
             var loaded = transcriber.LoadedModel == model.Id;
             var downloading = downloadingModel == model.Id;
-            var row = new Grid { Margin = new Thickness(16, 13, 16, 13) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            var row = new Grid { Margin = new Thickness(20), UseLayoutRounding = true };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(94) });
-            // Original typographic provider mark, deliberately not an OpenAI logo.
-            var mark = new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 0, 0), ToolTip = "OpenAI Whisper models. Original Sona provider mark; not an official logo." };
+            // Original speech waveform badge; provider identity stays in the text.
+            var mark = new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, ToolTip = "OpenAI Whisper models. Original Sona waveform; not an official provider logo." };
             mark.SetResourceReference(Border.BackgroundProperty, "Inset"); mark.SetResourceReference(Border.BorderBrushProperty, "Line");
-            mark.Child = ModelText("O", 12, false); ((TextBlock)mark.Child).HorizontalAlignment = HorizontalAlignment.Center; ((TextBlock)mark.Child).VerticalAlignment = VerticalAlignment.Center;
+            var waveform = new System.Windows.Shapes.Path
+            {
+                Width = 26, Height = 24, Stretch = Stretch.None,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                Data = Geometry.Parse("M2,9 L2,15 M7.5,5 L7.5,19 M13,2 L13,22 M18.5,6 L18.5,18 M24,10 L24,14"),
+                StrokeThickness = 2.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
+            };
+            waveform.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "Ink"); mark.Child = waveform;
             AutomationProperties.SetName(mark, "OpenAI Whisper provider"); row.Children.Add(mark);
 
             var identity = new StackPanel { Margin = new Thickness(0, 0, 12, 0) }; Grid.SetColumn(identity, 1); row.Children.Add(identity);

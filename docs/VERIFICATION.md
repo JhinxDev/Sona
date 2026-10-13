@@ -1,5 +1,41 @@
 # Candidate verification
 
+## 0.3.1 qualification, October 13
+
+The combined physical Ctrl+Win gesture supports hold/release and two quick taps
+for hands-free followed by one tap to finish. Injected events are rejected;
+interrupted/expired taps, delayed admission and listener cleanup have focused
+regressions. Double-tap while the insertion test is prepared cannot open the
+microphone. The consolidated gate passed 231 core and 28 Windows checks with
+zero compiler warnings/errors and no reported vulnerable NuGet dependencies.
+No real microphone or global synthetic input was used by these checks.
+
+Native appearance proof passed ten affected display/version/model cases. Model
+badges and both measured-waveform previews were inspected visually. Three native
+showcase screenshots use a separate profile with synthetic draft text, no owner
+vocabulary, microphone capture, credentials or call state. Eight unchanged theme
+checks from 0.3.0 remain applicable. Screenshots are illustrations, not speed or
+accuracy benchmarks.
+
+Clipboard backup is explicit, default-off and exposed through UI/CLI/MCP.
+The owner requested it enabled. The default watched list now contains ChatGPT
+and Codex identities only, preserving direct protection for Sona itself.
+The local whisper-server hint list is bounded to sixty unique entries; vocabulary
+storage remains bounded to two hundred. Other call platforms are not supported.
+
+GitHub release checks use an optional startup/12-hour poll of public metadata,
+a total ten-second deadline, a 64 KiB bound, strict stable-version and release URL
+validation, no credentials or redirects, and no automatic installation. Eighteen
+offline parser checks cover malformed, foreign and prerelease metadata. Until
+the repository has a public release, a 404 is reported as unavailable, not current.
+No account database or hosting is required. Owner live hold/double-tap, changed
+focus clipboard paste and real Discord restoration remain physical acceptance.
+
+The GitHub repository was renamed to JhinxDev/Sona and About metadata populated.
+It remains private. MIT applies to original source, with separate third-party
+notices. Private source/package verification is not a public distribution claim.
+
+
 ## Installed 0.3.0 readback and recovery limitation
 
 Installed source is `5e9cec5693e57e7d3d01fcf9eece4b25964f2486`; all 26 package

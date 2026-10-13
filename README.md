@@ -1,122 +1,137 @@
 # Sona
 
-0.3.0 keeps one selected local model resident for responsive dictation, with a
-10-minute default idle timeout, Keep until quit, and explicit Load/Unload actions.
-Switching models releases the previous worker. Panel and Capsule displays use
-measured microphone envelopes with smooth animation. Eight original themes are
-grouped into five dark and three light choices. The sidebar uses a theme-aware
-vector mark and bundled Inter fonts; sidebar/About versions share assembly data.
+**Local voice dictation for Windows, with a draft you stay in control of.**
 
-The speech backends currently supported are the six local Whisper profiles below.
-Parakeet/Voxtral and cloud speech providers are not selectable integrations yet.
-ChatGPT subscription sharing's current preview explicitly excludes audio input
-and the transcription API; it cannot fund speech transcription in Sona.
-[Official preview limits](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
-No account, paid cloud calls or background upload is enabled by these changes.
+Speak into a focused text field, review your words, and send them yourself.
+Sona runs Whisper on your computer, keeps the selected model warm between
+dictations, and can protect your Discord call while you record.
 
-For a later verified private package, use `tools/upgrade.ps1 -PackageDirectory
-<package> -ProcessId <Sona PID>`. It requires an idle visible app, preserves the
-current draft through an encrypted pre-quit checkpoint, and keeps that checkpoint
-if the update fails. Direct `install.ps1` is for installation when Sona is already
-closed. See verification for the initial 0.3.0 recovery limitation.
+Sona began with a simple frustration: dictation subscriptions and usage limits
+can get in the way of an everyday tool. The goal is a quiet Windows app that
+uses your own hardware, needs no Sona account, and fits into your writing and
+agent workflows. Local dictation already has good alternatives; Sona focuses
+on this particular combination of native Windows UI, careful draft insertion,
+and call protection. [Compare the approaches](docs/ALTERNATIVES.md).
 
-Local Windows dictation with editable drafts, a compact voice bar, downloadable
-Whisper models, Discord call protection and CLI/MCP access. No Sona account or
-subscription is required. Hold **Ctrl + Windows** to record and release to finish,
-or choose **Toggle** in Settings. **Esc** cancels. Sona inserts an unsent draft
-and never presses Enter to submit it. Closing the window keeps it in the tray.
+**Private preview.** Version 0.3.1 has passed source and native fixture checks; live behavior still needs owner testing.
+There is no published binary download yet. Source and private packages remain
+separate from a public release.
 
-The owner accepted Sona 0.1.1's dark sidebar and grouped settings. Version 0.3.0
-extends that interface. Source qualification, installed behavior and physical
-acceptance are separate; see [verification](docs/VERIFICATION.md).
+![Sona Home with a sample editable draft](docs/images/sona-home.png)
 
-## Dictation and models
+## What Sona does
 
-Open Sona from Start and focus an editable composer. Home owns the current draft;
-Settings, Modes, Dictation Models, Transcribe File, History, Vocabulary and Snippets
-have dedicated pages. Clean, Verbatim and Notes control text cleanup. Recognition
-hints, heard-as corrections and whole-utterance snippets have separate records.
+- **Dictate without submitting.** Hold Ctrl + Windows and release to finish,
+  or double-tap the combination to start hands-free recording and tap once to
+  stop. This combined mode is called Hold / double-tap; the legacy Toggle mode
+  also remains available. Esc cancels. Sona never presses
+  Enter to send your message.
+- **Keep your draft.** Home has an editable result and its original text.
+  Focus changes preserve the draft instead of inserting into a different field.
+  Optionally copy completed dictation to the clipboard; this starts off by
+  default and can be enabled in Settings.
+- **See the recording.** Choose Panel or Capsule, with measured microphone
+  levels, elapsed time, stop/cancel controls, and the captured target app name.
+- **Choose your local model.** Tiny, Base, Small, Medium, Large v3 Turbo and
+  Large v3 are six Whisper profiles, executed by whisper.cpp. Downloads are
+  explicit and checked against pinned sizes and hashes. Model selection and
+  residency are shown separately.
+- **Avoid repeated loading.** One selected model stays resident until unload,
+  a model switch, quit, or the idle timeout. The default is 10 minutes;
+  Keep until quit is also available.
+- **Protect a Discord call.** Optionally mute Discord while Sona or a watched
+  app records, with separate incoming-audio protection. Overlapping recordings
+  share protection and manual mute/deafen choices are preserved.
+- **Make it yours.** Eight original light/dark themes, bundled Inter typography,
+  Clean/Verbatim/Notes modes, vocabulary hints, corrections and snippets.
+- **Use your tools.** `sona-agent` provides JSON CLI commands and an MCP stdio
+  interface for status, validated settings, model management and call protection.
+- **Check for updates when you choose.** Optional GitHub update checks run at
+  startup and every 12 hours. They need no account and never install automatically.
+  An unavailable private release endpoint means no public release is available,
+  not that you need to sign in.
 
-Dictation Models offers Tiny, Base, Small, Medium, Large v3 Turbo and Large v3.
-Explicit downloads show progress, support cancellation, and require pinned size
-and SHA256. Differing existing files are preserved. Use model verifies before
-selection and prepares the resident worker; downloading alone never switches it.
-Download size is not memory use. Medium/Turbo/Large need the separately installed
-CUDA engine. Workers have bounded time/memory and unload after each utterance;
-failure leaves the previous draft intact.
+![Sona Dictation Models with local Whisper profiles](docs/images/sona-models.png)
 
-Only Small CPU and Turbo CUDA have measured Sona benchmarks: eight licensed
-French and eight English FLEURS clips. Other models are clearly unmeasured. Tiny
-passed a download/verification/selection and one French file-replay pilot, which
-is not an accuracy benchmark. [Benchmark context](docs/VERIFICATION.md).
+## Start from source
 
-History stays in memory by default. Explicit local text saving is capped at 200
-entries and stores no audio. Turning saving off preserves earlier records until
-Clear history; clearing preserves the current draft. Transcribe File accepts short
-16 kHz mono PCM WAVs and never inserts automatically.
+You need Windows x64, PowerShell, a microphone for live dictation, and .NET 8
+with Windows desktop support. Initial SDK, engine, model and NuGet downloads
+need network access. After setup, speech transcription runs locally. CUDA
+requires a separate compatible NVIDIA engine installation.
 
-## Call protection
+From the repository root, prepare the pinned CPU engine, Small model and SDK:
 
-Settings can mute Discord during Sona or watched-app recording, optionally
-silencing incoming Discord audio. Sona waits for protection before opening its
-microphone. External apps use Windows activity polling with about 500 ms delay.
-Overlapping recordings retain protection until the final source ends. Manual
-mute/deafen is preserved; pause and quit restore only acknowledged owned changes.
-Failed restoration remains visible and can be retried.
+```powershell
+$env:SONA_RUNTIME = Join-Path $env:LOCALAPPDATA 'Sona\runtime'
+.\tools\setup-runtime.ps1 -RuntimeRoot $env:SONA_RUNTIME -BuildTools
+$env:DOTNET_CLI_HOME = Join-Path $env:SONA_RUNTIME 'dotnet-home'
+$env:NUGET_PACKAGES = Join-Path $env:SONA_RUNTIME 'nuget'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+$sonaDotnet = Join-Path $env:SONA_RUNTIME 'sdk\dotnet.exe'
+& $sonaDotnet build .\src\Murmur.App\Murmur.App.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet build .\src\Sona.Agent\Sona.Agent.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet run --project .\tests\Murmur.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet run --project .\tests\Murmur.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet list .\src\Murmur.App\Murmur.App.csproj package --vulnerable --include-transitive
+```
 
-Import Hush setup protects its credentials with Windows current-user encryption
-and lets you review watched apps/release preferences. Pause and quit Hush before
-connecting Sona; both must not control Discord together. Alternatively enter your
-own Discord developer application in the protected setup section. Discord RPC
-requires an authorized app/tester account; Sona ships no shared secrets. Legacy
-retirement and real-call acceptance require separate verification.
+The repository's `tools/build.ps1` and smoke-test helpers use the owner's
+`E:\DevelopmentTools\local-dictation` layout. That path is a development
+convenience, not a requirement for every Windows machine. Legacy internal
+Murmur names preserve source and preference compatibility.
 
-## Agent integrations and optional accounts
+Qualified private packages use `tools/install.ps1`; upgrades use
+`tools/upgrade.ps1 -PackageDirectory <package> -ProcessId <Sona PID>` to preserve
+an idle app's draft through an encrypted checkpoint. The installer verifies
+package files, creates a Start shortcut and stable `sona-agent` user-PATH entry.
+Startup is opt in. Engine/model/CUDA files are not bundled in the app package.
 
-`sona-agent` returns JSON status, validated settings patches, model
-discovery/download/verification and protection pause/resume. `--mcp` exposes the
-same named operations over MCP stdio. It connects to the running app through a
-current-user-only named pipe, without a public HTTP port. Credentials, history
-and microphone-start control are outside this API.
+## CLI and MCP
 
 ```powershell
 sona-agent status
-sona-agent settings patch '{"language":"fr","shortcutMode":"Toggle"}'
 sona-agent models list
 sona-agent models install tiny
 sona-agent protection status
+sona-agent settings patch '{"language":"fr","shortcutMode":"Toggle"}'
 ```
 
+The running app exposes a current-user-only named pipe. `sona-agent --mcp`
+serves its named operations over stdio. Credentials, history and starting the
+microphone are outside this interface.
 [Agent setup and MCP configuration](docs/AGENT-INTERFACE.md).
 
-Google sign-in and sync are not implemented or enabled. A future optional desktop
-OAuth integration could store opted-in settings/vocabulary in Drive's private
-app-data folder without a Sona email database. Audio, transcripts and credentials
-are excluded. [Integration design](docs/INTEGRATED-SONA.md).
+## Privacy and current limits
 
-## Build and installation
+No cloud speech provider, BYOK, sign-in, sync, analytics or background audio
+upload is implemented. History is memory-only by default; optional local text
+saving is capped at 200 entries and stores no audio. Local transcription needs
+no Sona subscription and has no subscription word quota, but recordings are
+limited to 120 seconds and transcription requests to 90 seconds.
 
-Windows x64 and the .NET 8 desktop runtime are required.
-`tools/setup-runtime.ps1 -BuildTools` explicitly prepares pinned CPU runtime and
-SDK files. Default runtime is `%LOCALAPPDATA%\Sona\runtime`, with compatibility
-for the existing development runtime. `SONA_RUNTIME` overrides it;
-`MURMUR_RUNTIME` remains supported. CUDA setup is separate. Models, SDKs and CUDA
-redistributables are not bundled in the application package.
+This preview targets Windows only. Medium, Turbo and Large require the
+separately installed CUDA engine. File transcription accepts short 16 kHz mono
+PCM WAVs. Accuracy and speed depend on the model, hardware, language and audio;
+only Small CPU and Turbo CUDA have measured project benchmarks.
 
-`tools/build.ps1` builds app/agent, runs safety checks and queries NuGet advisories.
-`tools/native-smoke.ps1` checks isolated UI; `tools/agent-smoke.ps1` checks CLI/MCP,
-optionally adding one explicit download with `-DownloadTiny`. Tests use no real
-microphone or global input. Native test instances have a 180-second lifetime.
+Discord protection requires your own authorized Discord developer app/tester
+setup or a reviewed Hush import. Sona ships no shared credentials. Pause and
+quit Hush before connecting Sona so only one app controls Discord.
+Call protection currently supports Discord only; adapters for other call
+platforms are future work and are not implemented.
 
-`tools/prepare-release.ps1` requires reviewed clean source and creates a hashed
-app/agent package. `tools/install.ps1` verifies files and creates the Start shortcut.
-Startup stays opt in. Internal Murmur names/data paths preserve preferences. There
-is no automatic cloud transcription, analytics, sound effects or submission.
-The installer makes a verified `Programs\Sona\current` junction and adds it once
-to the user's PATH so `sona-agent` works from new shells. The machine PATH and
-existing version directories are preserved; MCP clients can use that stable full path.
+Builds, synthetic replay and native test instances do not establish live
+microphone, target-app insertion or real-call acceptance. Current evidence and
+remaining checks are in [verification](docs/VERIFICATION.md) and the
+[owner test guide](tools/owner-test.md).
 
-The repository remains private while preparing eventual open-source distribution.
-Public release must exclude private history, user data, credentials and runtime
-redistributables. [Third-party notices](THIRD-PARTY-NOTICES.md),
-[owner test](tools/owner-test.md).
+[Design](docs/DESIGN.md) · [Implementation](docs/IMPLEMENTATION.md) ·
+[Integration plans](docs/INTEGRATED-SONA.md) ·
+[Third-party notices](THIRD-PARTY-NOTICES.md)
+
+## License
+
+Sona's source is licensed under [MIT](LICENSE). Third-party engines, models,
+fonts and redistributables retain their own terms; see
+[third-party notices](THIRD-PARTY-NOTICES.md).

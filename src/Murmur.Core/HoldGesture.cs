@@ -1,7 +1,7 @@
 namespace Murmur.Core;
 
 public enum HoldAction { None, Begin, Finish, Cancel }
-public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false);
+public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false, bool HandsFree = false);
 
 // Only current physical down-state, never typed text or key history. One listener
 // thread advances this reducer; the UI reads only the admitted generation.
@@ -16,6 +16,10 @@ public sealed class HoldGesture
     private bool draining;
     private bool latched;
     private bool toggleGesture;
+    private bool handsFree;
+    private bool tapPending;
+    private bool secondTap;
+    private long tapReleased;
     private long pendingToggle;
     public long PendingToggle => Interlocked.Read(ref pendingToggle);
     public bool ConsumeToggle(long token) => Interlocked.CompareExchange(ref pendingToggle, 0, token) == token;
@@ -33,6 +37,7 @@ public sealed class HoldGesture
     public void Invalidate()
     {
         Interlocked.Exchange(ref current, 0); Interlocked.Exchange(ref pendingToggle, 0); arming = holding = false;
+        handsFree = tapPending = secondTap = false;
         draining = Control || Windows; latched = latched && draining;
     }
     public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false)
@@ -42,6 +47,7 @@ public sealed class HoldGesture
         var repeat = pressed && down[key];
         if (repeat) return new(HoldAction.None, generation, latched && key is (0x5B or 0x5C));
         down[key] = pressed;
+        if (pressed && Other) tapPending = false;
         if (PendingToggle != 0 && pressed && Other)
         {
             var token = PendingToggle; Invalidate();
@@ -56,6 +62,21 @@ public sealed class HoldGesture
         {
             if (!Control || !Windows || Other)
             {
+                if (arming && !toggleGesture && !Other && milliseconds < due)
+                {
+                    var tapToken = generation;
+                    var startHandsFree = secondTap;
+                    Interlocked.Exchange(ref current, 0); arming = holding = false;
+                    draining = Control || Windows; latched = latched && draining;
+                    tapPending = !startHandsFree; tapReleased = milliseconds; secondTap = false;
+                    if (startHandsFree)
+                    {
+                        handsFree = true;
+                        Interlocked.Exchange(ref pendingToggle, tapToken);
+                        return new(HoldAction.Begin, tapToken, Toggle: true, HandsFree: true);
+                    }
+                    return default;
+                }
                 var action = holding ? (Other ? HoldAction.Cancel : HoldAction.Finish) : HoldAction.None;
                 var token = generation;
                 if (toggleGesture && !Other)
@@ -71,9 +92,16 @@ public sealed class HoldGesture
         if (Control && Windows && Other) { draining = true; return default; }
         if (Control && Windows && !Other)
         {
+            if (handsFree)
+            {
+                var token = generation; Invalidate();
+                return new(HoldAction.Finish, token, Toggle: true, HandsFree: true);
+            }
             if (PendingToggle != 0) { var pending = PendingToggle; Invalidate(); return new(HoldAction.Cancel, pending, Toggle: true); }
             arming = latched = true; due = milliseconds + 200;
             toggleGesture = toggle;
+            secondTap = !toggle && tapPending && milliseconds - tapReleased <= 350;
+            tapPending = false;
             Interlocked.Exchange(ref current, ++generation);
             if (toggle) { arming = false; holding = true; Interlocked.Exchange(ref pendingToggle, generation); return new(HoldAction.Begin, generation, Toggle: true); }
         }
@@ -83,6 +111,7 @@ public sealed class HoldGesture
     {
         if (!arming || milliseconds < due) return default;
         arming = false; holding = true;
+        tapPending = secondTap = false;
         return new(HoldAction.Begin, generation);
     }
     public HoldChange Reconcile(long admittedGeneration, bool physicalChord)

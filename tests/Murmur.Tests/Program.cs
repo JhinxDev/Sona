@@ -95,6 +95,44 @@ gesture.Key(0xA2, false, 2, toggle: true); gesture.Key(0x5B, false, 3, toggle: t
 Check(gesture.ConsumeToggle(delayedToggle.Generation) && !gesture.ConsumeToggle(delayedToggle.Generation), "Toggle admission is consumed once after recording begins");
 Check(gesture.Key(0x41, true, 4, toggle: true).Action == HoldAction.None, "Ordinary typing after admitted Toggle release cannot cancel the ongoing recording");
 var historyPath = Path.Combine(Path.GetTempPath(), "sona-history-" + Guid.NewGuid() + ".json");
+foreach (var ctrl in new[] { 0xA2, 0xA3 }) foreach (var win in new[] { 0x5B, 0x5C }) foreach (var ctrlFirst in new[] { false, true }) foreach (var releaseCtrl in new[] { false, true })
+{
+    var combo = new HoldGesture(); var first = ctrlFirst ? ctrl : win; var second = ctrlFirst ? win : ctrl;
+    var upFirst = releaseCtrl ? ctrl : win; var upSecond = releaseCtrl ? win : ctrl;
+    combo.Key(first, true, 0); combo.Key(second, true, 10);
+    Check(combo.Key(upFirst, false, 60).Action == HoldAction.None, "First quick tap leaves microphone closed"); combo.Key(upSecond, false, 70);
+    combo.Key(first, true, 140); combo.Key(second, true, 150);
+    var hf = combo.Key(upFirst, false, 190); combo.Key(upSecond, false, 200);
+    Check(hf.Action == HoldAction.Begin && hf.Toggle && hf.HandsFree && combo.PendingToggle == hf.Generation && combo.Current == 0, "Double quick tap admits handsfree after release across modifier variants");
+    Check(combo.ConsumeToggle(hf.Generation) && combo.Key(0x41, true, 220).Action == HoldAction.None, "Admitted handsfree permits ordinary typing"); combo.Key(0x41, false, 230);
+    combo.Key(first, true, 300); var hfStop = combo.Key(second, true, 310);
+    Check(hfStop.Action == HoldAction.Finish && hfStop.HandsFree && hfStop.Generation == hf.Generation && combo.Key(second, true, 320).Action == HoldAction.None && combo.Tick(600).Action == HoldAction.None, "Next single chord finishes handsfree once and cannot rearm while held");
+}
+gesture = new(); gesture.Key(0xA2, true, 0); gesture.Key(0x5B, true, 10); gesture.Key(0xA2, false, 60); gesture.Key(0x5B, false, 70);
+gesture.Key(0xA2, true, 500); gesture.Key(0x5B, true, 510);
+Check(gesture.Key(0xA2, false, 560).Action == HoldAction.None && gesture.PendingToggle == 0, "Expired double tap remains silent");
+gesture = new(); gesture.Key(0xA2, true, 0); gesture.Key(0x5B, true, 10); gesture.Key(0xA2, false, 60); gesture.Key(0x5B, false, 70);
+gesture.Key(0xA2, true, 140); gesture.Key(0x5B, true, 150); var heldSecond = gesture.Tick(350);
+Check(heldSecond.Action == HoldAction.Begin && !heldSecond.Toggle && gesture.Key(0xA2, false, 360).Action == HoldAction.Finish, "Holding second tap uses normal hold and release");
+foreach (var interrupt in new[] { 0x41, 0x1B, 0xA0, 0xA5 })
+{
+    gesture = new(); gesture.Key(0xA2, true, 0); gesture.Key(0x5B, true, 10); gesture.Key(0xA2, false, 60); gesture.Key(0x5B, false, 70);
+    gesture.Key(interrupt, true, 80); gesture.Key(interrupt, false, 90); gesture.Key(0xA2, true, 140); gesture.Key(0x5B, true, 150);
+    Check(gesture.Key(0xA2, false, 190).Action == HoldAction.None, "Foreign key between taps revokes double tap intent");
+}
+gesture = new(); gesture.Key(0xA2, true, 0); gesture.Key(0x5B, true, 10); gesture.Key(0xA2, false, 60); gesture.Key(0x5B, false, 70); gesture.Invalidate();
+gesture.Key(0xA2, true, 140); gesture.Key(0x5B, true, 150);
+Check(gesture.Key(0xA2, false, 190).Action == HoldAction.None, "Reset revokes pending double tap"); gesture.Key(0x5B, false, 200);
+gesture.Key(0xA2, true, 240); gesture.Key(0x5B, true, 250); var pendingHandsFree = gesture.Key(0xA2, false, 290); gesture.Key(0x5B, false, 300);
+gesture.Key(0xA2, true, 340); var pendingStop = gesture.Key(0x5B, true, 350);
+Check(pendingHandsFree.HandsFree && pendingStop.Action == HoldAction.Finish && gesture.PendingToggle == 0 && !gesture.ConsumeToggle(pendingHandsFree.Generation), "Stop during delayed handsfree admission revokes microphone permission");
+gesture = new(); gesture.Key(0xA2, true, 0); gesture.Key(0x5B, true, 10); gesture.Key(0xA2, false, 60); gesture.Key(0x5B, false, 70);
+gesture.Key(0xA2, true, 140, injected: true); gesture.Key(0x5B, true, 150, injected: true);
+Check(gesture.Key(0xA2, false, 190, injected: true).Action == HoldAction.None && gesture.PendingToggle == 0 && gesture.Tick(400).Action == HoldAction.None, "Injected second tap cannot complete a physical first tap");
+gesture.Key(0xA2, true, 450); gesture.Key(0x5B, true, 460); gesture.Key(0xA2, false, 500); gesture.Key(0x5B, false, 510);
+gesture.Key(0xA2, true, 550); gesture.Key(0x5B, true, 560); var inspectingHandsFree = gesture.Key(0xA2, false, 600); gesture.Key(0x5B, false, 610);
+var interruptedHandsFree = gesture.Key(0x1B, true, 620);
+Check(inspectingHandsFree.HandsFree && interruptedHandsFree.Action == HoldAction.Cancel && interruptedHandsFree.Generation == inspectingHandsFree.Generation && !gesture.ConsumeToggle(inspectingHandsFree.Generation), "Esc while handsfree target inspection is pending revokes admission");
 Check(HistoryStore.Load(historyPath).Count == 0 && !File.Exists(historyPath), "Absent history is read without creating a transcript file");
 HistoryStore.Save(historyPath, new[] { h });
 Check(HistoryStore.Load(historyPath).Single() == h, "Opt-in history preserves original, draft and insertion state");
@@ -181,8 +219,14 @@ Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDispla
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))
 {
     var fullSettings = AgentSettings.Apply(new Preferences(), fullSettingsPatch.RootElement);
-    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete sixteen-field settings response round trips through a validated agent patch");
+    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete seventeen-field settings response round trips through a validated agent patch");
 }
+using (var clipboardPatch = System.Text.Json.JsonDocument.Parse("{\"copyToClipboard\":true}"))
+{
+    var originalClipboard = new Preferences(); var clipboardSettings = AgentSettings.Apply(originalClipboard, clipboardPatch.RootElement);
+    Check(clipboardSettings.CopyToClipboard && !originalClipboard.CopyToClipboard, "Clipboard backup is explicitly configurable and does not mutate the old settings");
+}
+ReleaseVersionChecks.Run(Check);
 Console.WriteLine($"{count} checks passed.");
 
 sealed class FakeVoice : IVoiceProtectionTransport

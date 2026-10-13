@@ -32,7 +32,7 @@ public partial class MainWindow
                 catch { await ConfigureProtectionAsync(); throw; }
                 finally { preferencesApplying = false; }
                 preferences.Language = next.Language; preferences.Engine = next.Engine; preferences.Model = next.Model; preferences.ShortcutMode = next.ShortcutMode;
-                preferences.Style = next.Style; preferences.Device = next.Device; preferences.AutoInsert = next.AutoInsert; preferences.CloseToTray = next.CloseToTray;
+                preferences.Style = next.Style; preferences.Device = next.Device; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CloseToTray = next.CloseToTray;
                 preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
                 ThemeManager.Apply(preferences.Theme); ThemeChoice.SelectedItem = ThemeCatalog.Resolve(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay); PanelDisplay.IsChecked = preferences.RecordingDisplay == "Panel"; CapsuleDisplay.IsChecked = !PanelDisplay.IsChecked;
                 SetIdleChoice(preferences.ModelIdleMinutes);
@@ -43,7 +43,7 @@ public partial class MainWindow
                 TranscriptionEngine.SelectedIndex = preferences.Engine == "FastCpu" ? 1 : 0;
                 ShortcutMode.SelectedIndex = preferences.ShortcutMode == "Toggle" ? 1 : 0;
                 DraftStyle.SelectedIndex = preferences.Style == "Verbatim" ? 1 : preferences.Style == "Notes" ? 2 : 0;
-                AutoInsert.IsChecked = preferences.AutoInsert; CloseToTray.IsChecked = preferences.CloseToTray;
+                AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CloseToTray.IsChecked = preferences.CloseToTray;
                 Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline(); RefreshDevices(); RefreshModelCards();
                 modelPreparation = WarmSelectedAsync();
                 return new(true, AgentSettings.View(preferences));

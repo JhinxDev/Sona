@@ -47,10 +47,10 @@ public static class AgentProtocol
 public static class AgentSettings
 {
     // No credentials, transcripts, microphone start, paths or startup registration.
-    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.Device, p.AutoInsert, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
+    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.Device, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
-        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 16) throw new ArgumentException("Settings must be a bounded JSON object.");
+        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 17) throw new ArgumentException("Settings must be a bounded JSON object.");
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
@@ -68,6 +68,7 @@ public static class AgentSettings
                 case "style": next.Style = Choice(property.Value, "Clean", "Verbatim", "Notes"); break;
                 case "device": if (!property.Value.TryGetInt32(out var device) || device is < -1 or > 255) throw new ArgumentException("Invalid device."); next.Device = device; break;
                 case "autoInsert": next.AutoInsert = Boolean(property.Value); break;
+                case "copyToClipboard": next.CopyToClipboard = Boolean(property.Value); break;
                 case "closeToTray": next.CloseToTray = Boolean(property.Value); break;
                 case "protectionEnabled": next.ProtectionEnabled = Boolean(property.Value); break;
                 case "silenceIncoming": next.SilenceIncoming = Boolean(property.Value); break;

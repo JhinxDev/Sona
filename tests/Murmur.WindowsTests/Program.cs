@@ -136,7 +136,7 @@ if (!shortcutTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Sho
 if (shortcutFailure != null) throw new Exception("Native shortcut listener test failed", shortcutFailure);
 Check(shortcutStarted, "Dedicated native keyboard hook and message timer initialize without a microphone");
 Check(shortcutStopped && shortcutCallbacks == 0, "Shortcut reset and disposal stop the listener without starting capture or sending input");
-Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false;
+Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false, handsFreeTestSafe = false;
 var preparationRoot = Path.Combine(Path.GetTempPath(), "sona-preparation-test-" + Guid.NewGuid().ToString("N"));
 var preparationPriorData = Environment.GetEnvironmentVariable("MURMUR_DATA"); Environment.SetEnvironmentVariable("MURMUR_DATA", preparationRoot);
 var preparationThread = new Thread(() =>
@@ -155,6 +155,8 @@ var preparationThread = new Thread(() =>
             replacementBlocked = window.SessionForTests == Murmur.Core.SessionState.Recording;
             window.CancelForTests(); barrier.SetResult();
             cancelledBeforeCapture = !await begin && !fake.Started;
+            window.PrepareShortcutForTests();
+            handsFreeTestSafe = !await window.BeginShortcutForTestsAsync(false) && !fake.Started && window.SessionForTests == Murmur.Core.SessionState.Ready;
         }
         catch (Exception ex) { preparationFailure = ex; }
         finally { application.Shutdown(); dispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Send); }
@@ -167,6 +169,7 @@ Environment.SetEnvironmentVariable("MURMUR_DATA", preparationPriorData);
 if (preparationFailure != null) throw new Exception("Preparation regression failed", preparationFailure);
 Check(replacementBlocked, "Shortcut-test preparation cannot replace a session awaiting voice protection");
 Check(cancelledBeforeCapture, "Cancelling during asynchronous preparation prevents even a fake microphone from starting");
+Check(handsFreeTestSafe, "Double-tap cannot start a microphone during the explicitly microphone-free insertion test");
 if (Directory.Exists(preparationRoot)) Directory.Delete(preparationRoot, true);
 var time = new TestClock(); var capture = new FakeCapture();
 using (var recorder = new Recorder(_ => capture, time))

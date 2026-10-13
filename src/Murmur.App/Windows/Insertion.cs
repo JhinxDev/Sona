@@ -27,6 +27,17 @@ public sealed class Insertion : IDisposable
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException) { return null; }
     }
+    public static string AppName(DraftTarget? target)
+    {
+        if (target == null) return "No focused text field";
+        try
+        {
+            using var process = Process.GetProcessById(target.ProcessId);
+            var name = process.ProcessName;
+            return name.Equals("codex", StringComparison.OrdinalIgnoreCase) ? "Codex" : name.Equals("ChatGPT", StringComparison.OrdinalIgnoreCase) ? "ChatGPT" : name;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
+    }
     public static bool Same(DraftTarget? target, DraftTarget? current) => target != null && current != null && target.Window == current.Window && target.ProcessId == current.ProcessId && target.RuntimeId.SequenceEqual(current.RuntimeId) && target.FocusEpoch == current.FocusEpoch;
     public async Task<(bool Inserted, string Detail)> InsertAsync(DraftTarget? target, string text, CancellationToken cancellation = default)
     {

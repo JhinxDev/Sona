@@ -1,6 +1,6 @@
 # Third-party notices
 
-Sona is private owner source. Its original interface and code were developed independently. Installed Wispr Flow and Spokenly were owner-authorized reference targets only; none of their proprietary implementation or assets is distributed here.
+Sona original source is licensed under MIT; the repository currently remains a private preview. Its original interface and code were developed independently. Installed Wispr Flow and Spokenly were owner-authorized reference targets only; none of their proprietary implementation or assets is distributed here.
 
 - [NAudio 2.2.1](https://github.com/naudio/NAudio/tree/v2.2.1): MIT, copyright Mark Heath and contributors. The license text is under `licenses/NAudio.txt` and copied into the application package.
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp): MIT, copyright Georgi Gerganov and contributors. Its pinned official engine is a separate local runtime download; `licenses/whisper.cpp.txt` retains the license.

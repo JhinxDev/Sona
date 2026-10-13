@@ -40,8 +40,12 @@ and busy dictation are rejected. Settings commits preserve active values if savi
 fails. Protection uses the same controller as the UI. Pausing restores only owned
 voice changes; resuming reconciles current watched microphone activity.
 
+Version 0.3.1 adds `copyToClipboard` as a validated boolean. It copies a
+completed dictation, including when focus changes, without pressing Enter.
+It defaults off for new installations and is enabled for the owner on request.
+
 Supported settings: `language`, `engine`, `model`, `shortcutMode`, `style`,
-`device`, `autoInsert`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
+`device`, `autoInsert`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
 `protectionReleaseDelayMs`, `protectionShortcut`, `watchedApps`. Credential setup, transcript/history
 export and microphone capture are intentionally outside this API. A same-user
 agent is trusted to make the requested local settings changes; this interface

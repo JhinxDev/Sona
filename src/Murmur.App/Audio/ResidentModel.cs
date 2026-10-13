@@ -50,7 +50,7 @@ internal sealed class ResidentModel
                 body.Add(new StringContent("json"), "response_format");
                 body.Add(new StringContent("true"), "no_context");
                 body.Add(new StringContent("true"), "suppress_nst");
-                var prompt = string.Join(", ", p.Terms.Concat(p.Vocabulary.Select(x => x.Written)).Distinct().Take(30));
+                var prompt = string.Join(", ", p.Terms.Concat(p.Vocabulary.Select(x => x.Written)).Distinct().Take(60));
                 body.Add(new StringContent(prompt), "prompt");
                 using var reply = await http.PostAsync(new Uri(endpoint!, "inference"), body, deadline.Token).ConfigureAwait(false);
                 if (!reply.IsSuccessStatusCode) throw new IOException("Local transcription failed. Your draft was left untouched.");

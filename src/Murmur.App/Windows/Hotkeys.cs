@@ -29,6 +29,7 @@ public sealed class Hotkeys : IDisposable
     private nint keyboardHook;
     private long activeGeneration;
     private long startingGeneration;
+    private HoldChange? startingTerminal;
     private long admissionEpoch;
     private int admitsHold = 1;
     private int disposed;
@@ -59,7 +60,7 @@ public sealed class Hotkeys : IDisposable
             {
                 activeGeneration = 0; watchdog.Stop(); Reset(); cancel();
             }
-            else if (activeGeneration != 0 && !PhysicalChord()) PostThreadMessage(listenerId, ReconcileMessage, (nuint)activeGeneration, 0);
+            else if (activeGeneration != 0 && activeIsHold && !PhysicalChord()) PostThreadMessage(listenerId, ReconcileMessage, (nuint)activeGeneration, 0);
         };
     }
     private static long Now => (long)Stopwatch.GetElapsedTime(0).TotalMilliseconds;
@@ -120,13 +121,35 @@ public sealed class Hotkeys : IDisposable
                 if (epoch != Interlocked.Read(ref admissionEpoch) || Volatile.Read(ref admitsHold) == 0 || (change.Toggle ? gesture.PendingToggle != change.Generation : gesture.Current != change.Generation || !PhysicalChord())) return;
                 if (startingGeneration != 0) return;
                 startingGeneration = change.Generation;
-                try { if (await begin(!change.Toggle) && epoch == Interlocked.Read(ref admissionEpoch) && Volatile.Read(ref disposed) == 0) { activeGeneration = change.Generation; activeIsHold = !change.Toggle; if (change.Toggle) gesture.ConsumeToggle(change.Generation); else watchdog.Start(); } else Reset(); }
-                finally { startingGeneration = 0; }
+                startingTerminal = null;
+                try
+                {
+                    var began = await begin(!change.Toggle);
+                    if (began && epoch == Interlocked.Read(ref admissionEpoch) && Volatile.Read(ref disposed) == 0)
+                    {
+                        if (startingTerminal is { } terminal)
+                        {
+                            if (terminal.Action == HoldAction.Finish) finish(); else cancel();
+                        }
+                        else
+                        {
+                            activeGeneration = change.Generation; activeIsHold = !change.Toggle;
+                            if (change.Toggle) gesture.ConsumeToggle(change.Generation);
+                            watchdog.Start();
+                        }
+                    }
+                    else { if (began && !change.Toggle) cancel(); Reset(); }
+                }
+                finally { startingGeneration = 0; startingTerminal = null; }
             }
+            // Legacy Toggle releases are informational; only an explicit handsfree
+            // stop or a physical Hold release is a terminal Finish.
+            else if (change.Action == HoldAction.Finish && change.Toggle && !change.HandsFree) return;
+            else if (startingGeneration == change.Generation) startingTerminal = change;
             else if (activeGeneration == change.Generation)
             {
                 activeGeneration = 0; watchdog.Stop();
-                if (change.Action == HoldAction.Finish) { if (activeIsHold) finish(); } else cancel();
+                if (change.Action == HoldAction.Finish) finish(); else cancel();
             }
         }));
     }

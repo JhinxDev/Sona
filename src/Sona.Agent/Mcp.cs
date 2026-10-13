@@ -92,7 +92,7 @@ internal static class Mcp
             model = new { type = "string", @enum = ModelCatalog.All.Select(m => m.Id).Prepend("auto").ToArray() }, shortcutMode = new { type = "string", @enum = new[] { "Hold", "Toggle" } },
             theme = new { type = "string", @enum = ThemeCatalog.All.Select(t => t.Id).ToArray() }, recordingDisplay = new { type = "string", @enum = new[] { "Panel", "Capsule" } }, modelIdleMinutes = new { type = "integer", minimum = 0, maximum = 240 },
             style = new { type = "string", @enum = new[] { "Clean", "Verbatim", "Notes" } }, device = new { type = "integer", minimum = -1, maximum = 255 },
-            autoInsert = new { type = "boolean" }, closeToTray = new { type = "boolean" }, protectionEnabled = new { type = "boolean" }, silenceIncoming = new { type = "boolean" }, protectionReleaseDelayMs = new { type = "integer", minimum = 0, maximum = 5000 }, protectionShortcut = new { type = "string", maxLength = 64 }, watchedApps = new { type = "array", maxItems = 50, items = new { type = "string", maxLength = 160 } }
+            autoInsert = new { type = "boolean" }, copyToClipboard = new { type = "boolean" }, closeToTray = new { type = "boolean" }, protectionEnabled = new { type = "boolean" }, silenceIncoming = new { type = "boolean" }, protectionReleaseDelayMs = new { type = "integer", minimum = 0, maximum = 5000 }, protectionShortcut = new { type = "string", maxLength = 64 }, watchedApps = new { type = "array", maxItems = 50, items = new { type = "string", maxLength = 160 } }
         }, additionalProperties = false };
         return new { type = "object", properties = new { }, additionalProperties = false };
     }

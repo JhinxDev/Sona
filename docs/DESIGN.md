@@ -1,5 +1,15 @@
 # Sona design
 
+October 13, 0.3.1: model rows use 20 DIP margins, a 60 DIP leading column
+and an original 44 DIP rounded vector waveform badge. The provider remains
+explicit text, not a borrowed official logo. Both recording displays identify
+the captured destination app without reading window titles or following pointer
+hover. Hold mode also recognizes two quick Ctrl+Win chords for hands-free;
+the next chord finishes. Clipboard backup is explicit and defaults off for new
+users. GitHub checks are opt-in, use unauthenticated public metadata only, and
+show an in-app Home notice and Settings release link without automatic install.
+
+
 October 13 owner additions: retain the accepted layout, add eight selectable
 original palettes (Charcoal, Amethyst, Fjord, Mocha, OLED; Paper, Linen, Mist),
 and bundle unmodified Inter 4.1 Regular/SemiBold/Bold under SIL OFL. Semantic

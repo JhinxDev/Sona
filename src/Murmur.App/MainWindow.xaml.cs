@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     internal Func<CancellationToken, Task>? PreparationForTests { get; set; }
     internal Func<Recorder>? RecorderForTests { get; set; }
     internal Task<bool> BeginForTestsAsync() => arguments.Contains("--test-ui") ? BeginRecordingAsync() : Task.FromResult(false);
+    internal Task<bool> BeginShortcutForTestsAsync(bool hold) => BeginShortcutAsync(hold);
     internal void PrepareShortcutForTests() => PrepareTest_Click(this, new RoutedEventArgs());
     internal void CancelForTests() => RequestCancel();
     internal SessionState? SessionForTests => session?.State;
@@ -56,7 +57,7 @@ public partial class MainWindow : Window
         SpeechLanguage.SelectedIndex = preferences.Language == "en" ? 1 : preferences.Language == "fr" ? 2 : 0;
         TranscriptionEngine.SelectedIndex = preferences.Engine == "FastCpu" ? 1 : 0;
         DraftStyle.SelectedIndex = preferences.Style == "Verbatim" ? 1 : preferences.Style == "Notes" ? 2 : 0;
-        AutoInsert.IsChecked = preferences.AutoInsert; CloseToTray.IsChecked = preferences.CloseToTray; StartWithWindows.IsChecked = preferences.Startup;
+        AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CheckUpdates.IsChecked = preferences.CheckForUpdates; CloseToTray.IsChecked = preferences.CloseToTray; StartWithWindows.IsChecked = preferences.Startup;
         ShortcutMode.SelectedIndex = preferences.ShortcutMode == "Toggle" ? 1 : 0; KeepHistory.IsChecked = preferences.KeepHistory;
         shortcutToggleMode = preferences.ShortcutMode == "Toggle" ? 1 : 0; LoadHistory();
         ModelStatus.Text = transcriber.Available ? "Installed local runtime is ready." : "Run setup-runtime.ps1 to install the local runtime.";
@@ -79,6 +80,7 @@ public partial class MainWindow : Window
     {
         agentServer = new AgentServer(HandleAgentAsync); agentServer.Start();
         ThemeManager.ApplyTitleBar(this);
+        InitializeUpdateChecks();
         if (!arguments.Contains("--test-ui"))
         {
             try { Startup.MigrateLegacy(preferences.Startup); }
@@ -98,6 +100,11 @@ public partial class MainWindow : Window
     }
     private async Task<bool> BeginShortcutAsync(bool hold)
     {
+        if (preparedInsertionTest && !hold)
+        {
+            ShortcutStatus.Text = "Insertion test: hold Ctrl + Windows, then release. Double-tap does not use the microphone.";
+            return false;
+        }
         if (!hold && session?.State == SessionState.Recording) { StartStop(); return true; }
         if (processing || shutdownPending || session?.State == SessionState.Recording) return false;
         foreach (var name in new[] { "Wispr Flow", "WisprFlow", "Spokenly" })
@@ -167,6 +174,7 @@ public partial class MainWindow : Window
             if (admission != null && !admission()) { Cancel(); return false; }
             hotkeys?.Recording(true); timer.Start();
             Status.Text = "Listening"; StatusDetail.Text = "Speak your thought. Press Esc to cancel."; RecordButton.Content = "Stop";
+            overlay.UpdateTarget(Insertion.AppName(target));
             overlay.Update("Listening", "Esc to cancel"); overlay.ShowFor(target?.Window ?? 0);
             return true;
         }
@@ -191,13 +199,19 @@ public partial class MainWindow : Window
             if (current.State == SessionState.Cancelled || !ReferenceEquals(current, session)) return;
             if (!current.Complete(original, TextPipeline.Apply(original, preferences))) { Render(current); return; }
             Render(current); AddHistory(current);
+            var clipboardDetail = "";
+            if (preferences.CopyToClipboard)
+            {
+                try { Clipboard.SetText(current.Draft); clipboardDetail = " Copied to clipboard."; }
+                catch (COMException) { clipboardDetail = " Clipboard is busy; use Copy draft to retry."; }
+            }
             if (preferences.AutoInsert && target != null)
             {
                 var result = await insertion.InsertAsync(target, current.Draft, cancellation!.Token);
                 if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); }
-                Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail;
+                Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
             }
-            else { Status.Text = "Draft ready"; StatusDetail.Text = "Review it here, or copy it when you are ready."; }
+            else { Status.Text = "Draft ready"; StatusDetail.Text = "Review it here, or copy it when you are ready." + clipboardDetail; }
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
@@ -286,7 +300,7 @@ public partial class MainWindow : Window
             preferences.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
             preferences.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
             preferences.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
-            preferences.AutoInsert = AutoInsert.IsChecked == true; preferences.CloseToTray = CloseToTray.IsChecked == true; preferences.Startup = startup;
+            preferences.AutoInsert = AutoInsert.IsChecked == true; preferences.CopyToClipboard = CopyToClipboard.IsChecked == true; preferences.CheckForUpdates = CheckUpdates.IsChecked == true; preferences.CloseToTray = CloseToTray.IsChecked == true; preferences.Startup = startup;
             preferences.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
             preferences.KeepHistory = KeepHistory.IsChecked == true;
             preferences.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
@@ -304,7 +318,7 @@ public partial class MainWindow : Window
             SaveHistory(); RefreshHistory();
             SettingsResult.Text = ModeResult.Text = ModelResult.Text = "Preferences saved.";
             if (!preferences.KeepHistory && File.Exists(HistoryPath)) HistoryResult.Text = "Saving is off. Use Clear history to remove previously saved text.";
-            StatusDetail.Text = preferences.ShortcutMode == "Toggle" ? "Press Ctrl + Windows to start, then press it again to finish. Esc cancels." : "Hold Ctrl + Windows while you speak. Release to finish.";
+            StatusDetail.Text = preferences.ShortcutMode == "Toggle" ? "Press Ctrl + Windows to start, then press it again to finish. Esc cancels." : "Hold Ctrl + Windows while you speak. Release to finish. Double-tap for hands-free; tap again to finish.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
     }
@@ -319,7 +333,7 @@ public partial class MainWindow : Window
         Device.SelectedItem = selected ?? Device.Items[0];
     }
     private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshDevices();
-    private void PreviewBar_Click(object sender, RoutedEventArgs e) { if (recorder != null || processing || insertionTestHolding) return; barPreview.Stop(); overlay.Update("Voice bar preview", "No microphone"); overlay.ShowFor(new WindowInteropHelper(this).Handle); barPreview.Start(); }
+    private void PreviewBar_Click(object sender, RoutedEventArgs e) { if (recorder != null || processing || insertionTestHolding) return; barPreview.Stop(); overlay.UpdateTarget("Preview"); overlay.Update("Voice bar preview", "No microphone"); overlay.ShowFor(new WindowInteropHelper(this).Handle); barPreview.Start(); }
     private void Quit_Click(object sender, RoutedEventArgs e) => RequestQuit();
     public void RequestQuit() => Dispatcher.BeginInvoke(() => _ = QuitAsync());
     private async Task QuitAsync()

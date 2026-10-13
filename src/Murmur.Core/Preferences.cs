@@ -16,13 +16,15 @@ public sealed class Preferences
     public string Style { get; set; } = "Clean";
     public int Device { get; set; } = -1;
     public bool AutoInsert { get; set; } = true;
+    public bool CopyToClipboard { get; set; }
+    public bool CheckForUpdates { get; set; }
     public bool CloseToTray { get; set; } = true;
     public bool Startup { get; set; }
     public bool ProtectionEnabled { get; set; }
     public bool SilenceIncoming { get; set; } = true;
     public int ProtectionReleaseDelayMs { get; set; } = 200;
     public string ProtectionShortcut { get; set; } = "ctrl+shift+h";
-    public List<string> WatchedApps { get; set; } = ["WisprFlow.exe", "Flow.exe", "ChatGPT.exe", "OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0", "OpenAI.Codex_2p2nqsd0c76g0"];
+    public List<string> WatchedApps { get; set; } = ["ChatGPT.exe", "OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0", "OpenAI.Codex_2p2nqsd0c76g0"];
     public List<string> Terms { get; set; } = [];
     public List<Replacement> Vocabulary { get; set; } = [new("codex", "Codex"), new("jhinx", "Jhinx"), new("github", "GitHub"), new("next cloud", "Nextcloud"), new("power shell", "PowerShell")];
     public List<Snippet> Snippets { get; set; } = [new("review my changes", "Review the current changes for correctness, accessibility, and regressions. Preserve unrelated work.")];

@@ -73,6 +73,12 @@ public partial class Overlay : Window
         if (IsVisible) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, Position);
     }
 
+    public void UpdateTarget(string name)
+    {
+        PanelTarget.Text = CapsuleTarget.Text = name;
+        PanelTarget.ToolTip = CapsuleTarget.ToolTip = name;
+    }
+
     public void UpdateModel(string name)
     {
         ModelName.Text = string.IsNullOrWhiteSpace(name) ? "On-device dictation" : name;
