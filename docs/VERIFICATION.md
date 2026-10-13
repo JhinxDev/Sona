@@ -18,12 +18,27 @@ the owner's supplied screenshot was recovered; newer unsaved text and the raw
 original transcript are not confirmed recovered. The installed receipt records
 `DraftPreserved=false`, rather than a false successful transfer claim.
 
-The maintained `tools/upgrade.ps1` now verifies and reads back a current-user
-DPAPI checkpoint before Quit, retains it on failure, and restores the prior
-app when no instance remains. Its synthetic encryption round trip and the
-already-installed no-op path passed without a microphone or app restart.
-The full future-upgrade path is not yet target-proven. Receipts:
+The maintained `tools/upgrade.ps1` verifies and reads back a current-user DPAPI
+checkpoint before Quit, retains it on failure, and restores the prior app when
+no relevant instance remains. Its isolated full-flow rehearsal passed 14 checks:
+synthetic draft/original seed, disabled capture and protection, deliberate
+post-Quit installer failure, encrypted retention, prior-version relaunch, exact
+fallback restore, successful retry, exact candidate restore and checkpoint
+cleanup. The live owner instance and production PATH/startup/shortcut/current
+junction were unchanged. The two package receipt identities were explicitly
+synthetic fixtures built from the same qualified source, not distinct releases.
+`--test-ui --test-transfer` scopes pipes/mutexes/profile and bypasses microphone,
+hotkeys, resident loading and Discord initialization while exercising the same
+draft restoration path. Installation rehearsals use a guarded unique temporary
+root and omit production launchers/PATH mutations. No live upgrade was repeated
+to close this proof. This establishes the maintained helper's bounded recovery
+flow; it does not retroactively recover the lost initial unsaved text. Receipts:
 `E:/Temp/qazws/sona030-installed.json` and `sona030-recovery.json`.
+Full-flow evidence root is recorded in
+`E:/Temp/qazws/sona-upgrade-rehearsal-current.txt`; `rehearsal.json` contains the
+14 checks. Failed harness evidence is retained separately. The initial alias
+collision and collapsed Original-field lookup were repaired; these did not
+involve the owner's app or data.
 
 ## Resident and appearance wave, 0.3.0, October 13
 

@@ -91,7 +91,7 @@ public partial class MainWindow
     {
         var payload = Environment.GetEnvironmentVariable("SONA_DRAFT_TRANSFER");
         Environment.SetEnvironmentVariable("SONA_DRAFT_TRANSFER", null);
-        if (string.IsNullOrEmpty(payload) || arguments.Contains("--test-ui")) return;
+        if (string.IsNullOrEmpty(payload) || arguments.Contains("--test-ui") && !arguments.Contains("--test-transfer")) return;
         try
         {
             var draft = System.Text.Json.JsonSerializer.Deserialize<TransferredDraft>(payload);

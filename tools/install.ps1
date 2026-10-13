@@ -1,10 +1,18 @@
-param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch)
+param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch, [string]$RehearsalRoot)
 $ErrorActionPreference='Stop'
 $taskPackage=[IO.Path]::GetFullPath($PackageDirectory)
 $taskReceipt=Get-Content -LiteralPath (Join-Path $taskPackage 'package.json') | ConvertFrom-Json
 if ($taskReceipt.Version -notmatch '^0\.[0-9]+\.[0-9]+$' -or $taskReceipt.SourceHead -notmatch '^[a-f0-9]{40}$') { throw 'The package receipt is not a recognized candidate.' }
-if (Get-Process -Name Murmur,Sona -ErrorAction SilentlyContinue) { throw 'Quit the existing dictation instance before installing this candidate.' }
-$taskInstall = Join-Path (Join-Path $env:LOCALAPPDATA 'Programs\Sona') ($taskReceipt.Version + '-' + $taskReceipt.SourceHead.Substring(0,8))
+$taskProgramRoot=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\Sona'))
+if($RehearsalRoot){
+    $RehearsalRoot=[IO.Path]::GetFullPath($RehearsalRoot)
+    if((Split-Path $RehearsalRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$'-or!(Test-Path -LiteralPath (Join-Path $RehearsalRoot '.sona-rehearsal'))){throw 'Unrecognized isolated rehearsal root'}
+    $taskProgramRoot=Join-Path $RehearsalRoot 'Programs\Sona'
+}
+$taskRunning=@(Get-Process -Name Murmur,Sona -ErrorAction SilentlyContinue)
+if($RehearsalRoot){$taskRunning=@($taskRunning|Where-Object{$_.Path-and$_.Path.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)})}
+if($taskRunning.Count){throw 'Quit the existing dictation instance before installing this candidate.'}
+$taskInstall = Join-Path $taskProgramRoot ($taskReceipt.Version + '-' + $taskReceipt.SourceHead.Substring(0,8))
 foreach ($taskFile in $taskReceipt.Files) {
     $taskSource = [IO.Path]::GetFullPath((Join-Path $taskPackage $taskFile.Path))
     if (!$taskSource.StartsWith($taskPackage + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Package path escapes its root.' }
@@ -19,13 +27,14 @@ foreach ($taskFile in $taskReceipt.Files) {
     if ((Get-FileHash -LiteralPath $taskDestination).Hash.ToLowerInvariant() -ne $taskFile.SHA256) { throw 'Installed file verification failed.' }
 }
 $taskMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sona.lnk'
+if($RehearsalRoot){$taskMenu=Join-Path $RehearsalRoot 'Sona.lnk'}
 $taskShell=New-Object -ComObject WScript.Shell
-if (Test-Path -LiteralPath $taskMenu) { $taskExisting=$taskShell.CreateShortcut($taskMenu); if (!$taskExisting.TargetPath.StartsWith((Join-Path $env:LOCALAPPDATA 'Programs\Sona') + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated Sona shortcut was preserved. Choose a different shortcut name.' } }
+if (Test-Path -LiteralPath $taskMenu) { $taskExisting=$taskShell.CreateShortcut($taskMenu); if (!$taskExisting.TargetPath.StartsWith($taskProgramRoot + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated Sona shortcut was preserved. Choose a different shortcut name.' } }
 $taskShortcut=$taskShell.CreateShortcut($taskMenu); $taskShortcut.TargetPath=Join-Path $taskInstall 'Sona.exe'; $taskShortcut.WorkingDirectory=$taskInstall; $taskShortcut.IconLocation=(Join-Path $taskInstall 'Sona.exe') + ',0'; $taskShortcut.Description='Intentional local dictation for an unsent draft'; $taskShortcut.Save()
 # Remove only the legacy shortcut verified by its own installed receipt. Keep
 # versioned recovery binaries and the existing preferences directory intact.
 $taskLegacyMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Murmur.lnk'
-if (Test-Path -LiteralPath $taskLegacyMenu) {
+if (!$RehearsalRoot -and (Test-Path -LiteralPath $taskLegacyMenu)) {
     $taskLegacy = $taskShell.CreateShortcut($taskLegacyMenu)
     $taskLegacyRoot = (Join-Path $env:LOCALAPPDATA 'Programs\Murmur') + '\'
     if ($taskLegacy.TargetPath.StartsWith($taskLegacyRoot,[StringComparison]::OrdinalIgnoreCase)) {
@@ -39,7 +48,6 @@ if (Test-Path -LiteralPath $taskLegacyMenu) {
 $taskInstalled=@{Version=$taskReceipt.Version; SourceHead=$taskReceipt.SourceHead; Path=(Join-Path $taskInstall 'Sona.exe'); SHA256=(Get-FileHash -LiteralPath (Join-Path $taskInstall 'Sona.exe')).Hash.ToLowerInvariant(); StartMenu=$taskMenu; StartupChanged=$false; InstalledAt=[DateTimeOffset]::Now.ToString('o'); Files=$taskReceipt.Files}
 $taskInstalled | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskInstall 'installation.json')
 if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
-    $taskProgramRoot=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\Sona'))
     $taskCurrent=Join-Path $taskProgramRoot 'current'
     if(Test-Path -LiteralPath $taskCurrent) {
         $taskCurrentItem=Get-Item -LiteralPath $taskCurrent
@@ -56,9 +64,12 @@ if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
     }
     if(-not [IO.Path]::GetFullPath($taskInstall).StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'CLI alias target escapes the Sona installation.'}
     New-Item -ItemType Junction -Path $taskCurrent -Value $taskInstall | Out-Null
+    if(!$RehearsalRoot){
     $taskUserPath=[Environment]::GetEnvironmentVariable('Path','User')
     $taskPathEntries=@($taskUserPath -split ';' | Where-Object{$_})
     if(-not @($taskPathEntries | Where-Object{$_.TrimEnd('\').Equals($taskCurrent,[StringComparison]::OrdinalIgnoreCase)}).Count){[Environment]::SetEnvironmentVariable('Path',(($taskPathEntries+$taskCurrent)-join ';'),'User')}
+    }
 }
+if ($Launch -and $RehearsalRoot) { throw 'Launch an isolated test with its explicit profile and --test-ui instead.' }
 if ($Launch) { Start-Process -FilePath (Join-Path $taskInstall 'Sona.exe') -ArgumentList '--start-hidden' -WindowStyle Hidden }
 $taskInstalled | ConvertTo-Json -Depth 2
