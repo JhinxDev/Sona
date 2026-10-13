@@ -1,5 +1,31 @@
 # Candidate verification
 
+## Installed cutover, October 13, 2026
+
+Installed Sona 0.2.0 uses source `248566565d2c3b4f424d7997c5533d597e21eb82`.
+All 23 package files matched the receipt. The stable `current` junction and user
+PATH expose `sona-agent`; Sona starts hidden at login and keeps running in the
+tray when closed. The existing 20 final native checks and 10 isolated CLI/MCP
+checks passed. No further code changed after those checks.
+
+The owner confirmed Hush protection paused and Discord disconnected. Both exact
+receipt-owned Hush processes were then stopped; fresh process readback returned
+zero. Hush's startup entry, taskbar pin and Start shortcut are removed. Installed
+files were moved under Sona's `retired-components/Hush-0.4.0-20261013` recovery
+directory. Private legacy user data and source history are preserved.
+
+Sona's internally imported DPAPI credential configuration connected successfully
+to actual Discord. CLI and native UI readback agree: enabled, connected, unpaused,
+shortcut registered, ownsChanges false, Ready. No agent opened a microphone or
+conducted a real-call mute/restoration test. Physical Codex insertion and personal
+speech/call acceptance remain owner checks; connection is not proof of those.
+
+Receipts: `sona-integrated-installed-readback.json`, `hush-cutover-final.json`
+and `sona-cutover-protection.json` under `E:/Temp/qazws/local-dictation-build`.
+The installed source identity remains fixed when later documentation-only
+commits advance the repository. Google sign-in/sync and public release remain
+unimplemented/unpublished.
+
 ## Integrated 0.2.0 source wave, October 13
 
 The owner explicitly accepted 0.1.1's redesigned UI. Preserve that baseline.
