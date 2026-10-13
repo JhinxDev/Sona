@@ -38,5 +38,26 @@ if (Test-Path -LiteralPath $taskLegacyMenu) {
 }
 $taskInstalled=@{Version=$taskReceipt.Version; SourceHead=$taskReceipt.SourceHead; Path=(Join-Path $taskInstall 'Sona.exe'); SHA256=(Get-FileHash -LiteralPath (Join-Path $taskInstall 'Sona.exe')).Hash.ToLowerInvariant(); StartMenu=$taskMenu; StartupChanged=$false; InstalledAt=[DateTimeOffset]::Now.ToString('o'); Files=$taskReceipt.Files}
 $taskInstalled | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskInstall 'installation.json')
+if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
+    $taskProgramRoot=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\Sona'))
+    $taskCurrent=Join-Path $taskProgramRoot 'current'
+    if(Test-Path -LiteralPath $taskCurrent) {
+        $taskCurrentItem=Get-Item -LiteralPath $taskCurrent
+        if($taskCurrentItem.LinkType -ne 'Junction' -or -not $taskCurrentItem.Target) { throw 'An unrelated current directory was preserved.' }
+        $taskOldTarget=[IO.Path]::GetFullPath([string]$taskCurrentItem.Target[0])
+        if(-not $taskOldTarget.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated current junction was preserved.' }
+        $taskOldReceipt=Join-Path $taskOldTarget 'installation.json'
+        if(-not(Test-Path -LiteralPath $taskOldReceipt)){throw 'Unreceipted current junction was preserved.'}
+        $taskOwnedReceipt=Get-Content -LiteralPath $taskOldReceipt -Raw | ConvertFrom-Json
+        if($taskOwnedReceipt.Path -ne (Join-Path $taskOldTarget 'Sona.exe') -or (Get-FileHash -LiteralPath $taskOwnedReceipt.Path).Hash.ToLowerInvariant() -ne $taskOwnedReceipt.SHA256){throw 'Current junction ownership did not verify.'}
+        # Nonrecursive removal of the verified junction only; its version directory remains.
+        Remove-Item -LiteralPath $taskCurrent -Force
+    }
+    if(-not [IO.Path]::GetFullPath($taskInstall).StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'CLI alias target escapes the Sona installation.'}
+    New-Item -ItemType Junction -Path $taskCurrent -Value $taskInstall | Out-Null
+    $taskUserPath=[Environment]::GetEnvironmentVariable('Path','User')
+    $taskPathEntries=@($taskUserPath -split ';' | Where-Object{$_})
+    if(-not @($taskPathEntries | Where-Object{$_.TrimEnd('\').Equals($taskCurrent,[StringComparison]::OrdinalIgnoreCase)}).Count){[Environment]::SetEnvironmentVariable('Path',(($taskPathEntries+$taskCurrent)-join ';'),'User')}
+}
 if ($Launch) { Start-Process -FilePath (Join-Path $taskInstall 'Sona.exe') -ArgumentList '--start-hidden' -WindowStyle Hidden }
 $taskInstalled | ConvertTo-Json -Depth 2

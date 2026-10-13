@@ -91,6 +91,9 @@ microphone or global input. Native test instances have a 180-second lifetime.
 app/agent package. `tools/install.ps1` verifies files and creates the Start shortcut.
 Startup stays opt in. Internal Murmur names/data paths preserve preferences. There
 is no automatic cloud transcription, analytics, sound effects or submission.
+The installer makes a verified `Programs\Sona\current` junction and adds it once
+to the user's PATH so `sona-agent` works from new shells. The machine PATH and
+existing version directories are preserved; MCP clients can use that stable full path.
 
 The repository remains private while preparing eventual open-source distribution.
 Public release must exclude private history, user data, credentials and runtime
