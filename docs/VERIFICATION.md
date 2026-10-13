@@ -1,5 +1,30 @@
 # Candidate verification
 
+## Installed 0.3.0 readback and recovery limitation
+
+Installed source is `5e9cec5693e57e7d3d01fcf9eece4b25964f2486`; all 26 package
+files matched. Live app PID 45920 reports 0.3.0, idle, selected/resident Turbo,
+with contained CUDA worker PID 48652. Protection is enabled, connected, unpaused,
+shortcut registered and Ready. Startup and the stable current junction point at
+the new receipt-owned version. Later installer/docs commits do not change this
+installed source identity.
+
+The first update attempt failed after orderly app exit: PowerShell returned the
+junction Target as a string, and indexing selected its first character. The
+installer now normalizes string/array targets before checking full ownership.
+The temporary update helper did not retain its private transfer on failure.
+History saving was off and no history file existed. Only the draft visible in
+the owner's supplied screenshot was recovered; newer unsaved text and the raw
+original transcript are not confirmed recovered. The installed receipt records
+`DraftPreserved=false`, rather than a false successful transfer claim.
+
+The maintained `tools/upgrade.ps1` now verifies and reads back a current-user
+DPAPI checkpoint before Quit, retains it on failure, and restores the prior
+app when no instance remains. Its synthetic encryption round trip and the
+already-installed no-op path passed without a microphone or app restart.
+The full future-upgrade path is not yet target-proven. Receipts:
+`E:/Temp/qazws/sona030-installed.json` and `sona030-recovery.json`.
+
 ## Resident and appearance wave, 0.3.0, October 13
 
 The owner reports working dictation and actual Discord muting on installed

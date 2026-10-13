@@ -14,6 +14,12 @@ and the transcription API; it cannot fund speech transcription in Sona.
 [Official preview limits](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 No account, paid cloud calls or background upload is enabled by these changes.
 
+For a later verified private package, use `tools/upgrade.ps1 -PackageDirectory
+<package> -ProcessId <Sona PID>`. It requires an idle visible app, preserves the
+current draft through an encrypted pre-quit checkpoint, and keeps that checkpoint
+if the update fails. Direct `install.ps1` is for installation when Sona is already
+closed. See verification for the initial 0.3.0 recovery limitation.
+
 Local Windows dictation with editable drafts, a compact voice bar, downloadable
 Whisper models, Discord call protection and CLI/MCP access. No Sona account or
 subscription is required. Hold **Ctrl + Windows** to record and release to finish,

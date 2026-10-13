@@ -44,7 +44,8 @@ if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
     if(Test-Path -LiteralPath $taskCurrent) {
         $taskCurrentItem=Get-Item -LiteralPath $taskCurrent
         if($taskCurrentItem.LinkType -ne 'Junction' -or -not $taskCurrentItem.Target) { throw 'An unrelated current directory was preserved.' }
-        $taskOldTarget=[IO.Path]::GetFullPath([string]$taskCurrentItem.Target[0])
+        $taskCurrentTargets=@($taskCurrentItem.Target)
+        $taskOldTarget=[IO.Path]::GetFullPath([string]$taskCurrentTargets[0])
         if(-not $taskOldTarget.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated current junction was preserved.' }
         $taskOldReceipt=Join-Path $taskOldTarget 'installation.json'
         if(-not(Test-Path -LiteralPath $taskOldReceipt)){throw 'Unreceipted current junction was preserved.'}
