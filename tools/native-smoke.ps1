@@ -42,7 +42,7 @@ try {
     Native @('ui','invoke','SettingsTab','-a',"$($taskProcess.Id)") | Out-Null
     Native @('ui','invoke','PreviewVoiceBar','-a',"$($taskProcess.Id)") | Out-Null
     $taskBarTree = Native @('ui','inspect','-a',"$($taskProcess.Id)",'--depth','5')
-    $taskBar = @($taskBarTree.windows | Where-Object { $_.title -eq 'Sona voice bar' })
+    $taskBar = @($taskBarTree.windows | Where-Object { $_.title -eq 'Sona recording display' })
     Verify ($taskBar.Count -eq 1) 'Nonactivating voice bar has its own accessible window without a microphone'
     Native @('ui','screenshot','-w',"$($taskBar[0].hwnd)",'--output',(Join-Path $OutputDirectory 'voice-bar.png')) | Out-Null
     Native @('ui','invoke',(Exact 'Cancel dictation' 'Button'),'-a',"$($taskProcess.Id)") | Out-Null
@@ -122,13 +122,13 @@ try {
         if (!(Test-Path -LiteralPath $taskReplay)) { throw 'Local file replay did not complete within five seconds.' }
         $taskResult = Get-Content -LiteralPath $taskReplay -Raw -Encoding utf8 | ConvertFrom-Json
         Verify ($taskResult.State -eq 'Ready' -and $taskResult.Original -match 'accident') 'Production GPU transcriber completes the licensed French file into a ready draft'
-        Verify (@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-cli.exe' }).Count -eq 0) 'Completed production transcription unloads its model worker'
+        Verify (@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-server.exe' }).Count -eq 1) 'Completed production transcription retains exactly one resident model worker'
         Verify (@(Get-ChildItem -LiteralPath (Join-Path $env:MURMUR_DATA 'scratch') -Filter audio.wav -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Completed production transcription deletes temporary audio'
         CloseTest
         $taskSettings=Settings; $taskSettings.Engine='FastCpu'; $taskSettings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json')
         Launch @('--test-ui','--replay',('"' + $ReplayFile + '"'))
         $taskChildren=@()
-        for ($i=0;$i -lt 50 -and !$taskChildren.Count;$i++) { $taskChildren=@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-cli.exe' }); if (!$taskChildren.Count) { Start-Sleep -Milliseconds 50 } }
+        for ($i=0;$i -lt 50 -and !$taskChildren.Count;$i++) { $taskChildren=@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-server.exe' }); if (!$taskChildren.Count) { Start-Sleep -Milliseconds 50 } }
         Verify ($taskChildren.Count -eq 1) 'CPU option starts one contained transcription worker'
         CloseTest
         Verify (!(Get-Process -Id $taskChildren[0].ProcessId -ErrorAction SilentlyContinue)) 'Quit during CPU transcription leaves no worker'

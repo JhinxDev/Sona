@@ -8,7 +8,7 @@ internal static class Mcp
     {
         ["sona_status"] = "status", ["sona_settings_get"] = "settings.get", ["sona_settings_patch"] = "settings.patch",
         ["sona_models_list"] = "models.list", ["sona_models_info"] = "models.info", ["sona_models_install"] = "models.install",
-        ["sona_models_verify"] = "models.verify", ["sona_models_cancel"] = "models.cancel", ["sona_protection_status"] = "protection.status", ["sona_protection_pause"] = "protection.pause", ["sona_protection_resume"] = "protection.resume"
+        ["sona_models_verify"] = "models.verify", ["sona_models_cancel"] = "models.cancel", ["sona_models_load"] = "models.load", ["sona_models_unload"] = "models.unload", ["sona_protection_status"] = "protection.status", ["sona_protection_pause"] = "protection.pause", ["sona_protection_resume"] = "protection.resume"
     };
     public static async Task RunAsync()
     {
@@ -33,7 +33,7 @@ internal static class Mcp
                     var requested = parameters.TryGetProperty("protocolVersion", out var version) ? version.GetString() : null;
                     var selected = requested is "2025-11-25" or "2025-06-18" or "2025-03-26" ? requested : "2025-11-25";
                     initialized = true;
-                    Result(id, new { protocolVersion = selected, capabilities = new { tools = new { listChanged = false } }, serverInfo = new { name = "sona", version = "0.2.0" } });
+                    Result(id, new { protocolVersion = selected, capabilities = new { tools = new { listChanged = false } }, serverInfo = new { name = "sona", version = typeof(Mcp).Assembly.GetName().Version?.ToString(3) } });
                 }
                 else if (method == "ping") Result(id, new { });
                 else if (!initialized) Error(id, -32000, "Initialize first.");
@@ -73,6 +73,8 @@ internal static class Mcp
         "settings.get" => "Read the supported Sona settings.",
         "settings.patch" => "Change whitelisted local settings while Sona is idle. Unknown values are rejected.",
         "models.list" => "List pinned multilingual local models, file sizes and measured benchmark notes.",
+        "models.load" => "Prepare the selected local model in memory without recording audio.",
+        "models.unload" => "Release the resident local model without deleting downloaded files.",
         "models.info" => "Read exact model metadata, license, source revision and installed state.",
         "models.install" => "Explicitly download one pinned model from Hugging Face. Check status for progress and use models.cancel to cancel.",
         "models.verify" => "Check an existing model against its pinned size and SHA256.",
@@ -88,6 +90,7 @@ internal static class Mcp
         {
             language = new { type = "string", @enum = new[] { "auto", "en", "fr" } }, engine = new { type = "string", @enum = new[] { "Auto", "FastCpu" } },
             model = new { type = "string", @enum = ModelCatalog.All.Select(m => m.Id).Prepend("auto").ToArray() }, shortcutMode = new { type = "string", @enum = new[] { "Hold", "Toggle" } },
+            theme = new { type = "string", @enum = ThemeCatalog.All.Select(t => t.Id).ToArray() }, recordingDisplay = new { type = "string", @enum = new[] { "Panel", "Capsule" } }, modelIdleMinutes = new { type = "integer", minimum = 0, maximum = 240 },
             style = new { type = "string", @enum = new[] { "Clean", "Verbatim", "Notes" } }, device = new { type = "integer", minimum = -1, maximum = 255 },
             autoInsert = new { type = "boolean" }, closeToTray = new { type = "boolean" }, protectionEnabled = new { type = "boolean" }, silenceIncoming = new { type = "boolean" }, protectionReleaseDelayMs = new { type = "integer", minimum = 0, maximum = 5000 }, protectionShortcut = new { type = "string", maxLength = 64 }, watchedApps = new { type = "array", maxItems = 50, items = new { type = "string", maxLength = 160 } }
         }, additionalProperties = false };

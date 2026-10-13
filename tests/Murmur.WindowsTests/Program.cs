@@ -18,6 +18,42 @@ if (args.Length > 0 && args[0] == "--contain-parent")
     File.WriteAllText(Path.Combine(args[1], "parent.json"), JsonSerializer.Serialize(new { Child = worker.Process.Id, Inherited = BoundedProcess.InApplicationJob(worker.Process.Handle) }));
     await Task.Delay(TimeSpan.FromSeconds(60)); return;
 }
+if (args.Length == 2 && args[0] == "--resident-fixture")
+{
+    BoundedProcess.ContainApplication(); var clock = new TestClock(); var resident = new ResidentModel(clock);
+    var p = new Murmur.Core.Preferences { Model = "tiny", Engine = "FastCpu", Language = "fr", ModelIdleMinutes = 1 };
+    var checks = new List<string>(); void Proof(bool value, string name) { if (!value) throw new Exception(name); checks.Add(name); }
+    var timings = new List<double>();
+    try
+    {
+        var load = Stopwatch.StartNew(); await resident.WarmAsync(p, CancellationToken.None); load.Stop();
+        var firstPid = resident.ProcessId; Proof(firstPid != null && resident.LoadedModel == "tiny", "Selected Tiny model loads without microphone capture");
+        for (var iteration = 0; iteration < 2; iteration++)
+        {
+            var input = await File.ReadAllBytesAsync(args[1]); var elapsed = Stopwatch.StartNew(); var result = await resident.RunAsync(input, p, CancellationToken.None); elapsed.Stop(); timings.Add(elapsed.Elapsed.TotalMilliseconds);
+            Proof(result.Length > 0 && input.All(b => b == 0), "Fixture transcription returns text and clears input audio " + iteration);
+            Proof(resident.ProcessId == firstPid, "Two dictations reuse the same resident worker " + iteration);
+        }
+        clock.Advance(59); await resident.ExpireAsync(); Proof(resident.ProcessId == firstPid, "Idle timeout retains model before deadline");
+        clock.Advance(2); await resident.ExpireAsync(); Proof(resident.LoadedModel == null && resident.ProcessId == null, "Idle timeout unloads model after deadline");
+        p.ModelIdleMinutes = 0; await resident.WarmAsync(p, CancellationToken.None); var retainedPid = resident.ProcessId;
+        clock.Advance(3600); await resident.ExpireAsync(); Proof(resident.ProcessId == retainedPid, "Keep until quit retains model after long inactivity");
+        p.Model = "small"; await resident.WarmAsync(p, CancellationToken.None);
+        Proof(resident.LoadedModel == "small" && resident.ProcessId != retainedPid, "Switching models replaces the resident worker");
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel(); var cancelledAudio = await File.ReadAllBytesAsync(args[1]);
+        try { await resident.RunAsync(cancelledAudio, p, cancelled.Token); throw new Exception("Cancellation was ignored"); } catch (OperationCanceledException) { }
+        Proof(cancelledAudio.All(b => b == 0), "Cancelled queued transcription clears audio without running");
+        using var midRequest = new CancellationTokenSource(TimeSpan.FromMilliseconds(20)); var activeAudio = await File.ReadAllBytesAsync(args[1]);
+        try { await resident.RunAsync(activeAudio, p, midRequest.Token); throw new Exception("In-flight cancellation was ignored"); } catch (OperationCanceledException) { }
+        Proof(activeAudio.All(b => b == 0), "In-flight cancellation clears the audio buffer");
+        Proof(resident.ProcessId == null && resident.LoadedModel == null && !resident.CleanupPending, "In-flight cancellation confirms resident worker release");
+        await resident.UnloadAsync(); Proof(resident.LoadedModel == null && resident.ProcessId == null, "Explicit unload releases worker");
+        if (Transcriber.CudaEngineAvailable && Transcriber.Models.Present("turbo")) { p.Model = "turbo"; p.Engine = "Auto"; await resident.WarmAsync(p, CancellationToken.None); Proof(resident.LoadedModel == "turbo", "Resident Turbo confirms real CUDA backend"); await resident.UnloadAsync(); }
+        Console.WriteLine(JsonSerializer.Serialize(new { Passed = checks.Count, Checks = checks, InitialLoadMilliseconds = load.Elapsed.TotalMilliseconds, WarmFixtureMilliseconds = timings, MicrophoneOpened = false, GlobalInputSent = false }));
+    }
+    finally { await resident.UnloadAsync(); }
+    return;
+}
 var passed = new List<string>();
 void Check(bool condition, string label) { if (!condition) throw new Exception(label); passed.Add(label); Console.WriteLine("PASS " + label); }
 var credentialTestPath = Path.Combine(Path.GetTempPath(), "sona-credential-test-" + Guid.NewGuid().ToString("N"), "credentials.dpapi");

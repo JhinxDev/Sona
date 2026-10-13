@@ -24,7 +24,8 @@ public static class Startup
     public static void MigrateLegacy(bool enabled)
     {
         using var read = Registry.CurrentUser.OpenSubKey(RunPath);
-        if (read?.GetValue("Murmur") is string legacy && Owned(legacy, "Murmur")) Set(enabled);
+        var desired = "\"" + Environment.ProcessPath + "\" --start-hidden";
+        if (read?.GetValue("Murmur") is string legacy && Owned(legacy, "Murmur") || read?.GetValue("Sona") is string sona && sona != desired && Owned(sona, "Sona")) Set(enabled);
     }
     public static void Set(bool enabled)
     {

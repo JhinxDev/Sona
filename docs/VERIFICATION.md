@@ -1,5 +1,34 @@
 # Candidate verification
 
+## Resident and appearance wave, 0.3.0, October 13
+
+The owner reports working dictation and actual Discord muting on installed
+0.2.0. Restoration was not explicitly reported. The new candidate adds resident
+local models, selectable Panel/Capsule measured-wave displays, eight grouped
+themes, Inter typography and theme-aware vector branding. Both version labels
+derive from the running assembly rather than independent literals.
+
+138 Core checks and 27 Windows lifecycle checks passed; 20 native checks passed,
+plus 17 focused appearance checks and 10 CLI/MCP checks. Focused resident tests
+passed 14 checks using licensed French fixture audio without microphone capture:
+same-worker reuse for two requests, input clearing, timeout expiry, Keep until quit,
+switch replacement, canceled queued and in-flight audio, explicit release and real Turbo CUDA
+loading. Tiny CPU initial load was 579.6 ms; two warm fixture requests were 233.0
+and 213.8 ms on this PC. This is a single fixture timing, not accuracy or a general
+speed claim. Earlier corpus metrics remain historical one-shot engine evidence.
+
+Read-only review identified and closed worker ownership loss on failed termination
+and canceled idle monitoring after a failed Quit. New native/font work exposed
+a queued cancellation after window closure; the affected Windows checks passed
+after an idempotent closed-window guard. Failed runs are preserved. WPF's TabControl
+template sidebar label is not exposed in the tool's control tree; source and
+screenshots verify its shared assembly binding, while About is checked directly.
+
+Evidence: `E:/Temp/qazws/sona030-final-gate.log`, `sona030-core-final.log`, `sona030-resident-qualified.log`,
+`sona030-native/native-smoke.json`, `sona030-appearance-proof/appearance-smoke.json`
+and `sona030-agent/agent-smoke.json`. Physical live waveform/focus and the new
+installed runtime remain separate acceptance evidence until recorded.
+
 ## Installed cutover, October 13, 2026
 
 Installed Sona 0.2.0 uses source `248566565d2c3b4f424d7997c5533d597e21eb82`.

@@ -4,7 +4,7 @@ using Murmur.Core;
 if (args.Contains("--mcp")) { await Mcp.RunAsync(); return; }
 if (args.Length == 0 || args.Contains("--help"))
 {
-    Console.WriteLine("sona-agent status | doctor | settings get | settings patch <JSON> | models list | models info/install/verify <id> | models cancel | protection status/pause/resume | request <method> [JSON] | --mcp\nAll results are JSON. Requires running Sona. Local current-user pipe; no account or microphone control."); return;
+    Console.WriteLine("sona-agent status | doctor | settings get | settings patch <JSON> | models list | models info/install/verify <id> | models cancel/load/unload | protection status/pause/resume | request <method> [JSON] | --mcp\nAll results are JSON. Requires running Sona. Local current-user pipe; no account or microphone control."); return;
 }
 try
 {

@@ -47,10 +47,10 @@ public static class AgentProtocol
 public static class AgentSettings
 {
     // No credentials, transcripts, microphone start, paths or startup registration.
-    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ShortcutMode, p.Style, p.Device, p.AutoInsert, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
+    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.Device, p.AutoInsert, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
-        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 13) throw new ArgumentException("Settings must be a bounded JSON object.");
+        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 16) throw new ArgumentException("Settings must be a bounded JSON object.");
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
@@ -61,6 +61,9 @@ public static class AgentSettings
                 case "language": next.Language = Choice(property.Value, "auto", "en", "fr"); break;
                 case "engine": next.Engine = Choice(property.Value, "Auto", "FastCpu"); break;
                 case "model": next.Model = Choice(property.Value, ModelCatalog.All.Select(m => m.Id).Prepend("auto").ToArray()); break;
+                case "modelIdleMinutes": if (!property.Value.TryGetInt32(out var minutes) || minutes is < 0 or > 240) throw new ArgumentException("Invalid idle timeout."); next.ModelIdleMinutes = minutes; break;
+                case "recordingDisplay": next.RecordingDisplay = Choice(property.Value, "Panel", "Capsule"); break;
+                case "theme": next.Theme = Choice(property.Value, ThemeCatalog.All.Select(t => t.Id).ToArray()); break;
                 case "shortcutMode": next.ShortcutMode = Choice(property.Value, "Hold", "Toggle"); break;
                 case "style": next.Style = Choice(property.Value, "Clean", "Verbatim", "Notes"); break;
                 case "device": if (!property.Value.TryGetInt32(out var device) || device is < -1 or > 255) throw new ArgumentException("Invalid device."); next.Device = device; break;

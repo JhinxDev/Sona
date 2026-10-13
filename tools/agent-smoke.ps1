@@ -42,7 +42,7 @@ try
     $taskMcp.StandardInput.Close();$taskMcpOutput=$taskMcp.StandardOutput.ReadToEndAsync()
     if(-not $taskMcp.WaitForExit(20000)){$taskMcp.Kill();throw 'MCP smoke exceeded deadline'}
     $taskReplies=@($taskMcpOutput.GetAwaiter().GetResult().Split("`n",[StringSplitOptions]::RemoveEmptyEntries) | ForEach-Object{$_|ConvertFrom-Json})
-    Verify ($taskReplies.Count -eq 3 -and $taskReplies[0].result.protocolVersion -eq '2025-11-25' -and $taskReplies[1].result.tools.Count -eq 11) 'MCP stdio negotiates protocol and exposes named tools'
+    Verify ($taskReplies.Count -eq 3 -and $taskReplies[0].result.protocolVersion -eq '2025-11-25' -and $taskReplies[1].result.tools.Count -eq 13) 'MCP stdio negotiates protocol and exposes named tools'
     Verify ($taskReplies[2].result.structuredContent.ok -and $taskReplies[2].result.structuredContent.data.language -eq 'fr' -and -not $taskReplies[2].result.isError) 'MCP tool calls use the same live validated settings layer'
     if($DownloadTiny)
     {

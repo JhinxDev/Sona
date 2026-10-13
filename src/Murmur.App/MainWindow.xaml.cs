@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private readonly string preferencesPath;
     private readonly Preferences preferences;
     private readonly Transcriber transcriber = new();
+    private volatile bool windowClosed;
     private readonly Insertion insertion = new();
     private readonly EscapeGuard escape;
     private readonly Overlay overlay = new();
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
         RefreshDevices();
         RefreshEditors(); RestoreTransferredDraft();
         RefreshModelCards();
+        InitializeAppearance();
         overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
         if (arguments.Contains("--test-ui")) Title = "Sona (UI test)";
@@ -70,19 +72,19 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) => { if (recorder == null) return; overlay.Update("Listening", "Esc to cancel", recorder.Elapsed, recorder.Level); if (recorder.Elapsed >= 120) StartStop(); else recorder.CheckHealth(); };
         SystemEvents.PowerModeChanged += PowerChanged;
         SystemEvents.SessionSwitch += SessionChanged;
-        Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); tray?.Dispose(); cancellation?.Dispose(); };
+        Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
         Closing += ClosingWindow;
     }
     private void InitializeRuntime()
     {
         agentServer = new AgentServer(HandleAgentAsync); agentServer.Start();
-        var dark = 1; var caption = 0x001F1F1F; var nativeHandle = new WindowInteropHelper(this).Handle;
-        _ = DwmSetWindowAttribute(nativeHandle, 20, ref dark, sizeof(int)); _ = DwmSetWindowAttribute(nativeHandle, 35, ref caption, sizeof(int));
+        ThemeManager.ApplyTitleBar(this);
         if (!arguments.Contains("--test-ui"))
         {
             try { Startup.MigrateLegacy(preferences.Startup); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
             InitializeProtection();
+            modelIdleTimer.Start(); modelPreparation = WarmSelectedAsync();
             try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest)); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
@@ -134,6 +136,7 @@ public partial class MainWindow : Window
         if (processing || shutdownPending || preferencesApplying || preparing) { StatusDetail.Text = "The previous operation is finishing. Try again in a moment."; return false; }
         if (session?.State is SessionState.Recording or SessionState.Transcribing) return false;
         if (transcriber.CleanupPending) { ReportError("A temporary recording still needs cleanup. Use Quit to retry before recording again."); return false; }
+        if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new();
         target = arguments.Contains("--test-ui") ? null : insertion.Capture();
@@ -251,14 +254,16 @@ public partial class MainWindow : Window
     }
     private void Cancel()
     {
+        if (windowClosed) return;
         barPreview.Stop();
         preparedInsertionTest = insertionTestHolding = false;
-        cancellation?.Cancel(); session?.Cancel(); timer.Stop(); recorder?.Dispose(); recorder = null;
+        try { cancellation?.Cancel(); } catch (ObjectDisposedException) { }
+        session?.Cancel(); timer.Stop(); recorder?.Dispose(); recorder = null;
         protectionReleaseOperation = ReleaseOwnProtectionAsync();
         escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); RecordButton.Content = "Record";
         Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted.";
     }
-    private void RequestCancel() { cancellation?.Cancel(); session?.Cancel(); Dispatcher.BeginInvoke(Cancel); }
+    private void RequestCancel() { if (windowClosed) return; try { cancellation?.Cancel(); } catch (ObjectDisposedException) { return; } session?.Cancel(); if (!windowClosed && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(Cancel); }
     public void ReportError(string detail) { Cancel(); Status.Text = "Something needs attention"; StatusDetail.Text = detail; }
     private void Render(DictationSession current) { rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; }
     private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else operation = BeginRecordingAsync(); }
@@ -273,7 +278,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (session?.State is SessionState.Recording or SessionState.Transcribing) { SettingsResult.Text = "Finish or cancel your current dictation before changing preferences."; return; }
+            if (SettingsBusy) { SettingsResult.Text = "Finish or cancel your current operation before changing preferences."; return; }
             var priorKeepHistory = preferences.KeepHistory;
             var startup = StartWithWindows.IsChecked == true;
             if (startup != preferences.Startup) Startup.Set(startup);
@@ -284,7 +289,12 @@ public partial class MainWindow : Window
             preferences.AutoInsert = AutoInsert.IsChecked == true; preferences.CloseToTray = CloseToTray.IsChecked == true; preferences.Startup = startup;
             preferences.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
             preferences.KeepHistory = KeepHistory.IsChecked == true;
+            preferences.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
+            preferences.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";
+            preferences.ModelIdleMinutes = int.Parse((string)((ComboBoxItem)ModelIdleChoice.SelectedItem).Tag);
             preferences.Save(preferencesPath);
+            ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
+            RefreshModelCards(); modelPreparation = WarmSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();
             if (!priorKeepHistory && preferences.KeepHistory)
             {
@@ -316,12 +326,15 @@ public partial class MainWindow : Window
     {
         if (shutdownPending) return;
         shutdownPending = true; IsEnabled = false; Cancel();
+        modelLifetime.Cancel(); modelIdleTimer.Stop();
         try { await operation.WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for local cleanup", "Windows is still releasing worker files. Try Quit again shortly."); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException) { /* Always retry recorded cleanup failures below, even when the operation faulted. */ }
         try { await transcriber.RetryCleanupAsync(); }
         catch (ScratchCleanupException ex) { ShowCleanupFailure("Temporary recording needs cleanup", ex.Message + " Try Quit again after the file is released."); return; }
         if (transcriber.CleanupPending) { ShowCleanupFailure("Temporary recording needs cleanup", "Recording files remain on this computer. Try Quit again to retry cleanup."); return; }
+        try { await modelPreparation.WaitAsync(TimeSpan.FromSeconds(7)); await transcriber.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
+        catch (Exception ex) when (ex is IOException or TimeoutException) { ShowCleanupFailure("Model memory needs cleanup", "Try Quit again once the local model is released."); return; }
         modelDownloadCancellation?.Cancel();
         try { await modelDownloadOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
@@ -337,7 +350,7 @@ public partial class MainWindow : Window
         }
         quitting = true; Close(); Application.Current.Shutdown();
     }
-    private void ShowCleanupFailure(string status, string detail) { shutdownPending = false; IsEnabled = true; Status.Text = status; StatusDetail.Text = detail; ShowActivated = false; WindowState = WindowState.Normal; Show(); }
+    private void ShowCleanupFailure(string status, string detail) { if (modelLifetime.IsCancellationRequested) { modelLifetime.Dispose(); modelLifetime = new(); } if (!arguments.Contains("--test-ui")) modelIdleTimer.Start(); shutdownPending = false; IsEnabled = true; Status.Text = status; StatusDetail.Text = detail; ShowActivated = false; WindowState = WindowState.Normal; Show(); }
     private void ClosingWindow(object? sender, CancelEventArgs e)
     {
         if (quitting) return;

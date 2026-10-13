@@ -170,6 +170,19 @@ var joinVoice = new FakeVoice { State = new(false, false, false) }; var joinCont
 joinVoice.State = new(true, false, false); await joinController.EnsureProtectedAsync(default);
 Check(joinVoice.State.Muted && joinVoice.State.Deafened, "Call-entry reconciliation protects a recording that began outside a call");
 Check(ProtectionShortcut.TryParse("ctrl+shift+h", out var pauseModifiers, out var pauseKey) && pauseModifiers == 0x4006 && pauseKey == 0x48 && ProtectionShortcut.TryParse("alt+F24", out _, out _) && !ProtectionShortcut.TryParse("ctrl+ctrl+h", out _, out _) && !ProtectionShortcut.TryParse("ctrl+win", out _, out _) && !ProtectionShortcut.TryParse("shift+h", out _, out _), "Pause shortcut accepts bounded keyed combinations and rejects duplicate or modifier-only shortcuts");
+using (var appearancePatch = System.Text.Json.JsonDocument.Parse("{\"theme\":\"amethyst\",\"recordingDisplay\":\"Panel\",\"modelIdleMinutes\":30}"))
+{
+    var originalSettings = new Preferences(); var changedSettings = AgentSettings.Apply(originalSettings, appearancePatch.RootElement);
+    Check(changedSettings.Theme == "amethyst" && changedSettings.RecordingDisplay == "Panel" && changedSettings.ModelIdleMinutes == 30 && originalSettings.Theme == "charcoal", "Agent appearance and idle preferences clone without mutating current settings");
+}
+Check(ThemeCatalog.All.Count == 8 && ThemeCatalog.All.Count(t => t.IsDark) == 5 && ThemeCatalog.All.Select(t => t.Id).Distinct().Count() == 8, "Theme catalog contains eight distinct palettes grouped into five dark and three light");
+var invalidAppearance = new Preferences { Theme = "unknown", RecordingDisplay = "unknown", ModelIdleMinutes = -1 }; invalidAppearance.Normalize();
+Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDisplay == "Capsule" && invalidAppearance.ModelIdleMinutes == 0, "Malformed saved appearance and memory preferences normalize safely");
+using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))
+{
+    var fullSettings = AgentSettings.Apply(new Preferences(), fullSettingsPatch.RootElement);
+    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete sixteen-field settings response round trips through a validated agent patch");
+}
 Console.WriteLine($"{count} checks passed.");
 
 sealed class FakeVoice : IVoiceProtectionTransport

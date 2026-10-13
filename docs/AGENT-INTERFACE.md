@@ -1,5 +1,14 @@
 # Sona agent interface
 
+0.3.0 adds `theme` (eight catalog IDs), `recordingDisplay` (Panel/Capsule), and
+`modelIdleMinutes` (integer 0..240, zero Keep until quit) to validated patches.
+`sona-agent models load` prepares the selected model asynchronously; poll status.
+`sona-agent models unload` releases it while idle without deleting its files.
+Status exposes `loadedModel`, `residentProcessId`, and the selected next-use model.
+MCP exposes 13 named tools, including the load/unload pair. No microphone-start,
+credential or transcript-export capability is added. A bounded internal resident
+worker uses a private randomized loopback route; it is not the agent API.
+
 `sona-agent` is a Windows console binary beside Sona. A current-user-only named
 pipe connects it to the running desktop app. It requires no network listener,
 account or API key. All commands return `{ "ok": true, "data": ... }`, or

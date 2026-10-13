@@ -1,12 +1,26 @@
 # Sona
 
+0.3.0 keeps one selected local model resident for responsive dictation, with a
+10-minute default idle timeout, Keep until quit, and explicit Load/Unload actions.
+Switching models releases the previous worker. Panel and Capsule displays use
+measured microphone envelopes with smooth animation. Eight original themes are
+grouped into five dark and three light choices. The sidebar uses a theme-aware
+vector mark and bundled Inter fonts; sidebar/About versions share assembly data.
+
+The speech backends currently supported are the six local Whisper profiles below.
+Parakeet/Voxtral and cloud speech providers are not selectable integrations yet.
+ChatGPT subscription sharing's current preview explicitly excludes audio input
+and the transcription API; it cannot fund speech transcription in Sona.
+[Official preview limits](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+No account, paid cloud calls or background upload is enabled by these changes.
+
 Local Windows dictation with editable drafts, a compact voice bar, downloadable
 Whisper models, Discord call protection and CLI/MCP access. No Sona account or
 subscription is required. Hold **Ctrl + Windows** to record and release to finish,
 or choose **Toggle** in Settings. **Esc** cancels. Sona inserts an unsent draft
 and never presses Enter to submit it. Closing the window keeps it in the tray.
 
-The owner accepted Sona 0.1.1's dark sidebar and grouped settings. Version 0.2.0
+The owner accepted Sona 0.1.1's dark sidebar and grouped settings. Version 0.3.0
 extends that interface. Source qualification, installed behavior and physical
 acceptance are separate; see [verification](docs/VERIFICATION.md).
 
@@ -19,7 +33,8 @@ hints, heard-as corrections and whole-utterance snippets have separate records.
 
 Dictation Models offers Tiny, Base, Small, Medium, Large v3 Turbo and Large v3.
 Explicit downloads show progress, support cancellation, and require pinned size
-and SHA256. Differing existing files are preserved. Verify & use selects a model.
+and SHA256. Differing existing files are preserved. Use model verifies before
+selection and prepares the resident worker; downloading alone never switches it.
 Download size is not memory use. Medium/Turbo/Large need the separately installed
 CUDA engine. Workers have bounded time/memory and unload after each utterance;
 failure leaves the previous draft intact.

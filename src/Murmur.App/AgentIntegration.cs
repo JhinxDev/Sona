@@ -15,7 +15,7 @@ public partial class MainWindow
         if (shutdownPending) return new(false, Error: "Sona is shutting down.");
         switch (request.Method)
         {
-            case "status": return new(true, new { version = "0.2.0", state = recorder != null ? "recording" : processing || preparing ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, microphoneControl = false });
+            case "status": return new(true, new { version = AppVersion.Number, state = recorder != null ? "recording" : processing || preparing || preferencesApplying ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), loadedModel = transcriber.LoadedModel, residentProcessId = transcriber.ResidentProcessId, residentCleanupPending = transcriber.ResidentCleanupPending, downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, microphoneControl = false });
             case "settings.get": return new(true, AgentSettings.View(preferences));
             case "settings.patch":
                 if (SettingsBusy) return new(false, Error: "Finish the current dictation before changing settings.");
@@ -33,6 +33,9 @@ public partial class MainWindow
                 finally { preferencesApplying = false; }
                 preferences.Language = next.Language; preferences.Engine = next.Engine; preferences.Model = next.Model; preferences.ShortcutMode = next.ShortcutMode;
                 preferences.Style = next.Style; preferences.Device = next.Device; preferences.AutoInsert = next.AutoInsert; preferences.CloseToTray = next.CloseToTray;
+                preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
+                ThemeManager.Apply(preferences.Theme); ThemeChoice.SelectedItem = ThemeCatalog.Resolve(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay); PanelDisplay.IsChecked = preferences.RecordingDisplay == "Panel"; CapsuleDisplay.IsChecked = !PanelDisplay.IsChecked;
+                SetIdleChoice(preferences.ModelIdleMinutes);
                 preferences.ProtectionEnabled = next.ProtectionEnabled; preferences.SilenceIncoming = next.SilenceIncoming; preferences.ProtectionReleaseDelayMs = next.ProtectionReleaseDelayMs; preferences.WatchedApps = next.WatchedApps;
                 preferences.ProtectionShortcut = next.ProtectionShortcut; ProtectionShortcutInput.Text = preferences.ProtectionShortcut; UpdateProtectionHotkey();
                 ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming; WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
@@ -42,7 +45,16 @@ public partial class MainWindow
                 DraftStyle.SelectedIndex = preferences.Style == "Verbatim" ? 1 : preferences.Style == "Notes" ? 2 : 0;
                 AutoInsert.IsChecked = preferences.AutoInsert; CloseToTray.IsChecked = preferences.CloseToTray;
                 Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline(); RefreshDevices(); RefreshModelCards();
+                modelPreparation = WarmSelectedAsync();
                 return new(true, AgentSettings.View(preferences));
+            case "models.unload":
+                if (SettingsBusy) return new(false, Error: "Finish the current operation first.");
+                preferencesApplying = true;
+                try { await transcriber.UnloadAsync(cancellation); RefreshResidentStatus(); RefreshModelCards(); return new(true, new { loadedModel = transcriber.LoadedModel }); }
+                finally { preferencesApplying = false; }
+            case "models.load":
+                if (SettingsBusy) return new(false, Error: "Finish the current operation first.");
+                modelPreparation = WarmSelectedAsync(); return new(true, new { preparation = "started" });
             case "models.list": return new(true, ModelCatalog.All.Select(m => new { m.Id, m.Name, m.Bytes, m.ParametersMillions, m.Description, m.Measurements, installed = modelStore.Present(m.Id), selected = Transcriber.SelectedModel(preferences) == m.Id, requiresCuda = ModelCatalog.NeedsCuda(m.Id) }).ToArray());
             case "models.info":
                 var model = ModelCatalog.Get(ModelId(request.Parameters)); return new(true, new { model, installed = modelStore.Present(model.Id), license = "MIT", revision = ModelCatalog.Revision });

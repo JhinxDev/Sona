@@ -6,13 +6,20 @@ namespace Murmur.App.Audio;
 
 public sealed class Transcriber
 {
+    private readonly ResidentModel resident = new();
+    public string? LoadedModel => resident.LoadedModel;
+    public bool ResidentCleanupPending => resident.CleanupPending;
+    public int? ResidentProcessId => resident.ProcessId;
+    public Task ReconcileAsync(Preferences p, CancellationToken cancellation = default) => AvailableFor(p) ? resident.WarmAsync(p, cancellation) : resident.UnloadAsync(cancellation);
+    public Task UnloadAsync(CancellationToken cancellation = default) => resident.UnloadAsync(cancellation);
+    public Task ExpireAsync(CancellationToken cancellation = default) => resident.ExpireAsync(cancellation);
     private readonly HashSet<string> retained = new(StringComparer.OrdinalIgnoreCase);
     private readonly object cleanupGate = new();
     public bool CleanupPending { get { lock (cleanupGate) return retained.Count > 0; } }
     public static string ScratchRoot => Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Murmur"), "scratch");
     public static string RuntimeRoot => Environment.GetEnvironmentVariable("SONA_RUNTIME") ?? Environment.GetEnvironmentVariable("MURMUR_RUNTIME") ?? (Directory.Exists("E:\\DevelopmentTools\\local-dictation\\whisper") ? "E:\\DevelopmentTools\\local-dictation" : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sona", "runtime"));
-    public static bool CpuEngineAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe"));
-    public static bool CudaEngineAvailable => new[] { "whisper-cli.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name)));
+    public static bool CpuEngineAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-server.exe"));
+    public static bool CudaEngineAvailable => new[] { "whisper-server.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name)));
     public static ModelStore Models => new(Path.Combine(RuntimeRoot, "models"));
     public static string SelectedModel(Preferences preferences) => preferences.Model != "auto" ? preferences.Model : preferences.Engine != "FastCpu" && CudaEngineAvailable && Models.Present("turbo") ? "turbo" : "small";
     public bool Available => ModelCatalog.All.Any(m => Models.Present(m.Id) && (ModelCatalog.NeedsCuda(m.Id) ? CudaEngineAvailable : CpuEngineAvailable || CudaEngineAvailable));
@@ -21,7 +28,12 @@ public sealed class Transcriber
         var id = SelectedModel(preferences);
         return Models.Present(id) && (ModelCatalog.NeedsCuda(id) ? preferences.Engine != "FastCpu" && CudaEngineAvailable : CpuEngineAvailable || preferences.Engine != "FastCpu" && CudaEngineAvailable);
     }
-    public async Task<string> RunAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
+    public Task<string> RunAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
+    {
+        if (!AvailableFor(preferences)) { Array.Clear(wav); throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1."); }
+        return resident.RunAsync(wav, preferences, cancellation);
+    }
+    private async Task<string> RunOnceAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
     {
         if (!AvailableFor(preferences)) throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1.");
         var modelId = SelectedModel(preferences);

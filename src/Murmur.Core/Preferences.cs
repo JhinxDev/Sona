@@ -8,6 +8,9 @@ public sealed class Preferences
     public string Language { get; set; } = "auto";
     public string Engine { get; set; } = "Auto";
     public string Model { get; set; } = "auto";
+    public int ModelIdleMinutes { get; set; } = 10;
+    public string RecordingDisplay { get; set; } = "Capsule";
+    public string Theme { get; set; } = "charcoal";
     public string ShortcutMode { get; set; } = "Hold";
     public bool KeepHistory { get; set; }
     public string Style { get; set; } = "Clean";
@@ -34,6 +37,9 @@ public sealed class Preferences
         if (Language is not ("auto" or "en" or "fr")) Language = "auto";
         if (Engine is not ("Auto" or "FastCpu")) Engine = "Auto";
         if (Model != "auto" && !ModelCatalog.All.Any(m => m.Id == Model)) Model = "auto";
+        ModelIdleMinutes = Math.Clamp(ModelIdleMinutes, 0, 240);
+        if (RecordingDisplay is not ("Panel" or "Capsule")) RecordingDisplay = "Capsule";
+        Theme = ThemeCatalog.Resolve(Theme).Id;
         if (ShortcutMode is not ("Hold" or "Toggle")) ShortcutMode = "Hold";
         if (Style is not ("Clean" or "Verbatim" or "Notes")) Style = "Clean";
         if (Device < -1 || Device > 255) Device = -1;

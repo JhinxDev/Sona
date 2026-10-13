@@ -5,6 +5,7 @@ namespace Murmur.App.Windows;
 public sealed class BoundedProcess : IDisposable
 {
     private nint job;
+    private bool disposed;
     private static nint applicationJob;
     public static void ContainApplication()
     {
@@ -42,9 +43,10 @@ public sealed class BoundedProcess : IDisposable
     }
     public void Dispose()
     {
+        if (disposed) return;
         if (job != 0) { CloseHandle(job); job = 0; }
-        try { if (!Process.HasExited && !Process.WaitForExit(3000)) throw new IOException("Windows has not confirmed worker termination."); }
-        finally { Process.Dispose(); }
+        if (!Process.HasExited && !Process.WaitForExit(3000)) throw new IOException("Windows has not confirmed worker termination.");
+        Process.Dispose(); disposed = true;
     }
     [StructLayout(LayoutKind.Sequential)] private struct BasicLimit { public long PerProcess, PerJob; public uint Flags; public nuint MinWorking, MaxWorking; public uint Active; public nuint Affinity; public uint Priority, Scheduling; }
     [StructLayout(LayoutKind.Sequential)] private struct IoCounters { public ulong ReadOps, WriteOps, OtherOps, ReadBytes, WriteBytes, OtherBytes; }
