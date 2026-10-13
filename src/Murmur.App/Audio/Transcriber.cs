@@ -10,15 +10,23 @@ public sealed class Transcriber
     private readonly object cleanupGate = new();
     public bool CleanupPending { get { lock (cleanupGate) return retained.Count > 0; } }
     public static string ScratchRoot => Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Murmur"), "scratch");
-    public static string RuntimeRoot => Path.Combine(Environment.GetEnvironmentVariable("MURMUR_RUNTIME") ?? "E:\\DevelopmentTools\\local-dictation");
-    private static bool CpuAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe")) && File.Exists(Path.Combine(RuntimeRoot, "models", "ggml-small-q5_1.bin"));
-    private static bool CudaAvailable => new[] { "whisper-cli.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name))) && File.Exists(Path.Combine(RuntimeRoot, "models", "ggml-large-v3-turbo-q5_0.bin"));
-    public bool Available => CpuAvailable || CudaAvailable;
-    public bool AvailableFor(Preferences preferences) => preferences.Engine == "FastCpu" ? CpuAvailable : Available;
+    public static string RuntimeRoot => Environment.GetEnvironmentVariable("SONA_RUNTIME") ?? Environment.GetEnvironmentVariable("MURMUR_RUNTIME") ?? (Directory.Exists("E:\\DevelopmentTools\\local-dictation\\whisper") ? "E:\\DevelopmentTools\\local-dictation" : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sona", "runtime"));
+    public static bool CpuEngineAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-cli.exe"));
+    public static bool CudaEngineAvailable => new[] { "whisper-cli.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name)));
+    public static ModelStore Models => new(Path.Combine(RuntimeRoot, "models"));
+    public static string SelectedModel(Preferences preferences) => preferences.Model != "auto" ? preferences.Model : preferences.Engine != "FastCpu" && CudaEngineAvailable && Models.Present("turbo") ? "turbo" : "small";
+    public bool Available => ModelCatalog.All.Any(m => Models.Present(m.Id) && (ModelCatalog.NeedsCuda(m.Id) ? CudaEngineAvailable : CpuEngineAvailable || CudaEngineAvailable));
+    public bool AvailableFor(Preferences preferences)
+    {
+        var id = SelectedModel(preferences);
+        return Models.Present(id) && (ModelCatalog.NeedsCuda(id) ? preferences.Engine != "FastCpu" && CudaEngineAvailable : CpuEngineAvailable || preferences.Engine != "FastCpu" && CudaEngineAvailable);
+    }
     public async Task<string> RunAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
     {
         if (!AvailableFor(preferences)) throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1.");
-        var useCuda = preferences.Engine != "FastCpu" && CudaAvailable;
+        var modelId = SelectedModel(preferences);
+        if (!await Models.VerifyAsync(modelId, cancellation).ConfigureAwait(false)) throw new IOException("Selected model integrity check failed. Your draft was left untouched.");
+        var useCuda = preferences.Engine != "FastCpu" && CudaEngineAvailable;
         var work = Path.Combine(ScratchRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
@@ -27,7 +35,7 @@ public sealed class Transcriber
             var audio = Path.Combine(work, "audio.wav");
             await File.WriteAllBytesAsync(audio, wav, cancellation).ConfigureAwait(false);
             var info = new ProcessStartInfo(Path.Combine(RuntimeRoot, useCuda ? "whisper-cuda" : "whisper", "Release", "whisper-cli.exe"));
-            var args = new[] { "-m", Path.Combine(RuntimeRoot, "models", useCuda ? "ggml-large-v3-turbo-q5_0.bin" : "ggml-small-q5_1.bin"), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", useCuda ? "5" : "1", "-bo", useCuda ? "5" : "1", "-nf", "-sns", "-oj", "-of", Path.Combine(work, "result") };
+            var args = new[] { "-m", Models.PathFor(modelId), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", useCuda ? "5" : "1", "-bo", useCuda ? "5" : "1", "-nf", "-sns", "-oj", "-of", Path.Combine(work, "result") };
             foreach (var arg in args) info.ArgumentList.Add(arg);
             if (!useCuda) info.ArgumentList.Add("-ng");
             var prompt = string.Join(", ", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Written)).Distinct().Take(30));

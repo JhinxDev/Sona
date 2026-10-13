@@ -1,5 +1,42 @@
 # Candidate verification
 
+## Integrated 0.2.0 source wave, October 13
+
+The owner explicitly accepted 0.1.1's redesigned UI. Preserve that baseline.
+The 0.2.0 source extends it with six pinned downloadable multilingual models,
+local current-user CLI/MCP settings/model/protection operations and internal
+Discord microphone protection. Google sign-in/sync remains an optional design,
+not an implemented or enabled feature. Public publication has not occurred.
+
+Focused proof: 134 Core checks including strict agent patch/frame bounds,
+existing model preservation, overlapping voice-source ownership, manual
+unmute/remute ordering (including during undeafen acknowledgement), pause/resume,
+call-entry reconciliation and failed delayed restoration retry. 27 Windows checks
+include DPAPI fixture protection, fake Discord authentication/subscription/Off
+behavior, acknowledged mutations, overlap cleanup, and actual hidden WPF
+preparation cancellation with a fake recorder. No real microphone was opened.
+
+CLI/MCP smoke: 10 live isolated interoperability checks. The explicit Tiny model
+pilot adds four checks: accepted download, completion, independently matched
+catalog SHA256, and selection in isolated preferences. One licensed French WAV
+replay with Tiny produced a ready draft without capture or insertion. Tiny
+accuracy remains unmeasured. The existing 20 native UI checks passed on the first
+integrated wave; repeat affected native checks for the final frozen candidate.
+
+Review repaired seven concrete ownership/lifecycle paths and the residual manual
+mute change during undeafen acknowledgement. Failed harness runs are retained:
+fake IPC was initially blocked by the production Hush guard; its test prefix now
+isolates that guard. Embedding WPF required explicit dispatcher shutdown and an
+assembly-qualified icon URI. These failures did not involve actual Discord or
+owner microphone/audio. Hush retirement, installed 0.2.0 readback and real-call/
+physical Codex behavior remain separate gates until recorded below.
+
+Evidence is under `E:/Temp/qazws/local-dictation-build`: `sona-agent-wave1`,
+`sona-model-pilot`, `sona-tiny-replay`, `sona-integrated-native-wave1`. The model
+catalog metadata is pinned at whisper.cpp conversion revision
+`5359861c739e955e79d9a303bcbc70fb988958b1`; its public provenance receipt is outside
+source. No owner credentials or recordings belong in source/evidence packets.
+
 October 12, 2026, Windows x64. Sona 0.1.1 is a renamed/rebuilt candidate; Murmur 0.1.0 at source 20655f65 is retained as recovery history. Running old0.1.0 did not implement Ctrl+Win, explaining the owner's repeated no-op. Do not call a source build installed until its versioned receipt and actual running executable agree.
 
 ## Current automated scope

@@ -2,7 +2,7 @@ param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch)
 $ErrorActionPreference='Stop'
 $taskPackage=[IO.Path]::GetFullPath($PackageDirectory)
 $taskReceipt=Get-Content -LiteralPath (Join-Path $taskPackage 'package.json') | ConvertFrom-Json
-if ($taskReceipt.Version -notmatch '^0\.1\.[0-9]+$' -or $taskReceipt.SourceHead -notmatch '^[a-f0-9]{40}$') { throw 'The package receipt is not a recognized candidate.' }
+if ($taskReceipt.Version -notmatch '^0\.[0-9]+\.[0-9]+$' -or $taskReceipt.SourceHead -notmatch '^[a-f0-9]{40}$') { throw 'The package receipt is not a recognized candidate.' }
 if (Get-Process -Name Murmur,Sona -ErrorAction SilentlyContinue) { throw 'Quit the existing dictation instance before installing this candidate.' }
 $taskInstall = Join-Path (Join-Path $env:LOCALAPPDATA 'Programs\Sona') ($taskReceipt.Version + '-' + $taskReceipt.SourceHead.Substring(0,8))
 foreach ($taskFile in $taskReceipt.Files) {

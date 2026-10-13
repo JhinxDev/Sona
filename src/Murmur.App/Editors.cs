@@ -17,7 +17,7 @@ public partial class MainWindow
     }
     private bool EditorsBusy(TextBlock result)
     {
-        if (!processing && recorder == null && !shutdownPending) return false;
+        if (!SettingsBusy) return false;
         result.Text = "Finish or cancel dictation before editing."; return true;
     }
     private void SaveVocabulary(VocabularyRules rules)

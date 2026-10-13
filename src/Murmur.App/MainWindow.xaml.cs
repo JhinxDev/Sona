@@ -32,6 +32,13 @@ public partial class MainWindow : Window
     private bool processing;
     private bool shutdownPending;
     private bool preparedInsertionTest;
+    private bool preparing;
+    internal Func<CancellationToken, Task>? PreparationForTests { get; set; }
+    internal Func<Recorder>? RecorderForTests { get; set; }
+    internal Task<bool> BeginForTestsAsync() => arguments.Contains("--test-ui") ? BeginRecordingAsync() : Task.FromResult(false);
+    internal void PrepareShortcutForTests() => PrepareTest_Click(this, new RoutedEventArgs());
+    internal void CancelForTests() => RequestCancel();
+    internal SessionState? SessionForTests => session?.State;
     private bool insertionTestHolding;
     private Task operation = Task.CompletedTask;
     private readonly string[] arguments;
@@ -54,6 +61,7 @@ public partial class MainWindow : Window
         ModelStatus.Text = transcriber.Available ? "Installed local runtime is ready." : "Run setup-runtime.ps1 to install the local runtime.";
         RefreshDevices();
         RefreshEditors(); RestoreTransferredDraft();
+        RefreshModelCards();
         overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
         if (arguments.Contains("--test-ui")) Title = "Sona (UI test)";
@@ -67,13 +75,15 @@ public partial class MainWindow : Window
     }
     private void InitializeRuntime()
     {
+        agentServer = new AgentServer(HandleAgentAsync); agentServer.Start();
         var dark = 1; var caption = 0x001F1F1F; var nativeHandle = new WindowInteropHelper(this).Handle;
         _ = DwmSetWindowAttribute(nativeHandle, 20, ref dark, sizeof(int)); _ = DwmSetWindowAttribute(nativeHandle, 35, ref caption, sizeof(int));
         if (!arguments.Contains("--test-ui"))
         {
             try { Startup.MigrateLegacy(preferences.Startup); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
-            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcut, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest)); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
+            InitializeProtection();
+            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest)); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
             var menu = new System.Windows.Forms.ContextMenuStrip();
@@ -84,7 +94,7 @@ public partial class MainWindow : Window
         var replayIndex = Array.IndexOf(arguments, "--replay");
         if (replayIndex >= 0 && replayIndex + 1 < arguments.Length) operation = ReplayAsync(arguments[replayIndex + 1]);
     }
-    private bool BeginShortcut(bool hold)
+    private async Task<bool> BeginShortcutAsync(bool hold)
     {
         if (!hold && session?.State == SessionState.Recording) { StartStop(); return true; }
         if (processing || shutdownPending || session?.State == SessionState.Recording) return false;
@@ -106,7 +116,8 @@ public partial class MainWindow : Window
                 insertionTestHolding = true; return true;
             }
         }
-        return BeginRecording(hold ? () => hotkeys?.CanBeginHold == true : hotkeys?.IsToggleAdmission == true ? () => hotkeys?.CanBeginToggle == true : null);
+        var begin = BeginRecordingAsync(hold ? () => hotkeys?.CanBeginHold == true : hotkeys?.IsToggleAdmission == true ? () => hotkeys?.CanBeginToggle == true : null);
+        operation = begin; return await begin;
     }
     private void FinishShortcut()
     {
@@ -117,22 +128,36 @@ public partial class MainWindow : Window
         }
         else StartStop();
     }
-    private bool BeginRecording(Func<bool>? admission = null)
+    private async Task<bool> BeginRecordingAsync(Func<bool>? admission = null)
     {
-        if (processing || shutdownPending) { StatusDetail.Text = "The previous worker is finishing. Try again in a moment."; return false; }
+        if (arguments.Contains("--test-ui") && RecorderForTests == null) return false;
+        if (processing || shutdownPending || preferencesApplying || preparing) { StatusDetail.Text = "The previous operation is finishing. Try again in a moment."; return false; }
         if (session?.State is SessionState.Recording or SessionState.Transcribing) return false;
         if (transcriber.CleanupPending) { ReportError("A temporary recording still needs cleanup. Use Quit to retry before recording again."); return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new();
-        target = insertion.Capture();
+        target = arguments.Contains("--test-ui") ? null : insertion.Capture();
         barPreview.Stop();
         RetainCurrentDraft();
         preparedInsertionTest = insertionTestHolding = false;
         session = new(); session.Begin();
+        var captureSession = session; var captureCancellation = cancellation;
+        preparing = true;
         try
         {
-            escape.Arm(true);
-            var capture = new Recorder(); recorder = capture;
+            if (!arguments.Contains("--test-ui")) escape.Arm(true);
+            if (admission != null && !admission()) { Cancel(); return false; }
+            if (arguments.Contains("--test-ui") && PreparationForTests != null) await PreparationForTests(captureCancellation.Token);
+            else if (protection != null)
+            {
+                Status.Text = "Preparing call protection";
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(captureCancellation.Token); deadline.CancelAfter(TimeSpan.FromSeconds(12));
+                await protection.BeginOwnRecordingAsync(deadline.Token);
+            }
+            captureCancellation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(session, captureSession) || captureSession.State != SessionState.Recording || shutdownPending) return false;
+            if (admission != null && !admission()) { Cancel(); return false; }
+            var capture = arguments.Contains("--test-ui") ? RecorderForTests!() : new Recorder(); recorder = capture;
             capture.UnexpectedStop += error => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(recorder, capture)) { session?.Fail(error); ReportError(error); } });
             if (admission != null && !admission()) { Cancel(); return false; }
             capture.Start(preferences.Device);
@@ -142,9 +167,11 @@ public partial class MainWindow : Window
             overlay.Update("Listening", "Esc to cancel"); overlay.ShowFor(target?.Window ?? 0);
             return true;
         }
-        catch (Exception ex) when (ex is IOException or NAudio.MmException or InvalidOperationException) { recorder?.Dispose(); recorder = null; session.Fail(ex.Message); ReportError(ex is IOException ? ex.Message : "Microphone unavailable. Check Windows microphone permissions and the selected device."); return false; }
+        catch (OperationCanceledException) { if (ReferenceEquals(session, captureSession)) Cancel(); return false; }
+        catch (Exception ex) when (ex is IOException or NAudio.MmException or InvalidOperationException or System.Text.Json.JsonException) { if (ReferenceEquals(session, captureSession)) { recorder?.Dispose(); recorder = null; captureSession.Fail(ex.Message); ReportError(ex is IOException ? ex.Message : "Microphone or call protection unavailable. Check Settings and reconnect Discord."); } return false; }
+        finally { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); }
     }
-    private void StartStop() { if (!processing && recorder != null && session?.State == SessionState.Recording) operation = StopAsync(); }
+    private void StartStop() { if (!processing && session?.State == SessionState.Recording) { if (recorder == null) RequestCancel(); else operation = StopAsync(); } }
     private async Task StopAsync()
     {
         var current = session;
@@ -156,6 +183,7 @@ public partial class MainWindow : Window
         {
             Status.Text = "Making your draft"; StatusDetail.Text = "Transcribing locally. Esc still cancels."; overlay.Update("Transcribing", "Esc cancels");
             var wav = await active.StopAsync(); active.Dispose();
+            await ReleaseOwnProtectionAsync();
             var original = await transcriber.RunAsync(wav, preferences, cancellation!.Token);
             if (current.State == SessionState.Cancelled || !ReferenceEquals(current, session)) return;
             if (!current.Complete(original, TextPipeline.Apply(original, preferences))) { Render(current); return; }
@@ -170,7 +198,7 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
-        finally { active.Dispose(); processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); }
+        finally { active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); }
     }
     private async Task InsertReadyAsync(DraftTarget? suppliedTarget = null)
     {
@@ -190,7 +218,7 @@ public partial class MainWindow : Window
     }
     private void PrepareTest_Click(object sender, RoutedEventArgs e)
     {
-        if (processing || recorder != null) return;
+        if (processing || recorder != null || preparing) return;
         RetainCurrentDraft();
         session = new(); session.Begin(); session.Stop();
         const string test = "Sona insertion test: bonjour Codex, foo_bar = 42. This is an unsent draft.";
@@ -226,13 +254,14 @@ public partial class MainWindow : Window
         barPreview.Stop();
         preparedInsertionTest = insertionTestHolding = false;
         cancellation?.Cancel(); session?.Cancel(); timer.Stop(); recorder?.Dispose(); recorder = null;
+        protectionReleaseOperation = ReleaseOwnProtectionAsync();
         escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); RecordButton.Content = "Record";
         Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted.";
     }
     private void RequestCancel() { cancellation?.Cancel(); session?.Cancel(); Dispatcher.BeginInvoke(Cancel); }
     public void ReportError(string detail) { Cancel(); Status.Text = "Something needs attention"; StatusDetail.Text = detail; }
     private void Render(DictationSession current) { rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; }
-    private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else BeginRecording(); }
+    private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else operation = BeginRecordingAsync(); }
     private void Draft_Changed(object sender, TextChangedEventArgs e) { if (!rendering) session?.Edit(Draft.Text); if (CopyButton != null) CopyButton.IsEnabled = !string.IsNullOrWhiteSpace(Draft.Text); }
     private void Copy_Click(object sender, RoutedEventArgs e) { try { Clipboard.SetText(Draft.Text); StatusDetail.Text = "Draft copied at your request."; } catch (System.Runtime.InteropServices.COMException) { StatusDetail.Text = "The clipboard is busy. Try again."; } }
     private void Original_Click(object sender, RoutedEventArgs e) { Draft.Text = Original.Text; }
@@ -293,6 +322,19 @@ public partial class MainWindow : Window
         try { await transcriber.RetryCleanupAsync(); }
         catch (ScratchCleanupException ex) { ShowCleanupFailure("Temporary recording needs cleanup", ex.Message + " Try Quit again after the file is released."); return; }
         if (transcriber.CleanupPending) { ShowCleanupFailure("Temporary recording needs cleanup", "Recording files remain on this computer. Try Quit again to retry cleanup."); return; }
+        modelDownloadCancellation?.Cancel();
+        try { await modelDownloadOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
+        catch (TimeoutException) { ShowCleanupFailure("Waiting for model download cleanup", "Try Quit again shortly."); return; }
+        try { await modelStore.RetryCleanupAsync(); }
+        catch (IOException) { ShowCleanupFailure("Partial model download needs cleanup", "A model file is still locked. Try Quit again shortly."); return; }
+        if (agentServer != null) { await agentServer.DisposeAsync(); agentServer = null; }
+        if (protection != null)
+        {
+            try { await protectionReleaseOperation; using var restoreDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(7)); await protection.RestoreForQuitAsync(restoreDeadline.Token); }
+            catch (Exception ex) when (ex is IOException or OperationCanceledException) { ShowCleanupFailure("Discord restoration needs attention", "Sona could not confirm restoration. Reconnect Discord or pause protection, then try Quit again."); return; }
+            protectionTimer.Stop(); protectionHotkey?.Dispose(); await protection.DisposeAsync(); protection = null;
+        }
         quitting = true; Close(); Application.Current.Shutdown();
     }
     private void ShowCleanupFailure(string status, string detail) { shutdownPending = false; IsEnabled = true; Status.Text = status; StatusDetail.Text = detail; ShowActivated = false; WindowState = WindowState.Normal; Show(); }
@@ -300,7 +342,7 @@ public partial class MainWindow : Window
     {
         if (quitting) return;
         e.Cancel = true;
-        if (preferences.CloseToTray && !arguments.Contains("--test-ui")) { if (recorder != null || processing || insertionTestHolding) Cancel(); else { barPreview.Stop(); overlay.Hide(); } Dispatcher.BeginInvoke(Hide); }
+        if (preferences.CloseToTray && !arguments.Contains("--test-ui")) { if (recorder != null || processing || insertionTestHolding || preparing) Cancel(); else { barPreview.Stop(); overlay.Hide(); } Dispatcher.BeginInvoke(Hide); }
         else RequestQuit();
     }
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) => Dispatcher.BeginInvoke(() => { if (e.Mode == PowerModes.Suspend) Cancel(); hotkeys?.ResetBaseline(); });

@@ -20,6 +20,69 @@ if (args.Length > 0 && args[0] == "--contain-parent")
 }
 var passed = new List<string>();
 void Check(bool condition, string label) { if (!condition) throw new Exception(label); passed.Add(label); Console.WriteLine("PASS " + label); }
+var credentialTestPath = Path.Combine(Path.GetTempPath(), "sona-credential-test-" + Guid.NewGuid().ToString("N"), "credentials.dpapi");
+var fixtureVault = new ProtectedCredentials(credentialTestPath);
+fixtureVault.Save(new DiscordCredentials { ClientId = "123456789", ClientSecret = "fixture-secret-only", AccessToken = "fixture-access-only", ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600 });
+Check(fixtureVault.Load().ClientSecret == "fixture-secret-only" && !System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(credentialTestPath)).Contains("fixture-secret-only"), "Discord fixture setup round trips through current-user Windows encryption");
+var fakePipePrefix = "sona-test-discord-" + Guid.NewGuid().ToString("N") + "-";
+using var fakeServerStop = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+var fakeSubscriptions = new List<string>(); var fakeState = new Murmur.Core.VoiceState(true, false, false); int fakeCommands = 0;
+using var fakePipe = new System.IO.Pipes.NamedPipeServerStream(fakePipePrefix + "0", System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous | System.IO.Pipes.PipeOptions.CurrentUserOnly);
+async Task<(int Opcode, JsonElement Data)> ReadFakeFrame()
+{
+    var header = new byte[8]; await fakePipe.ReadExactlyAsync(header, fakeServerStop.Token);
+    var length = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(4)); if (length is < 1 or > 65536) throw new IOException();
+    var payload = new byte[length]; await fakePipe.ReadExactlyAsync(payload, fakeServerStop.Token); using var doc = JsonDocument.Parse(payload); return (BitConverter.ToInt32(header), doc.RootElement.Clone());
+}
+async Task WriteFakeFrame(int opcode, object payload)
+{
+    var bytes = JsonSerializer.SerializeToUtf8Bytes(payload); var header = new byte[8]; BitConverter.GetBytes(opcode).CopyTo(header, 0); BitConverter.GetBytes(bytes.Length).CopyTo(header, 4);
+    await fakePipe.WriteAsync(header, fakeServerStop.Token); await fakePipe.WriteAsync(bytes, fakeServerStop.Token); await fakePipe.FlushAsync(fakeServerStop.Token);
+}
+var fakeServerTask = Task.Run(async () =>
+{
+    try
+    {
+        await fakePipe.WaitForConnectionAsync(fakeServerStop.Token); var handshake = await ReadFakeFrame();
+        if (handshake.Opcode != 0 || handshake.Data.GetProperty("v").GetInt32() != 1) throw new IOException("Invalid fixture handshake");
+        await WriteFakeFrame(1, new { evt = "READY", data = new { } });
+        while (!fakeServerStop.IsCancellationRequested)
+        {
+            var frame = await ReadFakeFrame(); if (frame.Opcode != 1) continue;
+            var command = frame.Data.GetProperty("cmd").GetString(); var nonce = frame.Data.GetProperty("nonce").GetString(); fakeCommands++;
+            object data = new { };
+            if (command == "SUBSCRIBE") fakeSubscriptions.Add(frame.Data.GetProperty("evt").GetString()!);
+            else if (command == "GET_SELECTED_VOICE_CHANNEL") data = new { id = "fixture-channel" };
+            else if (command == "GET_VOICE_SETTINGS") data = new { mute = fakeState.Muted, deaf = fakeState.Deafened };
+            else if (command == "SET_VOICE_SETTINGS")
+            {
+                var a = frame.Data.GetProperty("args");
+                if (a.TryGetProperty("mute", out var mute)) fakeState = fakeState with { Muted = mute.GetBoolean() };
+                if (a.TryGetProperty("deaf", out var deaf)) fakeState = fakeState with { Deafened = deaf.GetBoolean() };
+                data = new { mute = fakeState.Muted, deaf = fakeState.Deafened };
+            }
+            await WriteFakeFrame(1, new { cmd = command, nonce, data });
+        }
+    }
+    catch (Exception ex) when (ex is OperationCanceledException or EndOfStreamException or IOException or ObjectDisposedException) { }
+});
+var fixtureSources = new HashSet<string> { "fixture-external-app" };
+await using (var service = new ProtectionService(fixtureVault, fakePipePrefix, _ => new HashSet<string>(fixtureSources)))
+{
+    await service.ConnectAsync(false, fakeServerStop.Token);
+    Check(service.Connected && fakeSubscriptions.SequenceEqual(new[] { "VOICE_SETTINGS_UPDATE", "VOICE_CHANNEL_SELECT" }), "Discord fixture connection authenticates and subscribes to both voice events");
+    await service.PauseAsync(false, fakeServerStop.Token);
+    Check(!fakeState.Muted && !fakeState.Deafened && !service.OwnsChanges, "Connecting and resuming while protection is Off never changes voice state despite an active watched source");
+    await service.ConfigureAsync(new Murmur.Core.Preferences { ProtectionEnabled = true, ProtectionReleaseDelayMs = 0 }, fakeServerStop.Token);
+    await service.BeginOwnRecordingAsync(fakeServerStop.Token);
+    Check(fakeState.Muted && fakeState.Deafened && service.OwnsChanges && fakeCommands >= 7, "Own recording preparation awaits framed Discord mute and deafen acknowledgements");
+    await service.EndOwnRecordingAsync(fakeServerStop.Token);
+    Check(fakeState.Muted && fakeState.Deafened, "Ending Sona recording retains protection while a watched app remains active");
+    fixtureSources.Clear(); await service.EndOwnRecordingAsync(fakeServerStop.Token);
+    Check(!fakeState.Muted && !fakeState.Deafened && !service.OwnsChanges, "Recording cleanup restores owned voice changes after the final source ends");
+    await service.RestoreForQuitAsync(fakeServerStop.Token);
+}
+fakeServerStop.Cancel(); await fakeServerTask; File.Delete(credentialTestPath); Directory.Delete(Path.GetDirectoryName(credentialTestPath)!);
 Exception? shortcutFailure = null; var shortcutStarted = false; var shortcutStopped = false; var shortcutCallbacks = 0;
 var shortcutTest = new Thread(() =>
 {
@@ -37,6 +100,38 @@ if (!shortcutTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Sho
 if (shortcutFailure != null) throw new Exception("Native shortcut listener test failed", shortcutFailure);
 Check(shortcutStarted, "Dedicated native keyboard hook and message timer initialize without a microphone");
 Check(shortcutStopped && shortcutCallbacks == 0, "Shortcut reset and disposal stop the listener without starting capture or sending input");
+Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false;
+var preparationRoot = Path.Combine(Path.GetTempPath(), "sona-preparation-test-" + Guid.NewGuid().ToString("N"));
+var preparationPriorData = Environment.GetEnvironmentVariable("MURMUR_DATA"); Environment.SetEnvironmentVariable("MURMUR_DATA", preparationRoot);
+var preparationThread = new Thread(() =>
+{
+    var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+    SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
+    var application = new Murmur.App.App(); application.InitializeComponent();
+    dispatcher.BeginInvoke(new Action(async () =>
+    {
+        try
+        {
+            var window = new Murmur.App.MainWindow(new[] { "--test-ui" });
+            var barrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); var fake = new FakeCapture();
+            window.PreparationForTests = _ => barrier.Task; window.RecorderForTests = () => new Recorder(_ => fake);
+            var begin = window.BeginForTestsAsync(); window.PrepareShortcutForTests();
+            replacementBlocked = window.SessionForTests == Murmur.Core.SessionState.Recording;
+            window.CancelForTests(); barrier.SetResult();
+            cancelledBeforeCapture = !await begin && !fake.Started;
+        }
+        catch (Exception ex) { preparationFailure = ex; }
+        finally { application.Shutdown(); dispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Send); }
+    }));
+    System.Windows.Threading.Dispatcher.Run();
+}) { IsBackground = true };
+preparationThread.SetApartmentState(ApartmentState.STA); preparationThread.Start();
+if (!preparationThread.Join(TimeSpan.FromSeconds(10))) throw new TimeoutException("Preparation regression exceeded its deadline");
+Environment.SetEnvironmentVariable("MURMUR_DATA", preparationPriorData);
+if (preparationFailure != null) throw new Exception("Preparation regression failed", preparationFailure);
+Check(replacementBlocked, "Shortcut-test preparation cannot replace a session awaiting voice protection");
+Check(cancelledBeforeCapture, "Cancelling during asynchronous preparation prevents even a fake microphone from starting");
+if (Directory.Exists(preparationRoot)) Directory.Delete(preparationRoot, true);
 var time = new TestClock(); var capture = new FakeCapture();
 using (var recorder = new Recorder(_ => capture, time))
 {
@@ -132,7 +227,8 @@ sealed class FakeCapture : IWaveIn
     public event EventHandler<WaveInEventArgs>? DataAvailable;
     public event EventHandler<StoppedEventArgs>? RecordingStopped;
     public bool Disposed { get; private set; }
-    public void StartRecording() { }
+    public bool Started { get; private set; }
+    public void StartRecording() { Started = true; }
     public void StopRecording() => RecordingStopped?.Invoke(this, new StoppedEventArgs());
     public void Emit(byte[] pcm) => DataAvailable?.Invoke(this, new WaveInEventArgs(pcm, pcm.Length));
     public void Disconnect(Exception? cause) => RecordingStopped?.Invoke(this, new StoppedEventArgs(cause));

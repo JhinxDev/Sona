@@ -61,7 +61,7 @@ public partial class MainWindow
     private void HistorySearch_Changed(object sender, TextChangedEventArgs e) => RefreshHistory();
     private void History_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (processing || recorder != null || History.SelectedItem is not HistoryItem item) return;
+        if (SettingsBusy || History.SelectedItem is not HistoryItem item) return;
         cancellation?.Cancel(); preparedInsertionTest = insertionTestHolding = false; target = null;
         session = new(); session.Begin(); session.Stop(); session.Complete(item.Original, item.Draft);
         if (item.Inserted) session.MarkInserted();
@@ -70,7 +70,7 @@ public partial class MainWindow
     }
     private void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
-        if (processing || recorder != null) { HistoryResult.Text = "Finish dictation before clearing history."; return; }
+        if (SettingsBusy) { HistoryResult.Text = "Finish dictation before clearing history."; return; }
         try
         {
             if (File.Exists(HistoryPath)) File.Delete(HistoryPath);
@@ -81,7 +81,7 @@ public partial class MainWindow
     }
     private void ChooseFile_Click(object sender, RoutedEventArgs e)
     {
-        if (processing || recorder != null) { FileResult.Text = "Finish or cancel the current dictation first."; return; }
+        if (SettingsBusy) { FileResult.Text = "Finish or cancel the current dictation first."; return; }
         var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Transcribe a WAV file", Filter = "WAV audio (*.wav)|*.wav", Multiselect = false };
         if (dialog.ShowDialog(this) != true) return;
         try

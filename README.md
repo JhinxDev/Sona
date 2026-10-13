@@ -1,33 +1,98 @@
 # Sona
 
-Private Windows dictation for unsent Codex drafts. Hold **Ctrl + Windows** while speaking and release to finish. In Settings, choose **Toggle** to press the same shortcut once to start and again to finish. **Esc** cancels. The microphone opens only after your intentional recording action.
+Local Windows dictation with editable drafts, a compact voice bar, downloadable
+Whisper models, Discord call protection and CLI/MCP access. No Sona account or
+subscription is required. Hold **Ctrl + Windows** to record and release to finish,
+or choose **Toggle** in Settings. **Esc** cancels. Sona inserts an unsent draft
+and never presses Enter to submit it. Closing the window keeps it in the tray.
 
-Sona 0.1.1 replaces the working name Murmur. Its dark sidebar, blue selection and grouped settings follow the owner's supplied Spokenly screenshots. Home owns the current draft; Settings, Modes, Dictation Models, Transcribe File, History, Vocabulary and Snippets have dedicated pages. The compact voice capsule appears during recording/transcription without activating its window. Closing the main window keeps Sona in the tray by default; tray Quit performs cleanup and exits.
+The owner accepted Sona 0.1.1's dark sidebar and grouped settings. Version 0.2.0
+extends that interface. Source qualification, installed behavior and physical
+acceptance are separate; see [verification](docs/VERIFICATION.md).
 
-## Use
+## Dictation and models
 
-1. Open **Sona** from Windows Start. Focus an editable Codex composer before recording.
-2. Hold Ctrl + Windows for at least 200 ms, speak, then release both keys. Keep the original field focused until the draft is ready. For Toggle, select that mode and Save preferences first.
-3. Review the inserted text before sending. Sona sends no Enter or Tab. If the field changed, the transcript stays in Sona. Copy draft is an explicit action; a ready draft can also use Ctrl+Alt+Shift+V in its intended field.
+Open Sona from Start and focus an editable composer. Home owns the current draft;
+Settings, Modes, Dictation Models, Transcribe File, History, Vocabulary and Snippets
+have dedicated pages. Clean, Verbatim and Notes control text cleanup. Recognition
+hints, heard-as corrections and whole-utterance snippets have separate records.
 
-Quit Spokenly or Wispr Flow before using the shared shortcut. A visible capsule explains a detected competitor conflict. Failure to reserve an alternate shortcut does not disable the independent Ctrl+Win listener. Settings reports listener initialization. Actual physical key/input behavior still needs the [owner test](tools/owner-test.md).
+Dictation Models offers Tiny, Base, Small, Medium, Large v3 Turbo and Large v3.
+Explicit downloads show progress, support cancellation, and require pinned size
+and SHA256. Differing existing files are preserved. Verify & use selects a model.
+Download size is not memory use. Medium/Turbo/Large need the separately installed
+CUDA engine. Workers have bounded time/memory and unload after each utterance;
+failure leaves the previous draft intact.
 
-Clean applies conservative explicit fillers, vocabulary and exact whole-utterance snippets. Verbatim retains recognized words. Notes supports spoken paragraph commands. Vocabulary has separate recognition terms and heard-as corrections; snippets have add/edit/delete forms and lossless bulk import. Original text remains available. Natural self-correction and personal mixed-language accuracy are unproven.
+Only Small CPU and Turbo CUDA have measured Sona benchmarks: eight licensed
+French and eight English FLEURS clips. Other models are clearly unmeasured. Tiny
+passed a download/verification/selection and one French file-replay pilot, which
+is not an accuracy benchmark. [Benchmark context](docs/VERIFICATION.md).
 
-History searches original and cleaned text, has a 200-entry cap and stays in session memory by default. **Keep text history on this device** explicitly enables local text storage. Disabling saving leaves earlier saved records until Clear history is used. Clear history removes the exact history file and preserves the current draft. Audio is never retained as history.
+History stays in memory by default. Explicit local text saving is capped at 200
+entries and stores no audio. Turning saving off preserves earlier records until
+Clear history; clearing preserves the current draft. Transcribe File accepts short
+16 kHz mono PCM WAVs and never inserts automatically.
 
-Transcribe File accepts 16 kHz, 16-bit mono PCM WAVs up to two minutes and 4 MB. It never inserts automatically. All local engines unload after each utterance. GPU Auto uses installed Whisper Large v3 Turbo CUDA; explicit Lightweight CPU uses Whisper Small. The app downloads nothing automatically and has no account, cloud requests, analytics, sound effects or automatic submission.
+## Call protection
 
-## Build and install
+Settings can mute Discord during Sona or watched-app recording, optionally
+silencing incoming Discord audio. Sona waits for protection before opening its
+microphone. External apps use Windows activity polling with about 500 ms delay.
+Overlapping recordings retain protection until the final source ends. Manual
+mute/deafen is preserved; pause and quit restore only acknowledged owned changes.
+Failed restoration remains visible and can be retried.
 
-`tools/setup-runtime.ps1 -BuildTools` explicitly obtains hash-checked engine/model/SDK files in `E:/DevelopmentTools/local-dictation`. `tools/setup-cuda-runtime.ps1` explicitly prepares the separately pinned official CUDA engine, NVIDIA cuBLAS runtime and Turbo model. The .NET 8 desktop runtime is required. No driver, service or global PATH changes are made.
+Import Hush setup protects its credentials with Windows current-user encryption
+and lets you review watched apps/release preferences. Pause and quit Hush before
+connecting Sona; both must not control Discord together. Alternatively enter your
+own Discord developer application in the protected setup section. Discord RPC
+requires an authorized app/tester account; Sona ships no shared secrets. Legacy
+retirement and real-call acceptance require separate verification.
 
-`tools/build.ps1` builds and runs Core/Windows lifetime checks plus the NuGet advisory query. `tools/native-smoke.ps1` uses isolated data, disabled microphone/hotkeys and a 180-second test lifetime; it can run alongside an owner instance. Optional `-ReplayFile` uses a licensed fixture. `tools/prepare-release.ps1` requires a reviewed clean source commit and makes a source-identified package with hashes. `tools/install.ps1` requires both Sona and legacy Murmur to be stopped, verifies files, creates Sona's Start shortcut, and removes only a receipt/hash-verified legacy shortcut. Recovery versions and existing preferences stay intact.
+## Agent integrations and optional accounts
 
-Private source: https://github.com/JhinxDev/local-dictation, branch `codex/local-dictation`. Internal source/namespace and data directory names retain Murmur for compatibility. Startup stays opt in; only receipt-verified application-owned legacy Run entries can migrate. Add **Sona.exe** through Hush's existing Apps page before an owner-started real call test.
+`sona-agent` returns JSON status, validated settings patches, model
+discovery/download/verification and protection pause/resume. `--mcp` exposes the
+same named operations over MCP stdio. It connects to the running app through a
+current-user-only named pipe, without a public HTTP port. Credentials, history
+and microphone-start control are outside this API.
 
-## Proof and limits
+```powershell
+sona-agent status
+sona-agent settings patch '{"language":"fr","shortcutMode":"Toggle"}'
+sona-agent models list
+sona-agent models install tiny
+sona-agent protection status
+```
 
-The Sona build has 113 Core checks and 19 Windows checks. Native UI coverage verifies forms, settings, history search/clear/relaunch, no-mic capsule preview and harmless prepared insertion text. The licensed 8 English/8 French FLEURS corpus, measured before the shell rename with unchanged ASR settings, gave Turbo CUDA 9.91% French and 5.77% English word error rates, median 0.9025/0.81 seconds respectively. These are finite public-corpus measurements, not personal speech acceptance.
+[Agent setup and MCP configuration](docs/AGENT-INTERFACE.md).
 
-Windows global input cannot atomically bind focus checking to a single field; OS acceptance alone does not prove retained destination text. Actual Codex insertion, physical Hold/Toggle/Esc, bilingual microphone speech, focus/device/sleep behavior, Hush calls and owner visual acceptance remain open. Optional cloud speech and AI rewriting are unimplemented. See [verification](docs/VERIFICATION.md), [design](docs/DESIGN.md), [reference findings](docs/REFERENCE-BEHAVIOR.md) and [third-party notices](THIRD-PARTY-NOTICES.md).
+Google sign-in and sync are not implemented or enabled. A future optional desktop
+OAuth integration could store opted-in settings/vocabulary in Drive's private
+app-data folder without a Sona email database. Audio, transcripts and credentials
+are excluded. [Integration design](docs/INTEGRATED-SONA.md).
+
+## Build and installation
+
+Windows x64 and the .NET 8 desktop runtime are required.
+`tools/setup-runtime.ps1 -BuildTools` explicitly prepares pinned CPU runtime and
+SDK files. Default runtime is `%LOCALAPPDATA%\Sona\runtime`, with compatibility
+for the existing development runtime. `SONA_RUNTIME` overrides it;
+`MURMUR_RUNTIME` remains supported. CUDA setup is separate. Models, SDKs and CUDA
+redistributables are not bundled in the application package.
+
+`tools/build.ps1` builds app/agent, runs safety checks and queries NuGet advisories.
+`tools/native-smoke.ps1` checks isolated UI; `tools/agent-smoke.ps1` checks CLI/MCP,
+optionally adding one explicit download with `-DownloadTiny`. Tests use no real
+microphone or global input. Native test instances have a 180-second lifetime.
+
+`tools/prepare-release.ps1` requires reviewed clean source and creates a hashed
+app/agent package. `tools/install.ps1` verifies files and creates the Start shortcut.
+Startup stays opt in. Internal Murmur names/data paths preserve preferences. There
+is no automatic cloud transcription, analytics, sound effects or submission.
+
+The repository remains private while preparing eventual open-source distribution.
+Public release must exclude private history, user data, credentials and runtime
+redistributables. [Third-party notices](THIRD-PARTY-NOTICES.md),
+[owner test](tools/owner-test.md).

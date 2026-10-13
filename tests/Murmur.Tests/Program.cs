@@ -106,4 +106,83 @@ try { HistoryStore.Load(historyPath); } catch (System.Text.Json.JsonException) {
 Check(invalidHistory && File.ReadAllText(historyPath) == "{malformed", "Malformed history is preserved instead of silently replaced"); File.Delete(historyPath);
 preferences = new Preferences { ShortcutMode = "Toggle", KeepHistory = true }; preferences.Save(path);
 Check(Preferences.Load(path).ShortcutMode == "Toggle" && Preferences.Load(path).KeepHistory, "Explicit toggle mode and opt-in history survive reload"); File.Delete(path);
+Check(ModelCatalog.All.Count == 6 && ModelCatalog.All.Select(m => m.Id).Distinct().Count() == 6 && ModelCatalog.All.All(m => m.Sha256.Length == 64 && m.DownloadUrl.Contains(ModelCatalog.Revision)), "Six bounded model identities pin conversion revision, file size and SHA256");
+bool InvalidPatch(string json) { try { using var j = System.Text.Json.JsonDocument.Parse(json); AgentSettings.Apply(new(), j.RootElement); return false; } catch (ArgumentException) { return true; } }
+Check(InvalidPatch("{\"language\":\"secret-input\"}") && InvalidPatch("{\"startup\":true}") && InvalidPatch("{\"device\":256}") && InvalidPatch("{\"autoInsert\":\"false\"}") && InvalidPatch("{\"model\":\"../../other\"}") && InvalidPatch("{\"language\":\"en\",\"language\":\"fr\"}"), "Agent settings reject unknown, mistyped, overbound, duplicate and path-like values");
+using (var j = System.Text.Json.JsonDocument.Parse("{\"language\":\"fr\",\"model\":\"tiny\",\"autoInsert\":false}"))
+{
+    var originalPreferences = new Preferences(); var patched = AgentSettings.Apply(originalPreferences, j.RootElement);
+    Check(patched.Language == "fr" && patched.Model == "tiny" && !patched.AutoInsert && originalPreferences.Language == "auto" && originalPreferences.Model == "auto", "Validated agent patch preserves original state until committed");
+}
+using (var stream = new MemoryStream())
+{
+    await AgentProtocol.WriteAsync(stream, new AgentReply(true, new { state = "idle" }), default); stream.Position = 0;
+    Check((await AgentProtocol.ReadAsync<AgentReply>(stream, default)).Ok, "Agent messages round trip with finite length framing");
+}
+using (var stream = new MemoryStream(BitConverter.GetBytes(AgentProtocol.MaximumBytes + 1)))
+{
+    var rejected = false; try { await AgentProtocol.ReadAsync<AgentReply>(stream, default); } catch (IOException) { rejected = true; }
+    Check(rejected, "Oversized agent frames fail before payload allocation");
+}
+var modelTestRoot = Path.Combine(Path.GetTempPath(), "sona-model-test-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(modelTestRoot); var store = new ModelStore(modelTestRoot);
+File.WriteAllText(store.PathFor("tiny"), "unrelated existing bytes");
+var preservedModel = false; try { await store.InstallAsync("tiny", null, default); } catch (IOException) { preservedModel = true; }
+Check(preservedModel && File.ReadAllText(store.PathFor("tiny")) == "unrelated existing bytes" && Directory.GetFiles(modelTestRoot).Length == 1, "Model installation preserves mismatched existing files before any network request");
+File.Delete(store.PathFor("tiny")); Directory.Delete(modelTestRoot);
+var voice = new FakeVoice(); var protectionController = new MicProtection(voice);
+await protectionController.ConfigureAsync(true, 0, default);
+await protectionController.SetSourcesAsync(new[] { "sona" }, default);
+Check(voice.State.Muted && voice.State.Deafened && protectionController.OwnsChanges, "Protection acquires acknowledged mute and deafen before own recording");
+await protectionController.SetSourcesAsync(new[] { "sona", "other" }, default);
+await protectionController.SetSourcesAsync(new[] { "other" }, default);
+Check(voice.State.Muted && voice.State.Deafened, "Overlapping microphone sources retain protection");
+await protectionController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(!voice.State.Muted && !voice.State.Deafened && voice.Changes.TakeLast(2).SequenceEqual(new[] { "deafen:False", "mute:False" }), "Final source restores deafen then mute");
+voice.State = new(true, true, true); await protectionController.SetSourcesAsync(new[] { "manual" }, default); await protectionController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(voice.State.Muted && voice.State.Deafened && !protectionController.OwnsChanges, "Pre-existing manual mute and deafen remain untouched");
+voice.State = new(true, false, false); await protectionController.SetSourcesAsync(new[] { "active" }, default); await protectionController.PauseAsync(true, default);
+Check(!voice.State.Muted && !voice.State.Deafened, "Pause restores only protection-owned changes");
+await protectionController.PauseAsync(false, default);
+Check(voice.State.Muted && voice.State.Deafened, "Resume reconciles sources that remain active");
+voice.State = new(true, false, false); await protectionController.ObserveAsync(voice.State, default);
+await protectionController.SetSourcesAsync(new[] { "active" }, default);
+Check(!voice.State.Muted && !protectionController.OwnsChanges, "Manual unmute is not overwritten by unchanged microphone polling");
+voice.State = new(true, true, true); await protectionController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(voice.State.Muted && voice.State.Deafened, "Manual re-mute after ownership revocation is preserved");
+voice.State = new(true, false, false); await protectionController.SetSourcesAsync(new[] { "close" }, default); await protectionController.CloseAsync(default);
+Check(!voice.State.Muted && !voice.State.Deafened && !protectionController.OwnsChanges, "Orderly quit acknowledges owned voice restoration");
+var orderedVoice = new FakeVoice(); var orderedController = new MicProtection(orderedVoice); await orderedController.ConfigureAsync(true, 0, default);
+await orderedController.SetSourcesAsync(new[] { "ordered" }, default);
+orderedVoice.Observe(false, false); orderedVoice.Observe(true, true);
+await orderedController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(orderedVoice.State.Muted && orderedVoice.State.Deafened && !orderedController.OwnsChanges, "Ordered unmute then manual remute revokes ownership even when the latest state is muted");
+var duringReleaseVoice = new FakeVoice(); var duringReleaseController = new MicProtection(duringReleaseVoice); await duringReleaseController.ConfigureAsync(true, 0, default); await duringReleaseController.SetSourcesAsync(new[] { "during-release" }, default);
+duringReleaseVoice.DuringUndeafen = () => { duringReleaseVoice.Observe(false, false); duringReleaseVoice.Observe(true, false); };
+await duringReleaseController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(duringReleaseVoice.State.Muted && !duringReleaseVoice.State.Deafened && !duringReleaseController.OwnsChanges, "Manual re-mute during undeafen acknowledgement is preserved before deciding to unmute");
+var retryVoice = new FakeVoice(); var retryController = new MicProtection(retryVoice); await retryController.ConfigureAsync(true, 1, default); await retryController.SetSourcesAsync(new[] { "retry" }, default);
+retryVoice.RejectRelease = true; await retryController.SetSourcesAsync(Array.Empty<string>(), default); await Task.Delay(30);
+Check(retryController.OwnsChanges && retryController.Status.Contains("retry"), "Failed delayed restoration retains ownership and surfaces retry state");
+retryVoice.RejectRelease = false; await retryController.SetSourcesAsync(Array.Empty<string>(), default);
+Check(!retryVoice.State.Muted && !retryVoice.State.Deafened && !retryController.OwnsChanges, "Idle polling retries failed delayed voice restoration");
+var joinVoice = new FakeVoice { State = new(false, false, false) }; var joinController = new MicProtection(joinVoice); await joinController.SetSourcesAsync(new[] { "existing-recording" }, default);
+joinVoice.State = new(true, false, false); await joinController.EnsureProtectedAsync(default);
+Check(joinVoice.State.Muted && joinVoice.State.Deafened, "Call-entry reconciliation protects a recording that began outside a call");
+Check(ProtectionShortcut.TryParse("ctrl+shift+h", out var pauseModifiers, out var pauseKey) && pauseModifiers == 0x4006 && pauseKey == 0x48 && ProtectionShortcut.TryParse("alt+F24", out _, out _) && !ProtectionShortcut.TryParse("ctrl+ctrl+h", out _, out _) && !ProtectionShortcut.TryParse("ctrl+win", out _, out _) && !ProtectionShortcut.TryParse("shift+h", out _, out _), "Pause shortcut accepts bounded keyed combinations and rejects duplicate or modifier-only shortcuts");
 Console.WriteLine($"{count} checks passed.");
+
+sealed class FakeVoice : IVoiceProtectionTransport
+{
+    public VoiceState State { get; set; } = new(true, false, false);
+    public List<string> Changes { get; } = [];
+    public bool RejectRelease { get; set; }
+    public Action? DuringUndeafen { get; set; }
+    private readonly Queue<VoiceObservation> observations = new();
+    public long ObservationVersion { get; private set; }
+    public void Observe(bool mute, bool deaf) { State = State with { Muted = mute, Deafened = deaf }; observations.Enqueue(new(++ObservationVersion, mute, deaf, false)); }
+    public IReadOnlyList<VoiceObservation> DrainObservations() { var result = observations.ToArray(); observations.Clear(); return result; }
+    public Task<VoiceState> ReadAsync(CancellationToken cancellation) => Task.FromResult(State);
+    public Task<bool> SetMuteAsync(bool value, CancellationToken cancellation) { if (!value && RejectRelease) return Task.FromResult(false); State = State with { Muted = value }; Changes.Add("mute:" + value); return Task.FromResult(true); }
+    public Task<bool> SetDeafenAsync(bool value, CancellationToken cancellation) { if (!value && RejectRelease) return Task.FromResult(false); State = State with { Deafened = value }; Changes.Add("deafen:" + value); if (!value) DuringUndeafen?.Invoke(); return Task.FromResult(true); }
+}

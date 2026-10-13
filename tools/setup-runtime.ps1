@@ -1,4 +1,4 @@
-param([string]$RuntimeRoot = 'E:\DevelopmentTools\local-dictation', [switch]$BuildTools)
+param([string]$RuntimeRoot = $(if($env:SONA_RUNTIME){$env:SONA_RUNTIME}elseif(Test-Path -LiteralPath 'E:\DevelopmentTools\local-dictation\whisper'){'E:\DevelopmentTools\local-dictation'}else{Join-Path $env:LOCALAPPDATA 'Sona\runtime'}), [switch]$BuildTools)
 $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath($RuntimeRoot)
 New-Item -ItemType Directory -Path $taskRoot -Force | Out-Null
@@ -26,7 +26,7 @@ foreach ($taskFile in $taskManifest.EngineFiles) {
     $taskPath = Join-Path (Join-Path $taskRoot 'whisper\Release') $taskFile.Name
     if (!(Test-Path -LiteralPath $taskPath) -or (Get-FileHash -LiteralPath $taskPath).Hash.ToLowerInvariant() -ne $taskFile.SHA256) { throw "Pinned engine file differs: $($taskFile.Name)" }
 }
-FetchChecked 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin' (Join-Path $taskRoot 'models\ggml-small-q5_1.bin') 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'
+FetchChecked 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin' (Join-Path $taskRoot 'models\ggml-small-q5_1.bin') 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'
 if ($BuildTools -and !(Test-Path -LiteralPath (Join-Path $taskRoot 'sdk\dotnet.exe'))) {
     $taskSdkArchive = Join-Path $taskRoot 'downloads\dotnet-sdk-8.0.425-win-x64.zip'
     FetchChecked 'https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.425/dotnet-sdk-8.0.425-win-x64.zip' $taskSdkArchive 'f0b6f15bf6f1a0507205c0cb102ab99e1dee875c4682c8ed94665be1d580186a06b21455e83b3a01a0ff7f4cd887b67420f2e2fe09ed985534a4cea488ae1af9' 'SHA512'

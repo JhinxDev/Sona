@@ -10,7 +10,7 @@ public sealed class Hotkeys : IDisposable
     private readonly nint handle;
     private readonly HwndSource source;
     private readonly Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
-    private readonly Func<bool, bool> begin;
+    private readonly Func<bool, Task<bool>> begin;
     private readonly Action finish;
     private readonly Action cancel;
     private readonly Action insert;
@@ -36,7 +36,9 @@ public sealed class Hotkeys : IDisposable
     private const uint BaselineMessage = 0x8002;
     private const uint ReconcileMessage = 0x8003;
     public Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { }
-    internal Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null)
+    internal Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null) : this(handle, hold => Task.FromResult(begin(hold)), finish, cancel, insert, registerLegacy, toggleMode) { }
+    public Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { }
+    private Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null)
     {
         this.handle = handle; this.begin = begin; this.finish = finish; this.cancel = cancel; this.insert = insert;
         this.toggleMode = toggleMode ?? (() => false);
@@ -110,14 +112,15 @@ public sealed class Hotkeys : IDisposable
     {
         if (change.Action == HoldAction.None) return;
         var epoch = Interlocked.Read(ref admissionEpoch);
-        dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(async () =>
         {
             if (Volatile.Read(ref disposed) != 0) return;
             if (change.Action == HoldAction.Begin)
             {
                 if (epoch != Interlocked.Read(ref admissionEpoch) || Volatile.Read(ref admitsHold) == 0 || (change.Toggle ? gesture.PendingToggle != change.Generation : gesture.Current != change.Generation || !PhysicalChord())) return;
+                if (startingGeneration != 0) return;
                 startingGeneration = change.Generation;
-                try { if (begin(!change.Toggle)) { activeGeneration = change.Generation; activeIsHold = !change.Toggle; if (change.Toggle) gesture.ConsumeToggle(change.Generation); else watchdog.Start(); } else Reset(); }
+                try { if (await begin(!change.Toggle) && epoch == Interlocked.Read(ref admissionEpoch) && Volatile.Read(ref disposed) == 0) { activeGeneration = change.Generation; activeIsHold = !change.Toggle; if (change.Toggle) gesture.ConsumeToggle(change.Generation); else watchdog.Start(); } else Reset(); }
                 finally { startingGeneration = 0; }
             }
             else if (activeGeneration == change.Generation)
@@ -125,14 +128,14 @@ public sealed class Hotkeys : IDisposable
                 activeGeneration = 0; watchdog.Stop();
                 if (change.Action == HoldAction.Finish) { if (activeIsHold) finish(); } else cancel();
             }
-        });
+        }));
     }
     private nint WindowHook(nint hwnd, int msg, nint wparam, nint lparam, ref bool handled)
     {
         if (msg == 0x0312 && (wparam == 2 || wparam == 4))
         {
             handled = true;
-            if (wparam == 2) begin(false); else insert();
+            if (wparam == 2) _ = begin(false); else insert();
         }
         return 0;
     }
