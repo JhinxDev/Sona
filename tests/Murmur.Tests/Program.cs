@@ -144,7 +144,9 @@ try { HistoryStore.Load(historyPath); } catch (System.Text.Json.JsonException) {
 Check(invalidHistory && File.ReadAllText(historyPath) == "{malformed", "Malformed history is preserved instead of silently replaced"); File.Delete(historyPath);
 preferences = new Preferences { ShortcutMode = "Toggle", KeepHistory = true }; preferences.Save(path);
 Check(Preferences.Load(path).ShortcutMode == "Toggle" && Preferences.Load(path).KeepHistory, "Explicit toggle mode and opt-in history survive reload"); File.Delete(path);
-Check(ModelCatalog.All.Count == 6 && ModelCatalog.All.Select(m => m.Id).Distinct().Count() == 6 && ModelCatalog.All.All(m => m.Sha256.Length == 64 && m.DownloadUrl.Contains(ModelCatalog.Revision)), "Six bounded model identities pin conversion revision, file size and SHA256");
+Check(ModelCatalog.All.Select(m => m.Id).Distinct().Count() == ModelCatalog.All.Count && ModelCatalog.All.All(m => m.Sha256.Length == 64 && m.Bytes > 0 && m.DownloadUrl.Contains(m.Revision)), "Speech model identities pin their provider conversion revision, file size and SHA256");
+SpeechProtocolChecks.Run(Check);
+SpeechAudioChecks.Run(Check);
 bool InvalidPatch(string json) { try { using var j = System.Text.Json.JsonDocument.Parse(json); AgentSettings.Apply(new(), j.RootElement); return false; } catch (ArgumentException) { return true; } }
 Check(InvalidPatch("{\"language\":\"secret-input\"}") && InvalidPatch("{\"startup\":true}") && InvalidPatch("{\"device\":256}") && InvalidPatch("{\"autoInsert\":\"false\"}") && InvalidPatch("{\"model\":\"../../other\"}") && InvalidPatch("{\"language\":\"en\",\"language\":\"fr\"}"), "Agent settings reject unknown, mistyped, overbound, duplicate and path-like values");
 using (var j = System.Text.Json.JsonDocument.Parse("{\"language\":\"fr\",\"model\":\"tiny\",\"autoInsert\":false}"))

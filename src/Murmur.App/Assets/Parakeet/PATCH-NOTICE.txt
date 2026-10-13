@@ -1,0 +1,11 @@
+Sona local scheduler metadata compatibility repair, scheduler-metadata-v1.
+Built from ggml-org/llama.cpp bd4f514db14d87fded667787a7a963bfbaa98e89
+plus the 19 NVIDIA NeMo-Speech.cpp v0.2.0 patch series and Sona's
+scheduler-metadata.patch. Upstream code remains MIT; NVIDIA-authored
+patches retain Apache-2.0 and original notices. See accompanying licenses.
+
+The change retains graph capacity while allocating scheduler copy metadata
+lazily from actual node+leaf counts, with overflow and allocation checks.
+Sona's modification is distributed under the MIT terms in GGML-LICENSE.txt.
+No zero-allocation workaround or diagnostic instrumentation is included.
+Source patch, pins and rebuild instructions are in tools/parakeet.

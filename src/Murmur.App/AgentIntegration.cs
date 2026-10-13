@@ -75,7 +75,7 @@ public partial class MainWindow
                 modelPreparation = WarmAllSelectedAsync(); return new(true, new { preparation = "started" });
             case "models.list": return new(true, ModelCatalog.All.Select(m => new { m.Id, m.Name, m.Bytes, m.ParametersMillions, m.Description, m.Measurements, installed = modelStore.Present(m.Id), selected = Transcriber.SelectedModel(preferences) == m.Id, requiresCuda = ModelCatalog.NeedsCuda(m.Id) }).ToArray());
             case "models.info":
-                var model = ModelCatalog.Get(ModelId(request.Parameters)); return new(true, new { model, installed = modelStore.Present(model.Id), license = "MIT", revision = ModelCatalog.Revision });
+                var model = ModelCatalog.Get(ModelId(request.Parameters)); return new(true, new { model, installed = modelStore.Present(model.Id), license = model.License, revision = model.Revision });
             case "models.install":
                 var installId = ModelId(request.Parameters); ModelCatalog.Get(installId);
                 if (downloadingModel != null) return new(false, Error: "Another model download is running.");

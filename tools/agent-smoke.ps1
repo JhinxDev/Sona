@@ -17,7 +17,11 @@ try
     for($taskTry=0;$taskTry -lt 40;$taskTry++){$taskStatus=Agent @('status');if($taskStatus.ok){break};Start-Sleep -Milliseconds 100}
     Verify ($taskStatus.ok -and $taskStatus.data.state -eq 'idle' -and -not $taskStatus.data.microphoneControl) 'Local agent discovers isolated idle app without microphone controls'
     $taskModels=Agent @('models','list')
-    Verify ($taskModels.ok -and $taskModels.data.Count -eq 6 -and @($taskModels.data | Where-Object id -eq 'small')[0].installed) 'Agent lists six models and actual installed state'
+    Verify ($taskModels.ok -and $taskModels.data.Count -eq 7 -and @($taskModels.data | Where-Object id -eq 'small')[0].installed) 'Agent lists seven local choices and actual installed state'
+    $taskParakeetInfo=Agent @('models','info','parakeet-v3')
+    Verify ($taskParakeetInfo.ok -and $taskParakeetInfo.data.license-eq'CC-BY-4.0' -and $taskParakeetInfo.data.revision-eq'541d1f99c6b0c3cd0b11a95167540bb8edefd82b') 'Agent publishes provider-specific Parakeet license and immutable artifact revision'
+    $taskParakeetPatch=Agent @('settings','patch','{"model":"parakeet-v3","theme":"amethyst","copyToClipboard":true}')
+    Verify ($taskParakeetPatch.ok -and $taskParakeetPatch.data.model-eq'parakeet-v3' -and $taskParakeetPatch.data.theme-eq'amethyst' -and $taskParakeetPatch.data.copyToClipboard) 'Parakeet selection uses the validated agent settings path with saved theme and clipboard backup'
     $taskPatch=Agent @('settings','patch','{"language":"fr","engine":"FastCpu","model":"small","autoInsert":false}')
     Verify ($taskPatch.ok -and $taskPatch.data.language -eq 'fr' -and -not $taskPatch.data.autoInsert) 'Validated patch changes supported local settings'
     $taskSaved=Get-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Raw | ConvertFrom-Json

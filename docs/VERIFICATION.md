@@ -1,5 +1,67 @@
 # Candidate verification
 
+## 0.4.0 Parakeet and English-first model choice, October 13
+
+Core regression gate: 277 checks. The maintained real Windows speech fixture
+passed 19 checks for verified CPU/CUDA provisioning, cancellation, tampered-file
+preservation, locked-partial retry, residency/expiry/Keep until quit, CPU fallback,
+long-recording completion, queued/active audio clearing and confirmed unload.
+The separate paired-memory fixture also proved actual Whisper-to-Parakeet worker
+replacement and confirmed owned process exit. No microphone, owner text or global
+input was used. Read-only reviews closed the HTTP exception handling issue and
+found no remaining blocker in native scheduler packaging or bounded audio splitting.
+
+On the same eight distinct English FLEURS clips, Parakeet v3 had 8 word errors
+out of 156 (5.13%) and 20.5 ms median warm latency; Whisper Turbo had 9 errors
+(5.77%) and 144.3 ms. Each English clip had three timing requests; accuracy uses
+one pass per distinct clip. Punctuation is ignored; numerical spelling differences
+count. These speech-only measurements establish neither complete dictation latency
+nor personal-accent accuracy. Paired device-wide loading deltas were 974 versus
+1000 MiB. Peak host commit during clips was 2279 versus 1904 MiB; working sets
+were 340 versus 377 MiB. Commit, working set, VRAM and download size are distinct.
+
+Parakeet additionally completed eight French clips at 5.60% WER / 22.0 ms.
+Whisper's existing b5454 CUDA server failed a mixed-language resident sequence
+with native illegal-memory-access below its memory ceiling. Graph-disable failed
+to repair that route; it stopped, with failed evidence retained. Its completed
+comparison is English-only. No unverified production Whisper workaround was added.
+
+The stock NeMo runtime failed an eager 1.32 GB scheduler metadata allocation.
+The earlier zero-byte allocation theory was disproved. The reviewed, reproducible
+ggml metadata repair retains full graph capacity, conservative copy bounds and
+691 original exports while allocating from actual graph size. Startup and speech
+now stay within the unchanged 3 GiB host worker limit. A single 80.88-second native
+request omitted its final sentence; the exact native cause remains unestablished.
+Sona's quiet-boundary segments cover every PCM sample once, use one overall
+deadline and restore that final sentence (173 ms on the fixture). Eight maintained
+Core cases guard sample coverage, final remainder, formats and bounds.
+
+See PARAKEET.md and tools/parakeet for exact model/archive/binary/source/license
+pins and regeneration instructions. General Windows regressions passed 47 checks;
+live CLI/MCP passed 19, retaining all 18 tools. Native model-picker checks passed
+17 each at 1000x700 and 740x530 DIP; both screenshots were visually inspected.
+Real Use model actions switched both ways and saved Amethyst. The model footer
+now describes per-model licenses and current measurement units accurately.
+The first GUI harness tried an AutomationId for the title-bar close control,
+then observed WPF's peer-replacement Invoke error after an action had committed.
+The maintained harness closes its exact process window and requires persisted
+selection plus the newly enabled action before accepting that provider error.
+Compact scrolling initially passed the last model to reach the footer; direct
+row alignment repaired that harness assumption. These were not layout regressions.
+Installed private-package readback remains a separate exact-target receipt.
+Existing 0.3.3 appearance persistence, compact cleanup layout and encrypted-update
+recovery evidence are reused; no change was made to those implementations.
+
+Evidence: `E:/Temp/qazws/sona040-core-final.log`, `sona040-speech-final.json`,
+`sona040-speech-segment-qualified.log`, `sona040-gpu-paired-memory.json`,
+`sona040-long-tail-failure.json`, `sona040-whisper-all-clips-probe.json`,
+`sona040-whisper-graphs-disabled-probe.json`, `sona-parakeet-probe-scheduler.json`.
+The initial benchmark's negative Whisper VRAM deltas had a contaminated baseline
+and are not valid model measurements; the paired-memory fixture replaces them.
+Additional evidence: `sona040-windows-final.log`, `sona040-agent-final/agent-smoke.json`,
+`sona040-models-normal-qualified/models-ui-smoke.json`,
+`sona040-models-compact-verified/models-ui-smoke.json` and their screenshots.
+
 ## 0.3.3 compact controls and saved appearance, October 13
 
 The owner rejected the oversized local-cleanup selectors and reported Amethyst

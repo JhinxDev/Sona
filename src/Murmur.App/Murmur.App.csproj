@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><AssemblyName>Sona</AssemblyName><Product>Sona</Product><Title>Sona</Title><Version>0.3.3</Version><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/Murmur.ico</ApplicationIcon></PropertyGroup>
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><AssemblyName>Sona</AssemblyName><Product>Sona</Product><Title>Sona</Title><Version>0.4.0</Version><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/Murmur.ico</ApplicationIcon></PropertyGroup>
   <ItemGroup><ProjectReference Include="../Murmur.Core/Murmur.Core.csproj"/><PackageReference Include="NAudio" Version="2.2.1"/></ItemGroup>
   <ItemGroup><Using Remove="System.Windows.Forms"/><Using Remove="System.Drawing"/></ItemGroup>
   <ItemGroup><Resource Include="Assets/Murmur.ico"/></ItemGroup>
   <ItemGroup><Resource Include="Assets/Fonts/*.ttf"/><Content Include="Assets/Sona.svg" CopyToOutputDirectory="PreserveNewest"/><Content Include="Assets/Fonts/LICENSE.txt" CopyToOutputDirectory="PreserveNewest"/><Content Include="Assets/Fonts/PROVENANCE.md" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
+  <ItemGroup><Content Include="Assets/Parakeet/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/></ItemGroup>
 </Project>

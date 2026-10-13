@@ -386,8 +386,9 @@ public partial class MainWindow : Window
         try { await modelDownloadOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for model download cleanup", "Try Quit again shortly."); return; }
-        try { await modelStore.RetryCleanupAsync(); }
+        try { await modelStore.RetryCleanupAsync(); await ParakeetAssets.RetryCleanupAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (IOException) { ShowCleanupFailure("Partial model download needs cleanup", "A model file is still locked. Try Quit again shortly."); return; }
+        catch (TimeoutException) { ShowCleanupFailure("Parakeet setup needs cleanup", "Try Quit again after the runtime files finish releasing."); return; }
         if (agentServer != null) { await agentServer.DisposeAsync(); agentServer = null; }
         if (protection != null)
         {

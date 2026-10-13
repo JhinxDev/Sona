@@ -11,6 +11,16 @@ if (args.Length == 2 && args[0] == "--cleanup-fixture")
     BoundedProcess.ContainApplication();
     await CleanupIntegrationChecks.RunAsync(args[1]); return;
 }
+if (args.Length == 5 && args[0] == "--speech-fixture")
+{
+    BoundedProcess.ContainApplication();
+    await ParakeetIntegrationChecks.RunAsync(args[1], args[2], args[3], args[4]); return;
+}
+if (args.Length == 2 && args[0] == "--speech-memory-fixture")
+{
+    BoundedProcess.ContainApplication();
+    await ParakeetIntegrationChecks.MemoryAsync(args[1]); return;
+}
 if (args.Length > 0 && args[0] == "--held-file")
 {
     using var held = new FileStream(args[1], FileMode.Create, FileAccess.ReadWrite, FileShare.None);

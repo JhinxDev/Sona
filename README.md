@@ -3,7 +3,7 @@
 **Local voice dictation for Windows, with a draft you stay in control of.**
 
 Speak into a focused text field, review your words, and send them yourself.
-Sona runs Whisper on your computer, keeps the selected model warm between
+Sona runs Parakeet or Whisper on your computer, keeps the selected model warm between
 dictations, optionally polishes your text locally, and can protect your Discord
 call while you record.
 
@@ -14,9 +14,13 @@ agent workflows. Local dictation already has good alternatives; Sona focuses
 on this particular combination of native Windows UI, careful draft insertion,
 and call protection. [Compare the approaches](docs/ALTERNATIVES.md).
 
-**Private preview.** Version 0.3.3 keeps appearance choices saved immediately
-and refines the compact local-cleanup controls. Optional local text polishing
-supports GPU acceleration. Source and native fixture checks are separate from owner testing.
+**Private preview.** Version 0.4.0 adds NVIDIA Parakeet v3 beside Whisper,
+with CPU/GPU execution, warm residency and an English-focused comparison.
+On one RTX 4080 SUPER, Parakeet's median warm request was 21 ms versus Whisper
+Turbo's 144 ms, with slightly fewer word errors on eight English clips.
+These are speech-only measurements on a small test set. [Results and limits](docs/PARAKEET.md).
+Optional local text polishing supports GPU acceleration. Source and native
+fixture checks are separate from owner testing.
 There is no published binary download yet. Source and private packages remain
 separate from a public release.
 
@@ -35,10 +39,10 @@ separate from a public release.
   default and can be enabled in Settings.
 - **See the recording.** Choose Panel or Capsule, with measured microphone
   levels, elapsed time, stop/cancel controls, and the captured target app name.
-- **Choose your local model.** Tiny, Base, Small, Medium, Large v3 Turbo and
-  Large v3 are six Whisper profiles, executed by whisper.cpp. Downloads are
-  explicit and checked against pinned sizes and hashes. Model selection and
-  residency are shown separately.
+- **Choose your local model.** NVIDIA Parakeet v3 runs through NeMo-Speech.cpp;
+  Tiny, Base, Small, Medium, Large v3 Turbo and Large v3 remain six Whisper
+  choices. Model and needed engine downloads are explicit and checked against
+  pinned sizes and hashes. Model selection and residency are shown separately.
 - **Avoid repeated loading.** One selected model stays resident until unload,
   a model switch, quit, or the idle timeout. The default is 10 minutes;
   Keep until quit is also available.
@@ -60,14 +64,16 @@ separate from a public release.
   An unavailable private release endpoint means no public release is available,
   not that you need to sign in.
 
-![Sona Dictation Models with local Whisper profiles](docs/images/sona-models.png)
+![Sona Dictation Models with Parakeet and Whisper choices](docs/images/sona-models.png)
 
 ## Start from source
 
 You need Windows x64, PowerShell, a microphone for live dictation, and .NET 8
 with Windows desktop support. Initial SDK, engine, model and NuGet downloads
 need network access. After setup, speech transcription runs locally. CUDA
-requires a separate compatible NVIDIA engine installation.
+requires a compatible NVIDIA driver and portable engine. Choosing Parakeet's
+Download or Use model action installs its pinned CPU or CUDA engine when needed;
+startup never downloads models. Whisper CUDA setup remains separate.
 
 From the repository root, prepare the pinned CPU engine, Small model and SDK:
 
@@ -100,7 +106,9 @@ Qualified private packages use `tools/install.ps1`; upgrades use
 `tools/upgrade.ps1 -PackageDirectory <package> -ProcessId <Sona PID>` to preserve
 an idle app's draft through an encrypted checkpoint. The installer verifies
 package files, creates a Start shortcut and stable `sona-agent` user-PATH entry.
-Startup is opt in. Engine/model/CUDA files are not bundled in the app package.
+Startup is opt in. Engine/model/CUDA files are separate downloads. A small,
+reviewed MIT/Apache-licensed ggml scheduler compatibility DLL is bundled for
+the Parakeet runtime; its source patch and rebuild instructions are included.
 
 ## CLI and MCP
 

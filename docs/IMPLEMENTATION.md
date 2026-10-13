@@ -10,7 +10,15 @@ The primary owner executes the tightly coupled app work. The notification diagno
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Create reviewed private Git history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current candidate identity is Sona 0.3.3; internal Murmur namespaces/data paths preserve compatibility. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current candidate identity is Sona 0.4.0; internal Murmur namespaces/data paths preserve compatibility. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+
+Parakeet qualification uses `Murmur.WindowsTests --speech-fixture <corpus> <fresh
+JSON> <pinned CUDA ZIP> <pinned CPU ZIP>` and `--speech-memory-fixture <fresh JSON>`.
+The licensed corpus stays outside Git. The fixture retains completed short-clip
+measurements when only the lifecycle harness changes; it never opens a microphone.
+`tools/models-ui-smoke.ps1` checks provider/license/status and real model actions
+at normal and compact sizes. See PARAKEET.md for pins, native compatibility
+source, the long-recording repair and the existing Whisper mixed-language limit.
 
 Optional cleanup uses shared Core preservation rules and processing orchestration,
 one contained llama.cpp worker, pinned separately downloaded assets, and the same

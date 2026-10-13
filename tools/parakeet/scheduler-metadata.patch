@@ -1,0 +1,71 @@
+diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
+index 20bf965..36bfa32 100644
+--- a/ggml/src/ggml-backend.cpp
++++ b/ggml/src/ggml-backend.cpp
+@@ -828,6 +828,7 @@ struct ggml_backend_sched {
+ 
+     char * context_buffer;
+     size_t context_buffer_size;
++    size_t context_graph_overhead;
+ 
+     bool op_offload;
+ 
+@@ -1069,14 +1070,42 @@ void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgra
+     sched->n_graph_inputs = 0;
+     sched->is_reset = false;
+ 
++    // Reserve copy metadata for the actual graph, rather than every possible
++    // node in the scheduler's capacity. The original per-node split/input
++    // bound is retained; including leaves also covers their copied tensors.
++    GGML_ASSERT(graph->n_nodes >= 0 && graph->n_leafs >= 0);
++    const size_t n_nodes = (size_t) graph->n_nodes;
++    const size_t n_leafs = (size_t) graph->n_leafs;
++    GGML_ASSERT(n_nodes <= SIZE_MAX - n_leafs);
++    const size_t tensor_count = n_nodes + n_leafs;
++    static_assert(GGML_SCHED_MAX_SPLIT_INPUTS <= SIZE_MAX / (2 * sizeof(struct ggml_tensor)),
++                  "scheduler metadata stride overflows");
++    const size_t copy_stride = GGML_SCHED_MAX_SPLIT_INPUTS * 2 * sizeof(struct ggml_tensor);
++    GGML_ASSERT(copy_stride > 0);
++    GGML_ASSERT(tensor_count <= (SIZE_MAX - sched->context_graph_overhead) / copy_stride);
++    const size_t required = tensor_count * copy_stride + sched->context_graph_overhead;
++
++    // The old context refers to the buffer, so release it before resizing.
++    // Allocate the replacement first: a failed growth preserves the old
++    // buffer and stops before a null buffer can reach ggml_init.
++    ggml_free(sched->ctx);
++    sched->ctx = NULL;
++    if (required > sched->context_buffer_size) {
++        char * replacement = (char *) malloc(required);
++        if (replacement == NULL) {
++            GGML_ABORT("%s: failed to allocate scheduler metadata (%zu bytes)", __func__, required);
++        }
++        free(sched->context_buffer);
++        sched->context_buffer = replacement;
++        sched->context_buffer_size = required;
++    }
++
+     struct ggml_init_params params = {
+         /* .mem_size =   */ sched->context_buffer_size,
+         /* .mem_buffer = */ sched->context_buffer,
+         /* .no_alloc =   */ true
+     };
+ 
+-    ggml_free(sched->ctx);
+-
+     sched->ctx = ggml_init(params);
+     if (sched->ctx == NULL) {
+         GGML_ABORT("%s: failed to initialize context\n", __func__);
+@@ -1887,8 +1916,11 @@ ggml_backend_sched_t ggml_backend_sched_new(
+     sched->debug_graph_size = 0;
+     sched->debug_prev_graph_size = 0;
+ 
+-    sched->context_buffer_size = ggml_sched_max_splits*GGML_SCHED_MAX_SPLIT_INPUTS*2*sizeof(struct ggml_tensor) + ggml_graph_overhead_custom(graph_size, false);
+-    sched->context_buffer = (char *) malloc(sched->context_buffer_size);
++    // Keep full graph capacity; allocate tensor-copy metadata lazily from the
++    // actual graph at split time. Graph overhead retains the full capacity.
++    sched->context_graph_overhead = ggml_graph_overhead_custom(graph_size, false);
++    sched->context_buffer_size = 0;
++    sched->context_buffer = NULL;
+ 
+     const int initial_splits_capacity = 16;
+     sched->splits = (ggml_backend_sched_split *) calloc(initial_splits_capacity, sizeof(sched->splits[0]));

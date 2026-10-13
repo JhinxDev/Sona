@@ -20,12 +20,15 @@ public sealed class Transcriber
     public static string RuntimeRoot => Environment.GetEnvironmentVariable("SONA_RUNTIME") ?? Environment.GetEnvironmentVariable("MURMUR_RUNTIME") ?? (Directory.Exists("E:\\DevelopmentTools\\local-dictation\\whisper") ? "E:\\DevelopmentTools\\local-dictation" : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sona", "runtime"));
     public static bool CpuEngineAvailable => File.Exists(Path.Combine(RuntimeRoot, "whisper", "Release", "whisper-server.exe"));
     public static bool CudaEngineAvailable => new[] { "whisper-server.exe", "ggml-cuda.dll", "cublas64_11.dll", "cublasLt64_11.dll" }.All(name => File.Exists(Path.Combine(RuntimeRoot, "whisper-cuda", "Release", name)));
+    internal static bool ParakeetUsesCuda(Preferences p) => p.Engine != "FastCpu" && ParakeetAssets.Present(true);
+    internal static bool PreferParakeetCuda(Preferences p) => p.Engine != "FastCpu" && (ParakeetAssets.Present(true) || File.Exists(Path.Combine(Environment.SystemDirectory, "nvcuda.dll")));
     public static ModelStore Models => new(Path.Combine(RuntimeRoot, "models"));
     public static string SelectedModel(Preferences preferences) => preferences.Model != "auto" ? preferences.Model : preferences.Engine != "FastCpu" && CudaEngineAvailable && Models.Present("turbo") ? "turbo" : "small";
-    public bool Available => ModelCatalog.All.Any(m => Models.Present(m.Id) && (ModelCatalog.NeedsCuda(m.Id) ? CudaEngineAvailable : CpuEngineAvailable || CudaEngineAvailable));
+    public bool Available => ModelCatalog.All.Any(m => Models.Present(m.Id) && (m.IsParakeet ? ParakeetAssets.Present(true) || ParakeetAssets.Present(false) : ModelCatalog.NeedsCuda(m.Id) ? CudaEngineAvailable : CpuEngineAvailable || CudaEngineAvailable));
     public bool AvailableFor(Preferences preferences)
     {
         var id = SelectedModel(preferences);
+        if (ModelCatalog.Get(id).IsParakeet) return Models.Present(id) && ParakeetAssets.Present(ParakeetUsesCuda(preferences));
         return Models.Present(id) && (ModelCatalog.NeedsCuda(id) ? preferences.Engine != "FastCpu" && CudaEngineAvailable : CpuEngineAvailable || preferences.Engine != "FastCpu" && CudaEngineAvailable);
     }
     public Task<string> RunAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)

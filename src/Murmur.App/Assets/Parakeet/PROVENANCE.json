@@ -1,0 +1,49 @@
+{
+  "upstream": "https://github.com/ggml-org/llama.cpp",
+  "runtimeCommit": "6a3ca369370782acee0dd155e34394ba60b920c4",
+  "build": {
+    "requires": "Git, CMake>=3.26, Visual Studio2022 C++ x64 tools and Windows SDK. No CUDA toolkit.",
+    "windowsSdk": "10.0.26100.0",
+    "target": "ggml-base",
+    "configuration": "Release",
+    "visualStudioTools": "14.44.35207",
+    "compiler": "MSVC19.44.35227.0 x64"
+  },
+  "sourceArchives": [
+    {
+      "sha256": "6989d81b5cc895b809d1da1197fe7a01f07d7be7c41a18ab23ebca6278a02733",
+      "url": "https://github.com/NVIDIA/NeMo-Speech.cpp/archive/refs/tags/v0.2.0.zip"
+    },
+    {
+      "sha256": "d74b36880a15ad7e6889dc1bb1db7489e929e4110cc613b9716cfc31bc33bbe7",
+      "url": "https://github.com/ggml-org/llama.cpp/archive/bd4f514db14d87fded667787a7a963bfbaa98e89.zip"
+    }
+  ],
+  "rebuild": "Run rebuild.ps1 -OutputDirectory <new-empty-build-directory> -CMakePath <cmake> -GitPath <git>. It downloads and verifies pinned source archives, applies original NVIDIA patches, reconstructs this same source repair and builds only ggml-base. Different compiler/PE timestamps can change DLL byte hashes; new rebuilt bytes require independent acceptance and repinning.",
+  "verification": [
+    "691 official DLL export names and ordinals matched.",
+    "Root actual isolated CUDA startup passed original3072MiB budget; peak commit1974.45MiB, ASR readiness and authenticated inventory confirmed.",
+    "English/French accuracy, long audio, cancellation and complete product acceptance remain root-owned."
+  ],
+  "bundledDll": {
+    "file": "ggml-base.dll",
+    "sha256": "ada0590d50035510b7b4e09577ce849f7ef27ff4f43818c98b199da88839ec79",
+    "bytes": 679936
+  },
+  "patch": "scheduler-metadata-v1",
+  "upstreamCommit": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+  "license": {
+    "sonaModification": "MIT",
+    "ggml": "MIT",
+    "nvidiaPatches": "Apache-2.0"
+  },
+  "runtime": "https://github.com/NVIDIA/NeMo-Speech.cpp",
+  "originalDlls": {
+    "cpuSha256": "460afaa830b390add25ac11ee4f247ba2ea99368d337d068a5d84158e737f923",
+    "cudaSha256": "21747a2010b6e13f44d264f1746ca900e42b02175a72e7f9257ce7b991403513",
+    "bytes": 680960
+  },
+  "runtimeTag": "v0.2.0",
+  "nvidiaPatchCount": 19,
+  "patchSha256": "65798b97ffd076d075fc4bac518320aad42c6e4562329d015fe393499cb69f7c"
+}

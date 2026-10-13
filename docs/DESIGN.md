@@ -1,5 +1,13 @@
 # Sona design
 
+October 13, 0.4.0: the existing model rows add NVIDIA Parakeet v3, supported
+CPU/CUDA choices, provider-specific license/runtime metadata and measured English
+results. All six Whisper choices remain. Active selection and loaded state remain
+separate. Download/Use installs the needed pinned Parakeet engine explicitly;
+Cancel / retry download covers retained model/runtime partials. Layout, original
+provider waveform badges, theme persistence and compact cleanup controls retain
+the accepted 0.3.3 design.
+
 October 13, 0.3.3: the three TEXT CLEANUP selectors use the named SettingChoice
 style: 176 DIP wide, exactly 32 DIP tall, vertically centered in 48 DIP rows,
 with aligned right edges and 8 DIP above and below each control. The compact
@@ -44,7 +52,7 @@ stay flat. No random waveform masquerades as live input. Each preserves the
 nonactivating target-monitor positioning and accessible stop/cancel actions.
 
 The owner's speed preference supersedes the older exit-after-each-utterance
-design below: exactly one contained whisper-server worker holds the selected
+design below: exactly one contained Whisper or Parakeet worker holds the selected
 model until idle expiry, explicit unload, switching or quit. Default expiry is
 10 minutes; zero means Keep until quit. A randomized capability route on loopback
 is internal transport, with proxies disabled; the public agent surface remains
@@ -54,9 +62,10 @@ retains ownership, blocks replacement and is retried, never labeled unloaded.
 
 The model page has compact grouped rows with an Active dot/badge for next use,
 separate resident state, actual download sizes and only measured benchmark notes.
-All currently selectable families are OpenAI Whisper, independently executed by
-whisper.cpp. Other companies require a real runtime integration before appearing
-as supported choices. Provider typography is original rather than an official logo.
+Selectable families are OpenAI Whisper through whisper.cpp and NVIDIA Parakeet
+through NeMo-Speech.cpp. Other companies require a real runtime integration
+before appearing as supported choices. Provider typography is original rather
+than an official logo.
 
 Owner direction, October 12, 2026: reject the working name Murmur, choose Sona, and use six supplied Spokenly screenshots as the concrete interface reference. The earlier purple/hero/tab prototype was rejected. This document governs the current independent WPF implementation.
 
