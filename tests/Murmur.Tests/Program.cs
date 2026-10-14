@@ -215,7 +215,10 @@ using (var appearancePatch = System.Text.Json.JsonDocument.Parse("{\"theme\":\"a
     var originalSettings = new Preferences(); var changedSettings = AgentSettings.Apply(originalSettings, appearancePatch.RootElement);
     Check(changedSettings.Theme == "amethyst" && changedSettings.RecordingDisplay == "Panel" && changedSettings.ModelIdleMinutes == 30 && originalSettings.Theme == "charcoal", "Agent appearance and idle preferences clone without mutating current settings");
 }
-Check(ThemeCatalog.All.Count == 8 && ThemeCatalog.All.Count(t => t.IsDark) == 5 && ThemeCatalog.All.Select(t => t.Id).Distinct().Count() == 8, "Theme catalog contains eight distinct palettes grouped into five dark and three light");
+Check(ThemeCatalog.All.Count == 9 && ThemeCatalog.All.Count(t => t.IsDark) == 6 && ThemeCatalog.All.Select(t => t.Id).Distinct().Count() == 9, "Theme catalog contains nine distinct palettes grouped into six dark and three light");
+Check(ThemeCatalog.Resolve("amethyst-glass").UsesGlassMaterial && ThemeCatalog.Resolve("amethyst-glass").Label == "Amethyst Glass" && ThemeCatalog.All.Count(t => t.UsesGlassMaterial) == 1, "Only the optional Amethyst Glass theme enables native material treatment");
+var glassPreferences = new Preferences { Theme = "amethyst-glass" }; glassPreferences.Normalize();
+Check(glassPreferences.Theme == "amethyst-glass" && new Preferences().Theme == ThemeCatalog.DefaultId && ThemeCatalog.Resolve("amethyst").Colors["Accent"] == ThemeCatalog.Resolve("amethyst-glass").Colors["Accent"], "Glass preference is valid while defaults and original Amethyst accent remain unchanged");
 var invalidAppearance = new Preferences { Theme = "unknown", RecordingDisplay = "unknown", ModelIdleMinutes = -1 }; invalidAppearance.Normalize();
 Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDisplay == "Capsule" && invalidAppearance.ModelIdleMinutes == 0, "Malformed saved appearance and memory preferences normalize safely");
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))

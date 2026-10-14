@@ -21,6 +21,21 @@ into personal microphone or target-app acceptance.
   insertion or Discord call was recorded. The demo's disconnected Discord state
   is expected when Discord is closed.
 
+The optional Amethyst Glass addition was checked separately on October 14:
+279 core checks passed, followed by 26 native theme checks and eight captures.
+The real selector saved the theme in an isolated profile; Windows Mica readback,
+forced opaque fallback, compact layout and switching back to Amethyst/Paper were
+verified. Native theme checks preserve foreground, owner preferences and the
+installed application. Source default appearance is unchanged. The added glass
+screenshots use the new candidate rather than the earlier application assembly.
+Older Windows and an actual high-contrast policy change were not physically tested.
+The source includes OS, transparency and high-contrast guards with an opaque
+fallback; those guards are not a claim of testing every Windows configuration.
+
+Run `tools/theme-material-smoke.ps1` with explicit candidate, output and SDK paths
+for a bounded native material check. It requires the existing `winapp` capture CLI
+and uses a microphone-disabled test profile.
+
 The public README screenshots show real native controls and actual Parakeet /
 cleanup residency. They are demonstrations, not an accuracy or latency promise.
 

@@ -44,10 +44,17 @@ Screenshots use the real 0.4.0 interface with an isolated profile and synthetic 
   Sona or a watched ChatGPT/Codex app records, so others do not hear your
   dictation. Incoming audio can also be silenced. Overlapping recordings share
   protection, and restoration respects manual mute/deafen choices.
-- **Fit your workspace.** Eight light/dark themes, Inter typography, Panel or
+- **Fit your workspace.** Nine light/dark themes, Inter typography, Panel or
   Capsule recording displays, microphone level bars and local WAV transcription.
 - **Connect your tools.** A JSON CLI and stdio MCP interface manage status,
   validated settings, models and call protection without remote microphone control.
+
+Choose **Settings → Appearance → Amethyst Glass** to try layered violet surfaces,
+soft illumination and highlighted controls. On supported Windows 11 systems with
+transparency enabled, it uses Mica; an opaque material fallback is available.
+The existing Amethyst theme and new-profile defaults remain available.
+
+![Amethyst Glass appearance in a synthetic native demo](docs/images/sona-amethyst-glass.png)
 
 ![Parakeet and Whisper model choices](docs/images/sona-models.png)
 
