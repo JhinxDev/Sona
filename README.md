@@ -17,7 +17,8 @@ welcome.
 
 ![Sona with a sample editable draft](docs/images/sona-home.png)
 
-Screenshots use the real 0.4.0 interface with an isolated profile and synthetic text.
+All screenshots show the real 0.4.0 interface in Amethyst Glass, using the same
+native window size, an isolated profile and synthetic text.
 
 ## Everyday dictation
 
