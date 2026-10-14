@@ -17,7 +17,7 @@ public static class ThemeCatalog
     {
         Palette("charcoal", "Charcoal", true, "1F1F1F", "2B2B2D", "29292B", "797983", "F1F1F4", "B8B8C2", "6DC4FF", "006CCB", "203D60", "D4ECFF", "353B43"),
         Palette("amethyst", "Amethyst", true, "24212D", "302C3C", "292533", "877D99", "F3EFFA", "C0B7CF", "C4A6FF", "7050AC", "45345F", "ECDFFF", "3B3449"),
-        Palette("amethyst-glass", "Amethyst Glass", true, "171321", "2D233F", "201A2D", "8872AA", "FAF7FF", "CEC3DF", "C4A6FF", "794BC4", "53327C", "FCF9FF", "3D2B57"),
+        Palette("amethyst-glass", "Amethyst Glass", true, "09070E", "181320", "0D0B12", "655775", "FAF7FF", "C3BCD0", "C4A6FF", "68418E", "3B2856", "FCF9FF", "241C31"),
         Palette("fjord", "Fjord", true, "272F3B", "333E4C", "2D3744", "8092A5", "EBF1F7", "B6C6D7", "91CEDD", "306B83", "294B5E", "D6F2F8", "3E4D5D"),
         Palette("mocha", "Mocha", true, "242330", "302F40", "292838", "86819A", "EEEAF7", "C1BDD3", "E0B4CD", "8A466D", "52374E", "F7DEEE", "3D3749"),
         Palette("oled", "OLED", true, "09090C", "15151B", "101016", "66667B", "F4F4FA", "BDBDCB", "96B8FF", "315EB8", "1B2C50", "E3ECFF", "242430"),

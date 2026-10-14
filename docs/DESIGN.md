@@ -1,5 +1,22 @@
 # Sona design
 
+October 14, 0.4.0: optional Amethyst Glass uses a darker smoked violet material,
+requested to match the product film's studio. The base canvas is #09070E, panels
+#181320, inset #0D0B12 and edges #655775. Text remains #FAF7FF, secondary text
+#C3BCD0 and accent #C4A6FF. Primary #68418E and selection #3B2856 retain white
+labels. Frozen canvas gradients use #100B18 / #07060D / #0C0912; panel gradients
+use #21192C / #141019 / #1B1324. Ambient alpha values are 0x24, 0x20 and 0x18,
+with a dark scrim alpha of 60 and a limited action shadow at 16% opacity. Panel
+radius remains 14 DIP, with a 1 DIP selected navigation edge.
+
+Main-window Mica uses documented DWM_SYSTEMBACKDROP_TYPE on supported Windows 11
+with composition and transparency. The opaque fallback and theme reset remain.
+Inter, existing layout, original Amethyst and the Charcoal default are preserved.
+All README captures share dark Amethyst Glass, 1234 × 867 pixels and synthetic
+text. The changed source passed 279 core and 26 native checks, with actual loaded
+Parakeet and GPU cleanup captures. Older Windows and physical high-contrast
+behavior have source guards but were not exercised in these native captures.
+
 October 13, 0.4.0: the existing model rows add NVIDIA Parakeet v3, supported
 CPU/CUDA choices, provider-specific license/runtime metadata and measured English
 results. All six Whisper choices remain. Active selection and loaded state remain

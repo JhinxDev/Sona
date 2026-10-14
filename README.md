@@ -50,9 +50,9 @@ native window size, an isolated profile and synthetic text.
 - **Connect your tools.** A JSON CLI and stdio MCP interface manage status,
   validated settings, models and call protection without remote microphone control.
 
-Choose **Settings → Appearance → Amethyst Glass** to try layered violet surfaces,
-soft illumination and highlighted controls. On supported Windows 11 systems with
-transparency enabled, it uses Mica; an opaque material fallback is available.
+Choose **Settings → Appearance → Amethyst Glass** to try near-black smoked violet
+surfaces, restrained illumination and soft lilac edges. On supported Windows 11
+systems with transparency enabled, it uses Mica; an opaque material fallback is available.
 The existing Amethyst theme and new-profile defaults remain available.
 
 ![Amethyst Glass appearance in a synthetic native demo](docs/images/sona-amethyst-glass.png)

@@ -66,7 +66,7 @@ public static class ThemeManager
         _ = DwmSetWindowAttribute(handle, 36, ref text, sizeof(int));
         if (window is MainWindow)
         {
-            var edge = Current.UsesGlassMaterial ? ColorRef("#75628E") : -1;
+            var edge = Current.UsesGlassMaterial ? ColorRef("#493B5A") : -1;
             _ = DwmSetWindowAttribute(handle, 34, ref edge, sizeof(int));
         }
     }
@@ -87,21 +87,21 @@ public static class ThemeManager
         var opaque = !native || SystemParameters.HighContrast;
         if (!SystemParameters.HighContrast && (RenderCapability.Tier >> 16) > 0)
             resources["MaterialAmbient"] = AmbientLight();
-        resources["MaterialCanvas"] = Gradient(opaque ? "#FF332043" : "#BC332043", opaque ? "#FF191321" : "#C9191321", opaque ? "#FF272035" : "#B8272035", new Point(0, 0), new Point(1, 1));
-        resources["Sidebar"] = Gradient("#F02A2138", "#ED1D1728", "#F0322148", new Point(0, 0), new Point(.5, 1));
-        resources["Panel"] = Gradient(opaque ? "#FF3F3152" : "#B83F3152", opaque ? "#FF292034" : "#C4292034", opaque ? "#FF342440" : "#B8342440", new Point(0, 0), new Point(.75, 1));
-        resources["Inset"] = Gradient("#F4251D32", "#F41C1728", "#F42D213D", new Point(0, 0), new Point(1, 1));
-        resources["Button"] = Gradient("#F53B2C51", "#EF291F3B", "#F0342749", new Point(0, 0), new Point(0, 1));
-        resources["Primary"] = Gradient("#FF8757C2", "#FF6B419C", "#FF563178", new Point(0, 0), new Point(0, 1));
-        resources["Selection"] = Gradient("#ED885BC4", "#DF583781", "#E8462D68", new Point(0, 0), new Point(1, 1));
-        resources["Hover"] = Gradient("#E14B365F", "#DD342843", "#D13E2C52", new Point(0, 0), new Point(1, 1));
-        resources["MaterialEdge"] = Gradient("#BCEAD7FF", "#647E6998", "#886C4D94", new Point(0, 0), new Point(.7, 1));
-        resources["MaterialNavEdge"] = Gradient("#CED9B8FF", "#9D9C6CDE", "#7B704CA0", new Point(0, 0), new Point(1, 1));
+        resources["MaterialCanvas"] = Gradient(opaque ? "#FF100B18" : "#E8100B18", opaque ? "#FF07060D" : "#EB07060D", opaque ? "#FF0C0912" : "#E80C0912", new Point(0, 0), new Point(1, 1));
+        resources["Sidebar"] = Gradient("#F50F0C16", "#F50B0911", "#F5130E1D", new Point(0, 0), new Point(.5, 1));
+        resources["Panel"] = Gradient(opaque ? "#FF21192C" : "#DC21192C", opaque ? "#FF141019" : "#E4141019", opaque ? "#FF1B1324" : "#DE1B1324", new Point(0, 0), new Point(.75, 1));
+        resources["Inset"] = Gradient("#F8100C17", "#F809080E", "#F8130E1B", new Point(0, 0), new Point(1, 1));
+        resources["Button"] = Gradient("#F5251B32", "#F015101E", "#F01C1426", new Point(0, 0), new Point(0, 1));
+        resources["Primary"] = Gradient("#FF704B98", "#FF553575", "#FF3E2657", new Point(0, 0), new Point(0, 1));
+        resources["Selection"] = Gradient("#F05F3F88", "#EA39264F", "#EC2A1E3B", new Point(0, 0), new Point(1, 1));
+        resources["Hover"] = Gradient("#EB2D203D", "#EB1D1528", "#EB241A31", new Point(0, 0), new Point(1, 1));
+        resources["MaterialEdge"] = Gradient("#90BBA4D2", "#50594A6D", "#704F3A68", new Point(0, 0), new Point(.7, 1));
+        resources["MaterialNavEdge"] = Gradient("#ABA98DCB", "#80694D8B", "#60543C70", new Point(0, 0), new Point(1, 1));
         resources["MaterialNavThickness"] = new Thickness(1);
         resources["MaterialPanelRadius"] = new CornerRadius(14);
         if (!SystemParameters.HighContrast && (RenderCapability.Tier >> 16) > 0)
         {
-            resources["MaterialActionEffect"] = Shadow("#9B63E5", .25, 12, 0);
+            resources["MaterialActionEffect"] = Shadow("#8858BD", .16, 10, 0);
         }
     }
     private static Brush AmbientLight()
@@ -111,9 +111,9 @@ public static class ThemeManager
         var bounds = new RectangleGeometry(new Rect(0, 0, 1, 1));
         foreach (var (color, center, radiusX, radiusY) in new[]
         {
-            ("#987F50CE", new Point(.16, .12), .72, .62),
-            ("#88725CBA", new Point(.91, .52), .68, .78),
-            ("#606A427D", new Point(.35, 1.04), .70, .62)
+            ("#24674389", new Point(.16, .12), .72, .62),
+            ("#205A497E", new Point(.91, .52), .68, .78),
+            ("#1851305D", new Point(.35, 1.04), .70, .62)
         })
         {
             var light = new RadialGradientBrush
@@ -125,7 +125,7 @@ public static class ThemeManager
             light.GradientStops.Add(new(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
             drawing.Children.Add(new GeometryDrawing(light, null, bounds));
         }
-        drawing.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(32, 20, 13, 30)), null, bounds));
+        drawing.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(60, 6, 5, 11)), null, bounds));
         var brush = new DrawingBrush(drawing) { Stretch = Stretch.Fill };
         brush.Freeze(); return brush;
     }
