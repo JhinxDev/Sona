@@ -1,13 +1,13 @@
 param([Parameter(Mandatory)][string]$OutputDirectory,[switch]$Compact)
 $ErrorActionPreference='Stop';$env:WINAPP_CLI_TELEMETRY_OPTOUT='1'
 $taskRepo=Split-Path $PSScriptRoot -Parent
-$taskExe=Join-Path $taskRepo 'src\Murmur.App\bin\Release\net8.0-windows\Sona.exe'
+$taskExe=Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 $taskAgent=Join-Path $taskRepo 'src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Choose a fresh evidence directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 Add-Type 'using System.Runtime.InteropServices; public static class SonaModelDpi { [DllImport("user32.dll")] public static extern uint GetDpiForWindow(System.IntPtr window); }'
-$taskPrior=$env:MURMUR_DATA;$env:MURMUR_DATA=Join-Path $OutputDirectory 'data'
+$taskPrior=$env:SONA_DATA;$env:SONA_DATA=Join-Path $OutputDirectory 'data'
 $taskChecks=[Collections.Generic.List[string]]::new()
 function Check([bool]$Value,[string]$Name){if(!$Value){throw $Name};$taskChecks.Add($Name)}
 function Agent([string[]]$Arguments){return ((& $taskAgent @Arguments)-join "`n" | ConvertFrom-Json)}
@@ -79,5 +79,5 @@ try{
 }catch{$_|Out-String|Set-Content -LiteralPath (Join-Path $OutputDirectory 'failure.txt');throw}
 finally{
     if(!$taskProcess.HasExited){$null=$taskProcess.CloseMainWindow();$taskProcess.WaitForExit(10000)|Out-Null}
-    $env:MURMUR_DATA=$taskPrior;$taskProcess.Dispose()
+    $env:SONA_DATA=$taskPrior;$taskProcess.Dispose()
 }

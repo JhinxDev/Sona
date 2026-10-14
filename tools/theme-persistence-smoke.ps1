@@ -1,11 +1,11 @@
 param([Parameter(Mandatory)][string]$OutputDirectory)
 $ErrorActionPreference='Stop'; $env:WINAPP_CLI_TELEMETRY_OPTOUT='1'
 $taskRepo=Split-Path $PSScriptRoot -Parent
-$taskExe=Join-Path $taskRepo 'src\Murmur.App\bin\Release\net8.0-windows\Sona.exe'
+$taskExe=Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 $taskAgent=Join-Path $taskRepo 'src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Use a fresh evidence directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
-$taskPrior=$env:MURMUR_DATA; $env:MURMUR_DATA=Join-Path $OutputDirectory 'data'
+$taskPrior=$env:SONA_DATA; $env:SONA_DATA=Join-Path $OutputDirectory 'data'
 $taskChecks=[Collections.Generic.List[string]]::new(); $taskProcess=$null
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 function Verify([bool]$Value,[string]$Name){if(!$Value){throw $Name};$taskChecks.Add($Name)}
@@ -43,14 +43,14 @@ try{
     Verify ($taskPatch.ok) 'Theme regression starts from a known persisted profile'
     Choose 'SpeechLanguage' 'English'
     Choose 'ThemeChoice' 'Amethyst'
-    $taskSaved=Get-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Raw|ConvertFrom-Json
+    $taskSaved=Get-Content -LiteralPath (Join-Path $env:SONA_DATA 'preferences.json') -Raw|ConvertFrom-Json
     $taskRead=Agent @('settings','get')
     Verify ($taskSaved.Theme-eq 'amethyst'-and $taskRead.data.theme-eq 'amethyst') 'Choosing Amethyst saves it immediately without Save preferences'
     Verify ($taskSaved.Language-eq 'fr'-and (Selected 'SpeechLanguage')-eq 'English') 'Theme save preserves other unsaved form choices and their prior persisted values'
     CloseOwned; Launch
     $taskRead=Agent @('settings','get')
     Verify ($taskRead.data.theme-eq 'amethyst'-and (Selected 'ThemeChoice')-eq 'Amethyst') 'Saved Amethyst restores after an actual app relaunch'
-    $taskPreferenceFile=Join-Path $env:MURMUR_DATA 'preferences.json'
+    $taskPreferenceFile=Join-Path $env:SONA_DATA 'preferences.json'
     Choose 'SpeechLanguage' 'English'
     $taskPriorResult=(Native @('ui','get-value','SettingsResult','-a',"$($taskProcess.Id)")).text
     $taskLock=[IO.File]::Open($taskPreferenceFile,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
@@ -90,5 +90,5 @@ try{
 }catch{$_|Out-String|Set-Content -LiteralPath (Join-Path $OutputDirectory 'failure.txt');throw}
 finally{
     if($taskProcess-and !$taskProcess.HasExited){$null=$taskProcess.CloseMainWindow();if(!$taskProcess.WaitForExit(10000)){throw 'Owned test instance remains.'}}
-    $env:MURMUR_DATA=$taskPrior
+    $env:SONA_DATA=$taskPrior
 }

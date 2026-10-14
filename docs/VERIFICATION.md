@@ -403,3 +403,27 @@ GPU engine and model profiles remain unchanged by the Sona UI/rename. Reuse `ben
 ## Required owner proof
 
 Actual installed-version physical Ctrl+Win Hold/Toggle, visible capsule and focus retention; Codex unsent insertion/no duplicate and intact clipboard; English/French/mixed microphone speech; held-modifier Esc; focus/device/sleep behavior; Hush's Sona.exe recognition and real-call mute/restoration; owner visual/usability acceptance. See `tools/owner-test.md`. Technical proof, installation and acceptance stay distinct.
+
+
+## Sona source identity, October 14, 2026
+
+Source folders, projects, namespaces, test harnesses, app manifest, icon assets,
+project references and current build commands now use Sona. App and agent
+Release builds pass with zero warnings and errors. Core checks: 289 passed.
+Windows fixture checks: 49 passed without microphone capture or text injection.
+The isolated presentation fixture has no failures; 31 active-target checks and
+PowerShell tool parsing pass. NuGet reports no known vulnerable packages for
+the current app dependency set; package versions and original asset bytes are unchanged.
+
+New private profiles use Sona. Existing legacy profiles are reused in place,
+including their Windows-encrypted payloads; discovery does not copy, move or
+overwrite them. SONA_DATA and SONA_RUNTIME are the current override names.
+Earlier aliases, owned legacy startup/install cleanup, scratch recovery markers
+and the production single-instance/open signal are retained only for compatibility.
+Old and current test profile aliases address the same scoped Sona agent pipe.
+These compatibility checks use isolated fixtures; the installed app and the
+owner's private profile were not changed by this source cleanup.
+
+The README links the owner-approved Sona trailer and uses its approved poster
+with a consistent native Amethyst screenshot set. Existing hardware and
+owner-target acceptance limits above still apply.

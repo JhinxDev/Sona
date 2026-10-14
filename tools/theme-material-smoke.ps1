@@ -3,10 +3,11 @@ $ErrorActionPreference='Stop';$taskRoot=Split-Path $PSScriptRoot -Parent
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Preserve previous proof and choose a fresh output directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $taskCandidate=[IO.Path]::GetFullPath($CandidateDirectory);$taskOutput=[IO.Path]::GetFullPath($OutputDirectory)
-$taskPriorData=$env:MURMUR_DATA;$taskPriorDraft=$env:SONA_DRAFT_TRANSFER
-$env:MURMUR_DATA=Join-Path $taskOutput 'data';New-Item -ItemType Directory -Path $env:MURMUR_DATA | Out-Null
-@{Theme='amethyst-glass';Model='small';Language='en';AutoInsert=$false;CopyToClipboard=$false;KeepHistory=$false;Startup=$false;CloseToTray=$false;CheckForUpdates=$false;CleanupEnabled=$false;ProtectionEnabled=$false;Terms=@('Sona');Vocabulary=@();Snippets=@()}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Encoding utf8
+$taskPriorData=$env:SONA_DATA;$taskPriorDraft=$env:SONA_DRAFT_TRANSFER
+$env:SONA_DATA=Join-Path $taskOutput 'data';New-Item -ItemType Directory -Path $env:SONA_DATA | Out-Null
+@{Theme='amethyst-glass';Model='small';Language='en';AutoInsert=$false;CopyToClipboard=$false;KeepHistory=$false;Startup=$false;CloseToTray=$false;CheckForUpdates=$false;CleanupEnabled=$false;ProtectionEnabled=$false;Terms=@('Sona');Vocabulary=@();Snippets=@()}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $env:SONA_DATA 'preferences.json') -Encoding utf8
 $env:SONA_DRAFT_TRANSFER=@{Draft="Sona release checklist`n`nReview the glass theme and keyboard focus.`nKeep this draft unsent.";Original='Review the Sona glass theme and keyboard focus. Keep this draft unsent.'}|ConvertTo-Json -Compress
+# This guard deliberately watches the legacy owner's profile during isolated previews.
 $taskOwnerPreferences=Join-Path $env:LOCALAPPDATA 'Murmur/preferences.json';$taskOwnerHash=if(Test-Path -LiteralPath $taskOwnerPreferences){(Get-FileHash -LiteralPath $taskOwnerPreferences).Hash}else{$null}
 $taskRunnerOutput=Join-Path $taskOutput 'runner'
 $taskProcess=$null;$taskCaptured=[Collections.Generic.HashSet[string]]::new()
@@ -41,5 +42,5 @@ try {
  Get-Content -LiteralPath (Join-Path $taskOutput 'theme-material-receipt.json') -Raw
 }finally{
  if($taskProcess){if(!$taskProcess.HasExited){$null=$taskProcess.CloseMainWindow();$taskProcess.WaitForExit(10000)|Out-Null};$taskProcess.Dispose()}
- $env:MURMUR_DATA=$taskPriorData;$env:SONA_DRAFT_TRANSFER=$taskPriorDraft
+ $env:SONA_DATA=$taskPriorData;$env:SONA_DRAFT_TRANSFER=$taskPriorDraft
 }

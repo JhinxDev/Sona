@@ -28,7 +28,7 @@ if($taskInstances.Count-ne1){throw 'Select exactly one running Sona instance'}
 $taskOld=$taskInstances[0];$taskOldPath=$taskOld.Path;$taskProgramRoot=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\Sona'))
 if($RehearsalRoot){
     $RehearsalRoot=[IO.Path]::GetFullPath($RehearsalRoot)
-    if((Split-Path $RehearsalRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$'-or!(Test-Path -LiteralPath (Join-Path $RehearsalRoot '.sona-rehearsal'))-or[IO.Path]::GetFullPath($env:MURMUR_DATA)-ne(Join-Path $RehearsalRoot 'profile')){throw 'Unrecognized isolated rehearsal profile'}
+    if((Split-Path $RehearsalRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$'-or!(Test-Path -LiteralPath (Join-Path $RehearsalRoot '.sona-rehearsal'))-or[IO.Path]::GetFullPath($env:SONA_DATA)-ne(Join-Path $RehearsalRoot 'profile')){throw 'Unrecognized isolated rehearsal profile'}
     $taskProgramRoot=Join-Path $RehearsalRoot 'Programs\Sona'
 }
 if(!$taskOldPath.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Unexpected Sona install root'}
@@ -57,7 +57,7 @@ if(!(Idle)-or(Value 'Draft')-cne$taskDraft){throw 'App or draft changed; app pre
 SelectTab 'SettingsTab'
 $taskQuit=$taskRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)))
 if($taskQuit.Count-ne1){throw 'Quit control not unique; app preserved'}
-function LaunchPrivate([string]$Path,[string]$Payload){$taskLaunch=[Diagnostics.ProcessStartInfo]::new($Path);$taskLaunch.UseShellExecute=$false;$taskLaunch.Environment['SONA_DRAFT_TRANSFER']=$Payload;if($RehearsalRoot){$taskLaunch.ArgumentList.Add('--test-ui');$taskLaunch.ArgumentList.Add('--test-transfer');$taskLaunch.Environment['MURMUR_DATA']=Join-Path $RehearsalRoot 'profile'};try{return [Diagnostics.Process]::Start($taskLaunch)}finally{$taskLaunch.Environment.Remove('SONA_DRAFT_TRANSFER')|Out-Null}}
+function LaunchPrivate([string]$Path,[string]$Payload){$taskLaunch=[Diagnostics.ProcessStartInfo]::new($Path);$taskLaunch.UseShellExecute=$false;$taskLaunch.Environment['SONA_DRAFT_TRANSFER']=$Payload;if($RehearsalRoot){$taskLaunch.ArgumentList.Add('--test-ui');$taskLaunch.ArgumentList.Add('--test-transfer');$taskLaunch.Environment['SONA_DATA']=Join-Path $RehearsalRoot 'profile';$taskLaunch.Environment['MURMUR_DATA']=Join-Path $RehearsalRoot 'profile'};try{return [Diagnostics.Process]::Start($taskLaunch)}finally{$taskLaunch.Environment.Remove('SONA_DRAFT_TRANSFER')|Out-Null}}
 $taskNew=$null
 try{
     $taskQuit[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()

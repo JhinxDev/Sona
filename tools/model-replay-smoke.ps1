@@ -5,8 +5,8 @@ if(Test-Path -LiteralPath $OutputDirectory){throw 'Choose a fresh evidence direc
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $taskData=Join-Path $OutputDirectory 'data';New-Item -ItemType Directory -Path $taskData | Out-Null
 '{"Language":"fr","Model":"tiny","Engine":"FastCpu","AutoInsert":false}' | Set-Content -LiteralPath (Join-Path $taskData 'preferences.json')
-$taskPriorData=$env:MURMUR_DATA;$env:MURMUR_DATA=$taskData
-$taskProcess=Start-Process -FilePath (Join-Path $taskRepo 'src\Murmur.App\bin\Release\net8.0-windows\Sona.exe') -ArgumentList @('--test-ui','--replay',('"'+[IO.Path]::GetFullPath($WaveFile)+'"')) -WindowStyle Hidden -PassThru
+$taskPriorData=$env:SONA_DATA;$env:SONA_DATA=$taskData
+$taskProcess=Start-Process -FilePath (Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe') -ArgumentList @('--test-ui','--replay',('"'+[IO.Path]::GetFullPath($WaveFile)+'"')) -WindowStyle Hidden -PassThru
 try
 {
     $taskResultFile=Join-Path $taskData 'replay-result.json'
@@ -19,5 +19,5 @@ try
 finally
 {
     if(-not $taskProcess.HasExited){$taskProcess.Refresh();$null=$taskProcess.CloseMainWindow();if(-not $taskProcess.WaitForExit(10000)){throw 'Replay app did not quit; its test deadline remains active.'}}
-    $env:MURMUR_DATA=$taskPriorData
+    $env:SONA_DATA=$taskPriorData
 }

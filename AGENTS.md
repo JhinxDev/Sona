@@ -15,7 +15,7 @@ Respect the active user's model choices, working changes and explicit scope.
   repository. Use the documented SONA_RUNTIME and isolated SDK settings. Do not
   change a user's global SDK, driver, startup registration or font installation.
 - Build with --disable-build-servers -p:UseSharedCompilation=false. Run the
-  relevant checks from tests/Murmur.Tests and affected native tools after source
+  relevant checks from tests/Sona.Tests and affected native tools after source
   changes. A documentation-only change does not need an unchanged full replay.
 - Preserve upstream licenses and notices, pinned sizes/hashes and local download
   boundaries. Review dependency changes and every scoped Git diff before syncing.

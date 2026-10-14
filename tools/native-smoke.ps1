@@ -1,10 +1,10 @@
-param([string]$OutputDirectory = (Join-Path $env:TEMP ('murmur-native-' + [guid]::NewGuid().ToString('N'))), [string]$Winapp = 'C:\Users\qazws\AppData\Local\Microsoft\WindowsApps\winapp.exe', [string]$ReplayFile)
+param([string]$OutputDirectory = (Join-Path $env:TEMP ('sona-native-' + [guid]::NewGuid().ToString('N'))), [string]$Winapp = 'C:\Users\qazws\AppData\Local\Microsoft\WindowsApps\winapp.exe', [string]$ReplayFile)
 $ErrorActionPreference = 'Stop'; $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
 $taskRepo = Split-Path $PSScriptRoot -Parent
-$taskExe = Join-Path $taskRepo 'src\Murmur.App\bin\Release\net8.0-windows\Sona.exe'
+$taskExe = Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'Choose a fresh evidence directory; preserve previous results.' }
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
-$env:MURMUR_DATA = Join-Path $OutputDirectory 'preferences'
+$env:SONA_DATA = Join-Path $OutputDirectory 'preferences'
 $taskChecks = [System.Collections.Generic.List[string]]::new()
 function Native([string[]]$ActionArgs) {
     $taskRaw = & $Winapp @ActionArgs --json
@@ -33,8 +33,8 @@ function Launch([string[]]$LaunchArgs) {
     throw 'Test window did not start within five seconds.'
 }
 function CloseTest { Native @('ui','invoke','Close','-w',"$($taskProcess.MainWindowHandle)") | Out-Null; Verify ($taskProcess.WaitForExit(10000)) 'Test window exits cleanly with no hidden instance' }
-function Settings { Get-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Raw | ConvertFrom-Json }
-function WaitSettings([scriptblock]$Predicate) { for ($i=0;$i -lt 30;$i++) { if ((Test-Path -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json')) -and (& $Predicate (Settings))) { return }; Start-Sleep -Milliseconds 50 }; throw 'Preference save did not reach its expected receipt' }
+function Settings { Get-Content -LiteralPath (Join-Path $env:SONA_DATA 'preferences.json') -Raw | ConvertFrom-Json }
+function WaitSettings([scriptblock]$Predicate) { for ($i=0;$i -lt 30;$i++) { if ((Test-Path -LiteralPath (Join-Path $env:SONA_DATA 'preferences.json')) -and (& $Predicate (Settings))) { return }; Start-Sleep -Milliseconds 50 }; throw 'Preference save did not reach its expected receipt' }
 try {
     Launch @('--test-ui')
     Verify ((Native @('ui','get-property','RecordButton','-a',"$($taskProcess.Id)")).properties.IsEnabled -eq 'False') 'Isolated UI mode disables microphone recording'
@@ -97,7 +97,7 @@ try {
     WaitSettings { param($s) $s.KeepHistory -and $s.ShortcutMode -eq 'Toggle' }
     Verify ((Settings).KeepHistory -and (Settings).ShortcutMode -eq 'Toggle') 'Native settings save explicit toggle mode and opt-in text history'
     CloseTest
-    $taskHistoryPath=Join-Path $env:MURMUR_DATA 'history.json'
+    $taskHistoryPath=Join-Path $env:SONA_DATA 'history.json'
     @(@{Id=[guid]::NewGuid().ToString();CreatedAt=[DateTimeOffset]::Now.ToString('o');Original='Bonjour le monde';Draft='Hello Codex';Inserted=$true},@{Id=[guid]::NewGuid().ToString();CreatedAt=[DateTimeOffset]::Now.AddMinutes(-1).ToString('o');Original='Use foo_bar';Draft='Use foo_bar';Inserted=$false}) | ConvertTo-Json | Set-Content -LiteralPath $taskHistoryPath -Encoding utf8
     Launch @('--test-ui')
     Native @('ui','invoke','HistoryTab','-a',"$($taskProcess.Id)") | Out-Null
@@ -117,22 +117,22 @@ try {
     if ($ReplayFile) {
         if ($ReplayFile.Contains('"') -or !(Test-Path -LiteralPath $ReplayFile -PathType Leaf)) { throw 'Select an existing public fixture WAV.' }
         Launch @('--test-ui','--replay',('"' + $ReplayFile + '"'))
-        $taskReplay = Join-Path $env:MURMUR_DATA 'replay-result.json'
+        $taskReplay = Join-Path $env:SONA_DATA 'replay-result.json'
         for ($i=0;$i -lt 100 -and !(Test-Path -LiteralPath $taskReplay);$i++) { Start-Sleep -Milliseconds 50 }
         if (!(Test-Path -LiteralPath $taskReplay)) { throw 'Local file replay did not complete within five seconds.' }
         $taskResult = Get-Content -LiteralPath $taskReplay -Raw -Encoding utf8 | ConvertFrom-Json
         Verify ($taskResult.State -eq 'Ready' -and $taskResult.Original -match 'accident') 'Production GPU transcriber completes the licensed French file into a ready draft'
         Verify (@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-server.exe' }).Count -eq 1) 'Completed production transcription retains exactly one resident model worker'
-        Verify (@(Get-ChildItem -LiteralPath (Join-Path $env:MURMUR_DATA 'scratch') -Filter audio.wav -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Completed production transcription deletes temporary audio'
+        Verify (@(Get-ChildItem -LiteralPath (Join-Path $env:SONA_DATA 'scratch') -Filter audio.wav -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Completed production transcription deletes temporary audio'
         CloseTest
-        $taskSettings=Settings; $taskSettings.Engine='FastCpu'; $taskSettings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json')
+        $taskSettings=Settings; $taskSettings.Engine='FastCpu'; $taskSettings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $env:SONA_DATA 'preferences.json')
         Launch @('--test-ui','--replay',('"' + $ReplayFile + '"'))
         $taskChildren=@()
         for ($i=0;$i -lt 50 -and !$taskChildren.Count;$i++) { $taskChildren=@(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($taskProcess.Id)" | Where-Object { $_.Name -eq 'whisper-server.exe' }); if (!$taskChildren.Count) { Start-Sleep -Milliseconds 50 } }
         Verify ($taskChildren.Count -eq 1) 'CPU option starts one contained transcription worker'
         CloseTest
         Verify (!(Get-Process -Id $taskChildren[0].ProcessId -ErrorAction SilentlyContinue)) 'Quit during CPU transcription leaves no worker'
-        Verify (@(Get-ChildItem -LiteralPath (Join-Path $env:MURMUR_DATA 'scratch') -Filter audio.wav -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Quit during CPU transcription removes its temporary audio'
+        Verify (@(Get-ChildItem -LiteralPath (Join-Path $env:SONA_DATA 'scratch') -Filter audio.wav -Recurse -ErrorAction SilentlyContinue).Count -eq 0) 'Quit during CPU transcription removes its temporary audio'
     }
     @{Passed=$taskChecks.Count;Checks=$taskChecks;MicrophoneOpened=$false;GlobalInputSent=$false} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'native-smoke.json')
 } catch { $_ | Out-String | Set-Content -LiteralPath (Join-Path $OutputDirectory 'failure.txt'); throw } finally {

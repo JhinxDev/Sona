@@ -6,7 +6,7 @@ if((Split-Path $OutputRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$
 New-Item -ItemType Directory -Path $OutputRoot|Out-Null
 Set-Content -LiteralPath (Join-Path $OutputRoot '.sona-rehearsal') -Value 'synthetic only; no production profile'
 $taskRepo=Split-Path $PSScriptRoot -Parent;$taskRuntime='E:\DevelopmentTools\local-dictation'
-$taskPriorData=$env:MURMUR_DATA;$env:MURMUR_DATA=Join-Path $OutputRoot 'profile'
+$taskPriorData=$env:SONA_DATA;$env:SONA_DATA=Join-Path $OutputRoot 'profile'
 $taskProductionAgent=Join-Path $env:LOCALAPPDATA 'Programs\Sona\current\sona-agent.exe'
 $taskProductionBefore=(& $taskProductionAgent status)-join "`n"
 $taskProductionPID=@(Get-Process -Name Sona|Where-Object{$_.Path.StartsWith((Join-Path $env:LOCALAPPDATA 'Programs\Sona')+'\',[StringComparison]::OrdinalIgnoreCase)}|Select-Object -ExpandProperty Id)
@@ -26,11 +26,11 @@ function ReadField($Window,[string]$Id){
 }
 function SelectPage($Window,[string]$Id){(Field $Window $Id).GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()}
 function Recovery($Path){$taskBytes=[Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($Path),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);try{return ([Text.Encoding]::UTF8.GetString($taskBytes)|ConvertFrom-Json)}finally{[Array]::Clear($taskBytes,0,$taskBytes.Length)}}
-function PrivateLaunch([string]$Path,[string]$Payload){$taskInfo=[Diagnostics.ProcessStartInfo]::new($Path);$taskInfo.UseShellExecute=$false;$taskInfo.ArgumentList.Add('--test-ui');$taskInfo.ArgumentList.Add('--test-transfer');$taskInfo.Environment['MURMUR_DATA']=$env:MURMUR_DATA;$taskInfo.Environment['SONA_DRAFT_TRANSFER']=$Payload;return [Diagnostics.Process]::Start($taskInfo)}
+function PrivateLaunch([string]$Path,[string]$Payload){$taskInfo=[Diagnostics.ProcessStartInfo]::new($Path);$taskInfo.UseShellExecute=$false;$taskInfo.ArgumentList.Add('--test-ui');$taskInfo.ArgumentList.Add('--test-transfer');$taskInfo.Environment['SONA_DATA']=$env:SONA_DATA;$taskInfo.Environment['MURMUR_DATA']=$env:SONA_DATA;$taskInfo.Environment['SONA_DRAFT_TRANSFER']=$Payload;return [Diagnostics.Process]::Start($taskInfo)}
 try{
     $env:DOTNET_CLI_HOME=Join-Path $taskRuntime 'dotnet-home';$env:NUGET_PACKAGES=Join-Path $taskRuntime 'nuget';$env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
     $taskBuilt=Join-Path $OutputRoot 'built'
-    & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Murmur.App\Murmur.App.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
+    & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Sona.App\Sona.App.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
     if($LASTEXITCODE-ne0){throw 'Isolated app publish failed'}
     & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Sona.Agent\Sona.Agent.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
     if($LASTEXITCODE-ne0){throw 'Isolated agent publish failed'}
@@ -65,5 +65,5 @@ try{
     [pscustomobject]@{Passed=$taskChecks.Count;Checks=$taskChecks;SyntheticOnly=$true;SyntheticPackageIdentities=$true;MicrophoneOpened=$false;GlobalInputSent=$false;DiscordTouched=$false;OwnerInstanceStopped=$false}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $OutputRoot 'rehearsal.json')
 }catch{($_|Out-String)+$_.ScriptStackTrace|Set-Content -LiteralPath (Join-Path $OutputRoot 'failure.txt');throw}finally{
     foreach($taskProcess in @(ScopedProcess)){$taskWindow=Root $taskProcess;SelectPage $taskWindow 'SettingsTab';$taskQuit=$taskWindow.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)));if($taskQuit.Count-eq1){$taskQuit[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke();$taskProcess.WaitForExit(10000)|Out-Null}}
-    $env:MURMUR_DATA=$taskPriorData
+    $env:SONA_DATA=$taskPriorData
 }

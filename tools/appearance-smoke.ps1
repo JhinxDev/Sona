@@ -1,11 +1,11 @@
 param([Parameter(Mandatory)][string]$OutputDirectory,[switch]$DisplaysOnly)
 $ErrorActionPreference='Stop'; $env:WINAPP_CLI_TELEMETRY_OPTOUT='1'
 $taskRepo=Split-Path $PSScriptRoot -Parent
-$taskExe=Join-Path $taskRepo 'src\Murmur.App\bin\Release\net8.0-windows\Sona.exe'
+$taskExe=Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 $taskAgent=Join-Path $taskRepo 'src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Use a fresh evidence directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
-$taskPrior=$env:MURMUR_DATA; $env:MURMUR_DATA=Join-Path $OutputDirectory 'data'
+$taskPrior=$env:SONA_DATA; $env:SONA_DATA=Join-Path $OutputDirectory 'data'
 $taskChecks=[Collections.Generic.List[string]]::new()
 function Proof([bool]$Value,[string]$Name){if(!$Value){throw $Name};$taskChecks.Add($Name)}
 function Native([string[]]$Arguments){$taskRaw=winapp @Arguments --json; if($LASTEXITCODE-ne 0){throw ($taskRaw -join "`n")}; return (($taskRaw -join "`n")|ConvertFrom-Json)}
@@ -45,5 +45,5 @@ try{
     [pscustomobject]@{Passed=$taskChecks.Count;Checks=$taskChecks;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $OutputDirectory 'appearance-smoke.json')
 }finally{
     if(!$taskProcess.HasExited){Native @('ui','invoke','Close','-a',"$($taskProcess.Id)")|Out-Null; $taskProcess.WaitForExit(10000)|Out-Null}
-    $env:MURMUR_DATA=$taskPrior; $taskProcess.Dispose()
+    $env:SONA_DATA=$taskPrior; $taskProcess.Dispose()
 }

@@ -15,11 +15,19 @@ attempt at a native Windows alternative that you can inspect, adapt and improve.
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
+[![Watch the Sona trailer: voice to text on your PC](docs/images/sona-trailer.jpg)](https://www.youtube.com/watch?v=3XNpPcDO-kI)
+
+**[Watch the 4K trailer on Jhinx Dev](https://www.youtube.com/watch?v=3XNpPcDO-kI).**
+Actual Sona captures use demo text; the Codex and Discord sequences illustrate
+the workflow. The trailer includes AI-assisted narration, music and background art.
+
+## The app
+
 ![Sona with a sample editable draft](docs/images/sona-home.png)
 
-All screenshots show the real 0.4.0 interface in Amethyst, using the same
-native window size, an isolated profile and synthetic text. Their normal window
-title is Sona. Recording is disabled in this demonstration profile.
+The native screenshots below share the same Amethyst theme, window size and
+isolated demonstration profile. They show the real 0.4.0 interface with a normal
+Sona window title; recording is disabled in this profile.
 
 ## Everyday dictation
 
@@ -62,9 +70,14 @@ palette. Supported Windows 11 systems use Mica when transparency is enabled;
 opaque and system high-contrast fallbacks preserve readability. Saved Amethyst Glass
 settings map to Amethyst. New profiles still start with Charcoal.
 
-![Amethyst glass appearance in a synthetic native demo](docs/images/sona-amethyst-glass.png)
+<details>
+<summary>Settings and local models</summary>
 
-![Parakeet and Whisper model choices](docs/images/sona-models.png)
+![Amethyst glass settings in a native demo](docs/images/sona-amethyst-glass.png)
+
+![Parakeet and Whisper model choices in the same theme](docs/images/sona-models.png)
+
+</details>
 
 ## Build and run
 
@@ -89,17 +102,20 @@ $env:NUGET_PACKAGES = Join-Path $env:SONA_RUNTIME 'nuget'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $sonaDotnet = Join-Path $env:SONA_RUNTIME 'sdk\dotnet.exe'
 
-& $sonaDotnet build .\src\Murmur.App\Murmur.App.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet build .\src\Sona.App\Sona.App.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
 & $sonaDotnet build .\src\Sona.Agent\Sona.Agent.csproj -c Release --disable-build-servers -p:UseSharedCompilation=false
-& .\src\Murmur.App\bin\Release\net8.0-windows\Sona.exe
+& .\src\Sona.App\bin\Release\net8.0-windows\Sona.exe
 ```
 
 Keep `SONA_RUNTIME` set when launching this source build so Sona finds these
-assets. Internal `Murmur` names preserve source and preference compatibility.
+assets. Source projects, namespaces and assets use the Sona name. Existing private
+profiles are reused without moving settings or encrypted credentials; new profiles
+use `%LOCALAPPDATA%\Sona`. `SONA_DATA` selects an isolated test profile; the old
+environment alias remains supported for earlier tooling.
 
 If a preview window has an empty client area, launch `Sona.exe --software-rendering`
 to use the optional software renderer. The microphone-disabled `--test-ui` mode
-uses it automatically and requires a separate `MURMUR_DATA` directory.
+uses it automatically and requires a separate `SONA_DATA` directory.
 
 In **Dictation Models**, choose **Download** for Parakeet v3, then **Use model**.
 Its CPU or CUDA runtime is installed explicitly when needed. For CPU execution,
@@ -172,8 +188,8 @@ steps to reproduce a bug. Keep private transcripts and credentials out of report
 For the maintained regression checks, from the same PowerShell session:
 
 ```powershell
-& $sonaDotnet run --project .\tests\Murmur.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
-& $sonaDotnet run --project .\tests\Murmur.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet run --project .\tests\Sona.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $sonaDotnet run --project .\tests\Sona.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
 ```
 
 These checks do not establish real microphone, target-app insertion or call

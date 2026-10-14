@@ -107,4 +107,4 @@ implements tools and ping, not resources, sampling or remote HTTP transport.
 `tools/agent-smoke.ps1` verifies the actual CLI and MCP against an isolated app
 instance without a microphone, global input or actual Discord connection.
 `-DownloadTiny` adds one explicit pinned download and selection pilot. Isolation
-uses `MURMUR_DATA`; normal clients must omit that test-only override.
+uses `SONA_DATA`; normal clients must omit that test-only override.

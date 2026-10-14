@@ -5,13 +5,13 @@ $taskRuntime = 'E:\DevelopmentTools\local-dictation'
 $env:DOTNET_CLI_HOME = "$taskRuntime\dotnet-home"
 $env:NUGET_PACKAGES = "$taskRuntime\nuget"
 $taskRepo = Split-Path $PSScriptRoot -Parent
-& "$taskRuntime\sdk\dotnet.exe" build "$taskRepo\src\Murmur.App\Murmur.App.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
+& "$taskRuntime\sdk\dotnet.exe" build "$taskRepo\src\Sona.App\Sona.App.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
 if ($LASTEXITCODE -ne 0) { throw 'App build failed' }
 & "$taskRuntime\sdk\dotnet.exe" build "$taskRepo\src\Sona.Agent\Sona.Agent.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
 if ($LASTEXITCODE -ne 0) { throw 'Agent interface build failed' }
-& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Murmur.Tests" -c Release --disable-build-servers -p:UseSharedCompilation=false
+& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Sona.Tests" -c Release --disable-build-servers -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Safety regressions failed' }
-& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Murmur.WindowsTests" -c Release --disable-build-servers -p:UseSharedCompilation=false
+& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Sona.WindowsTests" -c Release --disable-build-servers -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Windows lifecycle regressions failed' }
-& "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Murmur.App\Murmur.App.csproj" package --vulnerable --include-transitive
+& "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

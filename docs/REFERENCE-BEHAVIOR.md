@@ -6,7 +6,7 @@ Flow's client declares separate hold/toggle/cancel paths and recording/processin
 
 Spokenly's native PE export tables expose transcription model load/free, language detection, raw/full text and backend queries. A separate cleanup library exposes load/answer/unload. These establish distinct ABI boundaries, not actual model choice or idle-memory behavior.
 
-Murmur independently implements intentional sessions, raw-text preservation, separate local vocabulary hints/replacements, exact whole-utterance snippets and on-demand worker exit. It uses no reference app binary, asset, endpoint or credentials. Bounded optional target context and local AI rewriting remain future design choices that need measured benefit.
+Sona independently implements intentional sessions, raw-text preservation, separate local vocabulary hints/replacements, exact whole-utterance snippets and on-demand worker exit. It uses no reference app binary, asset, endpoint or credentials. Bounded optional target context and local AI rewriting remain future design choices that need measured benefit.
 
 | Reference | Artifact identity |
 | --- | --- |

@@ -7,9 +7,9 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Murmur.App;
-using Murmur.App.Windows;
-using Murmur.Core;
+using Sona.App;
+using Sona.App.Windows;
+using Sona.Core;
 
 static class Program
 {
@@ -17,7 +17,7 @@ static class Program
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(nint window, uint attribute, out int value, int size);
     [STAThread] public static void Main(string[] args)
     {
-        if (!args.Contains("--test-ui") || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MURMUR_DATA"))) throw new InvalidOperationException("A microphone-disabled test profile is required.");
+        if (!args.Contains("--test-ui") || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SONA_DATA"))) throw new InvalidOperationException("A microphone-disabled test profile is required.");
         var output = args.Single(a => a.StartsWith("--material-proof=")).Split('=', 2)[1];
         var app = new App(); app.InitializeComponent();
         app.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(async () =>
@@ -111,7 +111,7 @@ static class Program
             ThemeCatalog.Resolve("amethyst-glass").Id == "amethyst" && combo.Items.Count == 8,
             "Eight selectable palettes share glass materials and the former Amethyst Glass ID aliases to Amethyst without a duplicate option");
         Choose("amethyst-glass");
-        var startupPreference = Preferences.Load(Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA")!, "preferences.json"));
+        var startupPreference = Preferences.Load(Path.Combine(Environment.GetEnvironmentVariable("SONA_DATA")!, "preferences.json"));
         Check(ThemeManager.Current.Id == "amethyst" && startupPreference.Theme == "amethyst" && ThemeManager.Current.UsesGlassMaterial &&
             (SystemParameters.HighContrast ? app.Resources["Panel"] is SolidColorBrush && app.Resources["MaterialCanvas"] is SolidColorBrush : app.Resources["Panel"] is LinearGradientBrush && app.Resources["MaterialCanvas"] is LinearGradientBrush),
             "A saved legacy Amethyst Glass ID loads as canonical Amethyst with the shared glass or accessible fallback materials");
@@ -151,7 +151,7 @@ static class Program
         Check(!ThemeManager.Current.IsDark && OpaqueGlassFallback(ThemeManager.Current), "Light Paper glass retains readable dark text and fully opaque fallback surfaces");
         await Snapshot("paper-after-glass-home");
         Choose("amethyst-glass"); await Snapshot("amethyst-glass-restored-home");
-        var preferences = Preferences.Load(Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA")!, "preferences.json"));
+        var preferences = Preferences.Load(Path.Combine(Environment.GetEnvironmentVariable("SONA_DATA")!, "preferences.json"));
         Check(preferences.Theme == "amethyst" && preferences.Language == "en" && !preferences.Startup && !preferences.KeepHistory && !preferences.ProtectionEnabled && !preferences.CopyToClipboard, "Legacy glass selection persists the canonical Amethyst appearance without changing the isolated profile's other settings");
         Check(ThemeCatalog.DefaultId == "charcoal" && new Preferences().Theme == "charcoal", "Shared glass materials do not change the new-profile Charcoal default");
         File.WriteAllText(Path.Combine(output, "theme-material-receipt.json"), JsonSerializer.Serialize(new { passed = checks.Count, checks, states, ownerProfileUsed = false, microphoneOpened = false, globalInputSent = false, clipboardWritten = false }, new JsonSerializerOptions { WriteIndented = true }));
