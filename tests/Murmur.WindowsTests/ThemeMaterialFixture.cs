@@ -1,6 +1,9 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Controls;
+using System.Windows.Shapes;
+using Path = System.IO.Path;
 using Murmur.App;
 using Murmur.Core;
 
@@ -8,6 +11,13 @@ internal sealed record ThemeMaterialFixtureResult(
     bool StartupCallbackObserved,
     bool ProductionStartupSuppressed,
     bool HighContrast,
+    string[] Checks,
+    string[] Failures);
+
+internal sealed record PresentationFixtureResult(
+    bool StartupCallbackObserved,
+    bool ProductionStartupSuppressed,
+    bool AppResourcesLoaded,
     string[] Checks,
     string[] Failures);
 
@@ -77,6 +87,317 @@ internal static class ThemeMaterialFixture
         return new ThemeStartupFixtureResult(startupObserved, productionStartupSuppressed, appResourcesLoaded, failures.ToArray());
     }
 
+    public static PresentationFixtureResult RunPresentation()
+    {
+        var checks = new List<string>();
+        var failures = new List<string>();
+        Exception? threadFailure = null;
+        var startupObserved = false;
+        var productionStartupSuppressed = false;
+        var appResourcesLoaded = false;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var dispatcher = Dispatcher.CurrentDispatcher;
+                var application = new ThemeResourceTestApplication();
+                application.InitializeComponent();
+                dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+                {
+                    try
+                    {
+                        startupObserved = application.StartupCallbackObserved;
+                        productionStartupSuppressed = application.MainWindow is null && application.Windows.Count == 0;
+                        appResourcesLoaded = application.Resources["SonaMark"] is Geometry
+                            && application.Resources["SettingGroup"] is Style
+                            && application.Resources["PrimaryButton"] is Style
+                            && application.Resources[typeof(TabItem)] is Style
+                            && application.Resources[typeof(RadioButton)] is Style;
+                        if (!startupObserved) failures.Add("Suppressed application startup callback was not observed");
+                        else checks.Add("Production startup callback was observed and intercepted");
+                        if (!productionStartupSuppressed) failures.Add("Production startup created a window");
+                        else checks.Add("No production window was created");
+                        if (!appResourcesLoaded) failures.Add("App.xaml did not load the actual presentation styles and resources");
+                        else checks.Add("App.xaml presentation styles and resources loaded");
+
+                        if (startupObserved && productionStartupSuppressed && appResourcesLoaded)
+                        {
+                            ThemeManager.Apply(ThemeCatalog.DefaultId);
+                            var root = new StackPanel();
+                            var groupText = new TextBlock { Text = "Readable settings" };
+                            var settingGroup = new Border
+                            {
+                                Style = (Style)application.Resources["SettingGroup"],
+                                Child = groupText
+                            };
+                            var buttonText = new TextBlock { Text = "Continue" };
+                            var button = new Button
+                            {
+                                Style = (Style)application.Resources["PrimaryButton"],
+                                Content = buttonText
+                            };
+                            var tab = new TabItem
+                            {
+                                Style = (Style)application.Resources[typeof(TabItem)],
+                                Header = "Settings",
+                                Tag = "S",
+                                IsSelected = true
+                            };
+                            var radio = new RadioButton
+                            {
+                                Style = (Style)application.Resources[typeof(RadioButton)],
+                                Content = "Panel",
+                                IsChecked = false
+                            };
+                            root.Children.Add(settingGroup);
+                            root.Children.Add(button);
+                            root.Children.Add(tab);
+                            root.Children.Add(radio);
+                            root.Measure(new Size(640, 480));
+                            root.Arrange(new Rect(0, 0, 640, 480));
+                            root.UpdateLayout();
+                            settingGroup.ApplyTemplate();
+                            button.ApplyTemplate();
+                            tab.ApplyTemplate();
+                            radio.ApplyTemplate();
+
+                            CheckNoVisualEffects(settingGroup, "SettingGroup", checks, failures);
+                            CheckNoVisualEffects(button, "PrimaryButton", checks, failures);
+                            CheckSelectedTab(tab, application, checks, failures);
+                            CheckRadioAffordance(radio, root, application, checks, failures);
+                            CheckIsolatedSettings(checks, failures);
+                            CheckDisabledButtons(root, application, checks, failures);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add("Presentation fixture dispatcher callback: " + ex.GetType().Name + ": " + ex.Message);
+                    }
+                    finally
+                    {
+                        application.Shutdown();
+                        dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
+                    }
+                }));
+                Dispatcher.Run();
+            }
+            catch (Exception ex)
+            {
+                threadFailure = ex;
+            }
+        }) { IsBackground = true, Name = "Sona presentation fixture" };
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        if (!thread.Join(TimeSpan.FromSeconds(10)))
+            throw new TimeoutException("Presentation fixture exceeded ten seconds");
+        if (threadFailure != null)
+            failures.Add(threadFailure.GetType().Name + ": " + threadFailure.Message);
+        return new PresentationFixtureResult(startupObserved, productionStartupSuppressed, appResourcesLoaded, checks.ToArray(), failures.ToArray());
+    }
+
+    private static void CheckDisabledButtons(Panel root, Application application, List<string> checks, List<string> failures)
+    {
+        foreach (var theme in ThemeCatalog.All)
+        {
+            ThemeManager.Apply(theme.Id);
+            var button = new Button { Style = (Style)application.Resources["PrimaryButton"], Content = "Record", IsEnabled = false };
+            root.Children.Add(button); root.Measure(new Size(640, 480)); root.Arrange(new Rect(0, 0, 640, 480));
+            root.UpdateLayout(); button.ApplyTemplate();
+            if (button.Opacity == 1 && Describe(button.Background) == Describe(application.Resources["Inset"])
+                && Describe(button.Foreground) == Describe(application.Resources["Muted"])
+                && button.Cursor == System.Windows.Input.Cursors.Arrow)
+                checks.Add(theme.Id + ": disabled primary action retains readable neutral styling without whole-control dimming");
+            else failures.Add(theme.Id + ": disabled primary action state: opacity=" + button.Opacity + "; background=" + Describe(button.Background) + "; expected=" + Describe(application.Resources["Inset"]) + "; foreground=" + Describe(button.Foreground) + "; cursor=" + button.Cursor);
+            CheckTextContrast(application, new[] { "Inset" }, "Muted", theme.Id + ": disabled action label", checks, failures);
+            root.Children.Remove(button);
+        }
+        ThemeManager.Apply(ThemeCatalog.DefaultId);
+    }
+
+    private static void CheckNoVisualEffects(FrameworkElement root, string label, List<string> checks, List<string> failures)
+    {
+        var effected = VisualDescendants(root)
+            .OfType<UIElement>()
+            .Where(element => element.Effect != null)
+            .Select(element => element.GetType().Name)
+            .ToArray();
+        if (effected.Length == 0)
+            checks.Add(label + " and its rendered descendants have no WPF Effect");
+        else
+            failures.Add(label + " applies WPF Effect to rendered foreground content: " + string.Join(", ", effected));
+    }
+
+    private static IEnumerable<DependencyObject> VisualDescendants(DependencyObject root)
+    {
+        yield return root;
+        if (root is not Visual) yield break;
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+            foreach (var child in VisualDescendants(VisualTreeHelper.GetChild(root, index)))
+                yield return child;
+    }
+
+    private static void CheckSelectedTab(TabItem tab, Application application, List<string> checks, List<string> failures)
+    {
+        var nav = tab.Template?.FindName("Nav", tab) as Border;
+        if (tab.IsSelected && nav != null)
+            CheckNoVisualEffects(tab, "Selected tab", checks, failures);
+        else
+            failures.Add("Selected tab template did not create its Nav surface");
+
+        var expected = application.Resources["SelectedInk"] as SolidColorBrush;
+        var actual = tab.Foreground as SolidColorBrush;
+        var textColors = VisualDescendants(tab).OfType<TextBlock>().Select(text => text.Foreground as SolidColorBrush).ToArray();
+        if (expected != null && actual?.Color == expected.Color && textColors.Length >= 2 && textColors.All(color => color?.Color == expected.Color))
+            checks.Add("Selected tab and rendered labels resolve to the selected foreground color");
+        else
+            failures.Add("Selected tab foreground did not reach both rendered labels with the selected palette color");
+    }
+
+    private static void CheckRadioAffordance(RadioButton radio, StackPanel root, Application application, List<string> checks, List<string> failures)
+    {
+        var dot = radio.Template?.FindName("SelectionDot", radio) as FrameworkElement;
+        var indicator = radio.Template?.FindName("Indicator", radio) as Border;
+        var panel = application.Resources["Panel"];
+        if (dot?.Visibility == Visibility.Collapsed && panel != null && ReferenceEquals(indicator?.Background, panel))
+            checks.Add("Unchecked display option renders an empty ring against the panel");
+        else
+            failures.Add("Unchecked display option did not render the unselected radio affordance");
+
+        radio.IsChecked = true;
+        root.UpdateLayout();
+        var accent = application.Resources["Accent"] as SolidColorBrush;
+        var selectedInk = application.Resources["SelectedInk"] as SolidColorBrush;
+        if (dot?.Visibility == Visibility.Visible && ReferenceEquals(dot is Ellipse ellipse ? ellipse.Fill : null, panel)
+            && accent != null && (indicator?.Background as SolidColorBrush)?.Color == accent.Color
+            && selectedInk != null && (radio.Foreground as SolidColorBrush)?.Color == selectedInk.Color)
+            checks.Add("Checked display option renders a visible accent dot and selected foreground");
+        else
+            failures.Add("Checked display option did not visibly differ with the selected accent treatment");
+    }
+
+    private static void CheckIsolatedSettings(List<string> checks, List<string> failures)
+    {
+        var dataRoot = Path.Combine(Path.GetTempPath(), "sona-presentation-fixture-" + Guid.NewGuid().ToString("N"));
+        var preferencesPath = Path.Combine(dataRoot, "preferences.json");
+        var priorData = Environment.GetEnvironmentVariable("MURMUR_DATA");
+        var priorTransfer = Environment.GetEnvironmentVariable("SONA_DRAFT_TRANSFER");
+        MainWindow? window = null;
+        void Proof(bool condition, string name)
+        {
+            if (condition) checks.Add(name);
+            else failures.Add(name);
+        }
+
+        try
+        {
+            var saved = new Preferences
+            {
+                AutoInsert = false,
+                Startup = true,
+                ProtectionEnabled = false,
+                SilenceIncoming = false,
+                ProtectionReleaseDelayMs = 321,
+                ProtectionShortcut = "ctrl+shift+h",
+                WatchedApps = ["fixture.exe"],
+                ModelIdleMinutes = 10,
+                Theme = ThemeCatalog.DefaultId
+            };
+            saved.Save(preferencesPath);
+            Environment.SetEnvironmentVariable("MURMUR_DATA", dataRoot);
+            // The constructor consumes this process-only transfer variable even in test mode.
+            // Clear it for the isolated window and restore it without inspecting its contents.
+            Environment.SetEnvironmentVariable("SONA_DRAFT_TRANSFER", null);
+            var app = Application.Current ?? throw new InvalidOperationException("Isolated settings fixture requires the intercepted WPF application");
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            window = new MainWindow(["--test-ui"]);
+
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var transcriber = typeof(MainWindow).GetField("transcriber", flags)?.GetValue(window) as Murmur.App.Audio.Transcriber;
+            var noRuntimeServices = !window.IsVisible && !window.IsLoaded
+                && typeof(MainWindow).GetField("recorder", flags)?.GetValue(window) is null
+                && typeof(MainWindow).GetField("protection", flags)?.GetValue(window) is null
+                && typeof(MainWindow).GetField("credentialVault", flags)?.GetValue(window) is null
+                && typeof(MainWindow).GetField("agentServer", flags)?.GetValue(window) is null
+                && typeof(MainWindow).GetField("hotkeys", flags)?.GetValue(window) is null
+                && typeof(MainWindow).GetField("activeApplication", flags)?.GetValue(window) is null
+                && transcriber != null && transcriber.ResidentProcessId is null && transcriber.LoadedModel is null;
+            Proof(noRuntimeServices, "Isolated --test-ui settings window stayed unshown with no recorder, resident worker, protection service, credential vault, agent server, shortcut hook, or active-app observer");
+            Proof(window.PreferencesSaveBar.Visibility == Visibility.Collapsed, "Fresh isolated preferences begin with the general Save bar hidden");
+
+            window.ProtectionEnabled.IsChecked = true;
+            window.SilenceIncoming.IsChecked = true;
+            window.WatchedApps.Text = "fixture-only.exe\nsecond-fixture.exe";
+            window.ProtectionDelay.Text = "876";
+            window.ProtectionShortcutInput.Text = "ctrl+alt+q";
+            var afterProtectionEdits = Preferences.Load(preferencesPath);
+            Proof(window.PreferencesSaveBar.Visibility == Visibility.Collapsed
+                && afterProtectionEdits.ProtectionEnabled == saved.ProtectionEnabled
+                && afterProtectionEdits.SilenceIncoming == saved.SilenceIncoming
+                && afterProtectionEdits.ProtectionReleaseDelayMs == saved.ProtectionReleaseDelayMs
+                && afterProtectionEdits.ProtectionShortcut == saved.ProtectionShortcut
+                && afterProtectionEdits.WatchedApps.SequenceEqual(saved.WatchedApps),
+                "Protection-only form edits neither show the general Save bar nor write protected settings");
+
+            window.AutoInsert.IsChecked = true;
+            var editShowsSave = window.PreferencesSaveBar.Visibility == Visibility.Visible;
+            window.AutoInsert.IsChecked = false;
+            var revertHidesSave = window.PreferencesSaveBar.Visibility == Visibility.Collapsed;
+            Proof(editShowsSave && revertHidesSave, "A general preference edit shows the sticky Save bar and reverting it hides the bar");
+
+            window.AutoInsert.IsChecked = true;
+            var idleChoice = window.ModelIdleChoice.Items.OfType<ComboBoxItem>().FirstOrDefault(item => (string?)item.Tag == "5");
+            if (idleChoice == null)
+            {
+                failures.Add("Five-minute model idle choice was not available in the isolated preferences window");
+            }
+            else
+            {
+                window.ModelIdleChoice.SelectedItem = idleChoice;
+                var afterIdleSave = Preferences.Load(preferencesPath);
+                Proof(afterIdleSave.ModelIdleMinutes == 5 && afterIdleSave.AutoInsert == saved.AutoInsert
+                    && afterIdleSave.Startup == saved.Startup
+                    && afterIdleSave.ProtectionEnabled == saved.ProtectionEnabled
+                    && afterIdleSave.SilenceIncoming == saved.SilenceIncoming
+                    && afterIdleSave.ProtectionReleaseDelayMs == saved.ProtectionReleaseDelayMs
+                    && afterIdleSave.ProtectionShortcut == saved.ProtectionShortcut
+                    && afterIdleSave.WatchedApps.SequenceEqual(saved.WatchedApps),
+                    "Model idle choice persists only its committed value while retaining saved general, startup, and protection preferences");
+                Proof(window.AutoInsert.IsChecked == true && window.PreferencesSaveBar.Visibility == Visibility.Visible,
+                    "Idle-only persistence leaves the unrelated unsaved general form choice and sticky Save bar intact");
+            }
+        }
+        catch (Exception ex)
+        {
+            failures.Add("Isolated settings fixture: " + ex.GetType().Name + ": " + ex.Message);
+        }
+        finally
+        {
+            try
+            {
+                if (window != null)
+                {
+                    var quitting = typeof(MainWindow).GetField("quitting", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    if (quitting == null) throw new MissingFieldException(typeof(MainWindow).FullName, "quitting");
+                    quitting.SetValue(window, true);
+                    window.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add("Closing isolated settings window: " + ex.GetType().Name + ": " + ex.Message);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("MURMUR_DATA", priorData);
+                Environment.SetEnvironmentVariable("SONA_DRAFT_TRANSFER", priorTransfer);
+                try { if (Directory.Exists(dataRoot)) Directory.Delete(dataRoot, true); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { failures.Add("Removing isolated settings fixture data: " + ex.GetType().Name + ": " + ex.Message); }
+            }
+        }
+    }
     public static ThemeMaterialFixtureResult RunIsolated()
     {
         var checks = new List<string>();

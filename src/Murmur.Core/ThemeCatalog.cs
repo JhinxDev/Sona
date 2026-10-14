@@ -21,9 +21,9 @@ public static class ThemeCatalog
         Palette("fjord", "Fjord", true, "272F3B", "333E4C", "2D3744", "8092A5", "EBF1F7", "B6C6D7", "91CEDD", "306B83", "294B5E", "D6F2F8", "3E4D5D"),
         Palette("mocha", "Mocha", true, "242330", "302F40", "292838", "86819A", "EEEAF7", "C1BDD3", "E0B4CD", "8A466D", "52374E", "F7DEEE", "3D3749"),
         Palette("oled", "OLED", true, "09090C", "15151B", "101016", "66667B", "F4F4FA", "BDBDCB", "96B8FF", "315EB8", "1B2C50", "E3ECFF", "242430"),
-        Palette("paper", "Paper", false, "F5F6F8", "FFFFFF", "F0F2F5", "7A8290", "222831", "515B68", "075DA9", "075DA9", "DCEBFA", "144D83", "E6EAF0"),
+        Palette("paper", "Paper", false, "F6F7F5", "FFFFFF", "EFF1F1", "7C858D", "252B30", "58636A", "075DA9", "075DA9", "DCE8F0", "204E70", "E7ECEF"),
         Palette("linen", "Linen", false, "F6F2EA", "FFFCF6", "F0EADF", "8E8375", "302B25", "62584D", "805135", "805135", "EDDFCF", "684027", "EBE3D7"),
-        Palette("mist", "Mist", false, "EEF3F6", "F9FCFE", "E7EEF3", "788A99", "243541", "4D6271", "235F79", "235F79", "D3E6EF", "1E536B", "DDE8EF")
+        Palette("mist", "Mist", false, "EAF3F1", "F6FBF9", "E3EFEC", "738A84", "233732", "526B65", "2C7369", "2C7369", "D3E9E3", "1E554D", "DCEBE6")
     });
 
     /// <summary>Unknown IDs resolve to the accepted default; the former glass palette remains a saved-setting alias.</summary>

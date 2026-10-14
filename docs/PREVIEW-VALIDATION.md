@@ -51,6 +51,33 @@ and uses a microphone-disabled test profile.
 The public README screenshots show real native controls and actual Parakeet /
 cleanup residency. They are demonstrations, not an accuracy or latency promise.
 
+## Current presentation qualification
+
+The final October 14 candidate passed a Release build with zero warnings/errors,
+31 isolated presentation/settings checks and 76 material/contrast checks. Earlier
+280 core and 31 active-target/icon checks retain their original provenance because
+their covered behavior did not change. New presentation checks cover neutral
+disabled actions and readable labels across all eight palettes. Unknown or
+malformed fixture arguments now stop before the broader Windows suite; an earlier
+mistyped invocation and worker-start timeout are retained as failed harness
+evidence, not a full-suite pass.
+
+Fresh native captures cover all eight palettes, fixed headings, contextual actions,
+compact unsaved settings, History Open draft, actual Parakeet/cleanup residency,
+and both popup sizes with retained-target warnings. They use isolated synthetic
+profiles and the software renderer with the native Mica path retained. The default
+hardware helper produced a blank WGC main-client capture despite valid WPF
+content; software rendering repaired that capture. Hardware presentation on the
+unlocked owner desktop remains unverified. Foreground APIs returned zero in this
+capture session, so this later pass claims no foreground-preservation acceptance.
+Owner preferences and installed app bytes were checked unchanged and all owned
+helper/worker processes exited. The normal title is Sona without a test suffix.
+
+The private Google design review scored the final application 9.1/10 across
+29 screenshot contexts, including reused unchanged page captures. This is a
+design critique, separate from functional, accessibility and owner acceptance.
+Public screenshots use the same dark Amethyst palette, size and normal title.
+
 ## Open checks and known limits
 
 1. Personal microphone, accent, focus/clipboard handling and insertion into the

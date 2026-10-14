@@ -16,7 +16,7 @@ public partial class MainWindow : Window
     private readonly Preferences preferences;
     private readonly Transcriber transcriber = new();
     private volatile bool windowClosed;
-    private readonly Insertion insertion = new();
+    private readonly Insertion insertion;
     private ActiveApplicationObserver? activeApplication;
     private readonly RecordingDestinationContext destinationContext = new();
     private static readonly DependencyPropertyKey ActiveAppNamePropertyKey = DependencyProperty.RegisterReadOnly(nameof(ActiveAppName), typeof(string), typeof(MainWindow), new PropertyMetadata("No active app"));
@@ -52,6 +52,8 @@ public partial class MainWindow : Window
     public MainWindow(string[] arguments)
     {
         this.arguments = arguments;
+        // UI previews never observe system focus or dispatch text input.
+        insertion = arguments.Contains("--test-ui") ? new Insertion(() => null, () => false, _ => 0) : new();
         preferencesPath = Path.Combine(Environment.GetEnvironmentVariable("MURMUR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Murmur"), "preferences.json");
         preferences = Preferences.Load(preferencesPath);
         InitializeComponent();
@@ -79,6 +81,7 @@ public partial class MainWindow : Window
         SystemEvents.SessionSwitch += SessionChanged;
         Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; activeApplication?.Dispose(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
         Closing += ClosingWindow;
+        InitializeSettingsActions();
     }
     private void InitializeRuntime()
     {
@@ -318,18 +321,7 @@ public partial class MainWindow : Window
         {
             if (SettingsBusy) { SettingsResult.Text = "Finish or cancel your current operation before changing preferences."; return; }
             var priorKeepHistory = preferences.KeepHistory;
-            var next = System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(preferences))!;
-            next.Language = (string)((ComboBoxItem)SpeechLanguage.SelectedItem).Tag;
-            next.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
-            next.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
-            next.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
-            next.AutoInsert = AutoInsert.IsChecked == true; next.CopyToClipboard = CopyToClipboard.IsChecked == true; next.CheckForUpdates = CheckUpdates.IsChecked == true; next.CloseToTray = CloseToTray.IsChecked == true; next.Startup = StartWithWindows.IsChecked == true;
-            next.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
-            next.KeepHistory = KeepHistory.IsChecked == true;
-            next.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
-            next.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";
-            next.ModelIdleMinutes = int.Parse((string)((ComboBoxItem)ModelIdleChoice.SelectedItem).Tag);
-            ReadCleanupPreferences(next);
+            var next = ReadGeneralPreferences();
             var startupChanged = next.Startup != preferences.Startup;
             if (startupChanged) Startup.Set(next.Startup);
             try { next.Save(preferencesPath); }
@@ -363,6 +355,7 @@ public partial class MainWindow : Window
             StatusDetail.Text = preferences.ShortcutMode == "Toggle" ? "Press Ctrl + Windows to start, then press it again to finish. Esc cancels." : "Hold Ctrl + Windows while you speak. Release to finish. Double-tap for hands-free; tap again to finish.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
+        finally { RefreshSettingsActions(); }
     }
     private sealed record DeviceOption(int Id, string Name) { public override string ToString() => Name; }
     private void RefreshDevices()

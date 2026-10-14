@@ -1,5 +1,17 @@
 # Sona design
 
+October 14, final shared-glass polish: reading surfaces and controls keep crisp
+foreground text without WPF drop shadows. Checked radio and switch states have
+distinct geometry and color; disabled buttons use a readable neutral surface.
+Settings and Models have fixed headings with inset scroll content. Related
+actions appear beside their settings; a single general-preferences footer
+appears only for unsaved changes. Independent idle-time changes preserve other
+unsaved settings. Model and cleanup actions reflect actual residency, availability
+and pending release. History exposes Open draft without automatic insertion.
+The compact retained-target warning reads Draft stays in Sona; the wider Panel
+and tooltip preserve the full transition. Paper is neutral daylight and Mist is
+slate/seafoam. Native source and preview titles are simply Sona.
+
 October 14, shared glass identity: all eight palettes now use the same material
 structure, with surfaces, edges and restrained ambient light derived from each
 palette. Amethyst uses the approved near-black colors; the former amethyst-glass

@@ -5,6 +5,14 @@ using Murmur.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 1 && args[0] == "--presentation-fixture")
+{
+    var report = ThemeMaterialFixture.RunPresentation();
+    Console.WriteLine(JsonSerializer.Serialize(report));
+    if (!report.StartupCallbackObserved || !report.ProductionStartupSuppressed || !report.AppResourcesLoaded || report.Failures.Length > 0)
+        throw new InvalidOperationException("Presentation fixture failed: " + string.Join("; ", report.Failures));
+    return;
+}
 if (args.Length == 1 && args[0] == "--active-target-fixture") { Console.WriteLine($"{await ActiveApplicationChecks.RunAsync()} active-target checks passed."); return; }
 if (args.Length == 1 && args[0] == "--theme-material-fixture")
 {
@@ -84,6 +92,12 @@ if (args.Length == 2 && args[0] == "--resident-fixture")
         Console.WriteLine(JsonSerializer.Serialize(new { Passed = checks.Count, Checks = checks, InitialLoadMilliseconds = load.Elapsed.TotalMilliseconds, WarmFixtureMilliseconds = timings, MicrophoneOpened = false, GlobalInputSent = false }));
     }
     finally { await resident.UnloadAsync(); }
+    return;
+}
+if (args.Length != 0)
+{
+    Console.Error.WriteLine("Unknown or malformed fixture arguments. No integration checks were started.");
+    Environment.ExitCode = 2;
     return;
 }
 var passed = new List<string>();

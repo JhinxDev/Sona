@@ -11,6 +11,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var test = e.Args.Contains("--test-ui");
+        if (test || e.Args.Contains("--software-rendering"))
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         var testData = Environment.GetEnvironmentVariable("MURMUR_DATA");
         if (test && string.IsNullOrWhiteSpace(testData)) { Shutdown(2); return; }
         var testScope = test ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(System.IO.Path.GetFullPath(testData!))))[..16] : "";

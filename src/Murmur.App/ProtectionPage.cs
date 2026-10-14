@@ -89,7 +89,12 @@ public partial class MainWindow
         try { ProtectionResult.Text = "Connecting Discord; approve its prompt if shown."; using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(75)); await protection.ConnectAsync(true, deadline.Token); ProtectionResult.Text = protection.Status; }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException or JsonException) { ProtectionResult.Text = "Discord connection failed. Check setup and pause/quit standalone Hush first."; }
     }
-    private async void PauseProtection_Click(object sender, RoutedEventArgs e) => await ToggleProtectionPauseAsync();
+    private async void PauseProtection_Click(object sender, RoutedEventArgs e)
+    {
+        if (SettingsBusy || protection == null || !(preferences.ProtectionEnabled || protection.Paused || protection.OwnsChanges)) return;
+        await ToggleProtectionPauseAsync();
+        RefreshSettingsActions();
+    }
     private async Task ToggleProtectionPauseAsync()
     {
         if (protection == null) return;

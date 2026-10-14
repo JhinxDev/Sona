@@ -61,7 +61,15 @@ public partial class MainWindow
     private void HistorySearch_Changed(object sender, TextChangedEventArgs e) => RefreshHistory();
     private void History_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (SettingsBusy || History.SelectedItem is not HistoryItem item) return;
+        if (History.SelectedItem is HistoryItem item) RestoreHistoryDraft(item);
+    }
+    private void OpenHistoryDraft_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: HistoryItem item }) RestoreHistoryDraft(item);
+    }
+    private void RestoreHistoryDraft(HistoryItem item)
+    {
+        if (SettingsBusy) { HistoryResult.Text = "Finish or cancel dictation before opening a history draft."; return; }
         cancellation?.Cancel(); preparedInsertionTest = insertionTestHolding = false; target = null;
         session = new(); session.Begin(); session.Stop(); session.Complete(item.Original, item.Draft);
         if (item.Inserted) session.MarkInserted();

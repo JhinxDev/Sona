@@ -80,7 +80,8 @@ public partial class Overlay : Window
 
     public void UpdateTarget(string name)
     {
-        PanelTarget.Text = CapsuleTarget.Text = name;
+        PanelTarget.Text = name;
+        CapsuleTarget.Text = name.StartsWith("Draft stays in Sona · ", StringComparison.Ordinal) ? "Draft stays in Sona" : name;
         PanelTarget.ToolTip = CapsuleTarget.ToolTip = name;
     }
 

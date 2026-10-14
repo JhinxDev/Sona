@@ -18,13 +18,15 @@ welcome.
 ![Sona with a sample editable draft](docs/images/sona-home.png)
 
 All screenshots show the real 0.4.0 interface in Amethyst, using the same
-native window size, an isolated profile and synthetic text.
+native window size, an isolated profile and synthetic text. Their normal window
+title is Sona. Recording is disabled in this demonstration profile.
 
 ## Everyday dictation
 
 - **Hold Ctrl + Windows** to record, then release to finish. Double-tap the
   combination for hands-free recording and tap once to stop. Esc cancels.
-  Sona writes into the text field you're using. It never presses Send or Enter
+  Sona inserts into compatible text fields while the original field remains
+  focused. It never presses Send or Enter
   to submit a message; you review and send it yourself.
 - **Keep control of your words.** Home retains the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
@@ -81,6 +83,7 @@ cd Sona
 
 $env:SONA_RUNTIME = Join-Path $env:LOCALAPPDATA 'Sona\runtime'
 .\tools\setup-runtime.ps1 -RuntimeRoot $env:SONA_RUNTIME -BuildTools
+$env:DOTNET_ROOT = Join-Path $env:SONA_RUNTIME 'sdk'
 $env:DOTNET_CLI_HOME = Join-Path $env:SONA_RUNTIME 'dotnet-home'
 $env:NUGET_PACKAGES = Join-Path $env:SONA_RUNTIME 'nuget'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
@@ -93,6 +96,10 @@ $sonaDotnet = Join-Path $env:SONA_RUNTIME 'sdk\dotnet.exe'
 
 Keep `SONA_RUNTIME` set when launching this source build so Sona finds these
 assets. Internal `Murmur` names preserve source and preference compatibility.
+
+If a preview window has an empty client area, launch `Sona.exe --software-rendering`
+to use the optional software renderer. The microphone-disabled `--test-ui` mode
+uses it automatically and requires a separate `MURMUR_DATA` directory.
 
 In **Dictation Models**, choose **Download** for Parakeet v3, then **Use model**.
 Its CPU or CUDA runtime is installed explicitly when needed. For CPU execution,
