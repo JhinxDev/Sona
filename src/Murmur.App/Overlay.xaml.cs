@@ -3,12 +3,17 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Shapes;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace Murmur.App;
 
 public partial class Overlay : Window
 {
+    private static readonly DependencyPropertyKey ActiveAppIconPropertyKey = DependencyProperty.RegisterReadOnly(nameof(ActiveAppIcon), typeof(ImageSource), typeof(Overlay), new PropertyMetadata(Windows.ApplicationIconCache.DefaultIcon));
+    public static readonly DependencyProperty ActiveAppIconProperty = ActiveAppIconPropertyKey.DependencyProperty;
+    public ImageSource ActiveAppIcon => (ImageSource)GetValue(ActiveAppIconProperty);
+    public void UpdateAppIcon(ImageSource icon) => SetValue(ActiveAppIconPropertyKey, icon);
     private const int SampleCount = 28;
     private readonly double[] samples = new double[SampleCount];
     private readonly double[] displayed = new double[SampleCount];
@@ -67,9 +72,9 @@ public partial class Overlay : Window
         PanelDisplay.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         CapsuleDisplay.Visibility = panel ? Visibility.Collapsed : Visibility.Visible;
         Width = panel ? 420 : 310;
-        MinHeight = panel ? 184 : 72;
-        Shell.Padding = new Thickness(panel ? 16 : 12);
-        Shell.CornerRadius = new CornerRadius(panel ? 18 : 28);
+        MinHeight = panel ? 216 : 82;
+        Shell.Padding = new Thickness(panel ? 20 : 12);
+        Shell.CornerRadius = new CornerRadius(panel ? 24 : 28);
         if (IsVisible) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, Position);
     }
 

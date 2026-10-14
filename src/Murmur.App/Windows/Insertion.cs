@@ -12,6 +12,7 @@ public sealed class Insertion : IDisposable
     private readonly Func<DraftTarget?>? readTarget;
     private readonly Func<bool>? readModifiers;
     private readonly Func<string, uint>? send;
+    internal long FocusEpoch => Interlocked.Read(ref focusEpoch);
     public Insertion() { callback = (_, _, _, _, _, _, _) => Interlocked.Increment(ref focusEpoch); hook = SetWinEventHook(0x8005, 0x8005, 0, callback, 0, 0, 0); }
     internal Insertion(Func<DraftTarget?> readTarget, Func<bool> readModifiers, Func<string, uint> send) { callback = (_, _, _, _, _, _, _) => { }; this.readTarget = readTarget; this.readModifiers = readModifiers; this.send = send; }
     public DraftTarget? Capture()
@@ -34,7 +35,10 @@ public sealed class Insertion : IDisposable
         {
             using var process = Process.GetProcessById(target.ProcessId);
             var name = process.ProcessName;
-            return name.Equals("codex", StringComparison.OrdinalIgnoreCase) ? "Codex" : name.Equals("ChatGPT", StringComparison.OrdinalIgnoreCase) ? "ChatGPT" : name;
+            string? executable = null;
+            try { executable = process.MainModule?.FileName; }
+            catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException) { }
+            return ActiveApplicationObserver.FriendlyName(name, executable);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
     }

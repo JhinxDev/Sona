@@ -4,6 +4,14 @@ The agent does not start a live microphone or inject global key/input tests. Ope
 
 1. In Settings choose **Test shortcut**. Focus an empty unsent Codex composer, hold **Ctrl + Windows** for at least 250 ms, then release. The capsule says Test shortcut/No microphone and the fixed Sona test sentence should appear once. Do not submit. Check no duplicate on a second attempt and clipboard preservation. The prepared test deliberately uses Hold even if normal recording is configured as Toggle.
 2. Cancel/clear the test. Focus an empty composer, hold Ctrl+Win and speak, then release both keys. The capsule should show measured audio level, then transcription. Keep focus until the result. Review before sending. Test a short English, French and mixed technical utterance.
+
+When the popup appears, confirm that it names the original app and uses its
+installed icon where available. Codex should read Codex; Discord should read
+Discord. Browsers identify the browser process rather than guessing the website.
+Change field or app during a recording and check that the original target stays
+fixed and the display says the draft will stay in Sona. Test both Panel and Capsule
+under a dark and a light theme. These are owner-started checks, not fixture claims.
+
 3. In **Hold / double-tap** mode, tap Ctrl+Win twice quickly to start hands-free, then tap once to finish. To test legacy tapping, select **Toggle** in Settings and Save preferences. Press Ctrl+Win once to start and again to finish. Esc must cancel either mode, including while modifiers are held. Alternate Ctrl+Alt+Shift+Space/V shortcuts are available only when individually registered.
 4. Change focus during an intentional recording. Expect a retained Sona draft rather than insertion into the other field. Test selected microphone switch/unplug and sleep/resume when convenient; no surprise resumed recording or delayed insertion should occur.
 5. Review the native UI, minimum-size scrolling, vocabulary/snippet forms and History search/clear. Text history stays in memory unless explicitly enabled; disabling saving leaves earlier saved text until Clear history. If you enable close-to-tray, closing hides the app without discarding an idle draft and reopening restores it; new profiles start with close-to-tray disabled.

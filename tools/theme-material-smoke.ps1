@@ -5,7 +5,7 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $taskCandidate=[IO.Path]::GetFullPath($CandidateDirectory);$taskOutput=[IO.Path]::GetFullPath($OutputDirectory)
 $taskPriorData=$env:MURMUR_DATA;$taskPriorDraft=$env:SONA_DRAFT_TRANSFER
 $env:MURMUR_DATA=Join-Path $taskOutput 'data';New-Item -ItemType Directory -Path $env:MURMUR_DATA | Out-Null
-@{Theme='amethyst';Model='small';Language='en';AutoInsert=$false;CopyToClipboard=$false;KeepHistory=$false;Startup=$false;CloseToTray=$false;CheckForUpdates=$false;CleanupEnabled=$false;ProtectionEnabled=$false;Terms=@('Sona');Vocabulary=@();Snippets=@()}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Encoding utf8
+@{Theme='amethyst-glass';Model='small';Language='en';AutoInsert=$false;CopyToClipboard=$false;KeepHistory=$false;Startup=$false;CloseToTray=$false;CheckForUpdates=$false;CleanupEnabled=$false;ProtectionEnabled=$false;Terms=@('Sona');Vocabulary=@();Snippets=@()}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $env:MURMUR_DATA 'preferences.json') -Encoding utf8
 $env:SONA_DRAFT_TRANSFER=@{Draft="Sona release checklist`n`nReview the glass theme and keyboard focus.`nKeep this draft unsent.";Original='Review the Sona glass theme and keyboard focus. Keep this draft unsent.'}|ConvertTo-Json -Compress
 $taskOwnerPreferences=Join-Path $env:LOCALAPPDATA 'Murmur/preferences.json';$taskOwnerHash=if(Test-Path -LiteralPath $taskOwnerPreferences){(Get-FileHash -LiteralPath $taskOwnerPreferences).Hash}else{$null}
 $taskRunnerOutput=Join-Path $taskOutput 'runner'

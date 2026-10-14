@@ -17,6 +17,11 @@ public partial class MainWindow : Window
     private readonly Transcriber transcriber = new();
     private volatile bool windowClosed;
     private readonly Insertion insertion = new();
+    private ActiveApplicationObserver? activeApplication;
+    private readonly RecordingDestinationContext destinationContext = new();
+    private static readonly DependencyPropertyKey ActiveAppNamePropertyKey = DependencyProperty.RegisterReadOnly(nameof(ActiveAppName), typeof(string), typeof(MainWindow), new PropertyMetadata("No active app"));
+    public static readonly DependencyProperty ActiveAppNameProperty = ActiveAppNamePropertyKey.DependencyProperty;
+    public string ActiveAppName => (string)GetValue(ActiveAppNameProperty);
     private readonly EscapeGuard escape;
     private readonly Overlay overlay = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
@@ -67,17 +72,19 @@ public partial class MainWindow : Window
         InitializeAppearance(); InitializeCleanup();
         overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
-        if (arguments.Contains("--test-ui")) Title = "Sona (UI test)";
         if (!transcriber.Available) { Status.Text = "Local engine not installed"; StatusDetail.Text = "Run setup-runtime.ps1 before recording."; }
         SourceInitialized += (_, _) => InitializeRuntime();
         timer.Tick += (_, _) => { if (recorder == null) return; overlay.Update("Listening", "Esc to cancel", recorder.Elapsed, recorder.Level); if (recorder.Elapsed >= 120) StartStop(); else recorder.CheckHealth(); };
         SystemEvents.PowerModeChanged += PowerChanged;
         SystemEvents.SessionSwitch += SessionChanged;
-        Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
+        Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; activeApplication?.Dispose(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
         Closing += ClosingWindow;
     }
     private void InitializeRuntime()
     {
+        activeApplication = new ActiveApplicationObserver(Dispatcher, () => insertion.FocusEpoch);
+        activeApplication.Changed += ApplyActiveApplication;
+        activeApplication.Start();
         agentServer = new AgentServer(HandleAgentAsync); agentServer.Start();
         ThemeManager.ApplyTitleBar(this);
         InitializeUpdateChecks();
@@ -97,6 +104,10 @@ public partial class MainWindow : Window
         }
         var replayIndex = Array.IndexOf(arguments, "--replay");
         if (replayIndex >= 0 && replayIndex + 1 < arguments.Length) operation = ReplayAsync(arguments[replayIndex + 1]);
+    }
+    private void ApplyActiveApplication(ActiveApplication app)
+    {
+        destinationContext.Observe(app); SetValue(ActiveAppNamePropertyKey, app.Name); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
     }
     private async Task<bool> BeginShortcutAsync(bool hold)
     {
@@ -121,6 +132,7 @@ public partial class MainWindow : Window
                 target = insertion.Capture();
                 if (hotkeys?.CanBeginHold != true) return false;
                 if (target == null) { ShowShortcutNotice("Test shortcut", "Focus an editable draft"); return false; }
+                activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.ProcessId ? activeApplication.Current.Icon : null); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
                 barPreview.Stop(); overlay.Update("Test shortcut", "No microphone"); overlay.ShowFor(target.Window);
                 insertionTestHolding = true; return true;
             }
@@ -147,6 +159,7 @@ public partial class MainWindow : Window
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new();
         target = arguments.Contains("--test-ui") ? null : insertion.Capture();
+        activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.ProcessId ? activeApplication.Current.Icon : null);
         barPreview.Stop();
         RetainCurrentDraft();
         preparedInsertionTest = insertionTestHolding = false;
@@ -174,7 +187,8 @@ public partial class MainWindow : Window
             if (admission != null && !admission()) { Cancel(); return false; }
             hotkeys?.Recording(true); timer.Start();
             Status.Text = "Listening"; StatusDetail.Text = "Speak your thought. Press Esc to cancel."; RecordButton.Content = "Stop";
-            overlay.UpdateTarget(Insertion.AppName(target));
+            overlay.UpdateTarget(destinationContext.Label);
+            overlay.UpdateAppIcon(destinationContext.Icon);
             overlay.Update("Listening", "Esc to cancel"); overlay.ShowFor(target?.Window ?? 0);
             return true;
         }
@@ -208,22 +222,25 @@ public partial class MainWindow : Window
                 try { Clipboard.SetText(current.Draft); clipboardDetail += " Copied to clipboard."; }
                 catch (COMException) { clipboardDetail += " Clipboard is busy; use Copy draft to retry."; }
             }
-            if (preferences.AutoInsert && target != null)
+            activeApplication?.Refresh();
+            if (preferences.AutoInsert && target != null && !destinationContext.DestinationChanged)
             {
                 var result = await insertion.InsertAsync(target, current.Draft, cancellation!.Token);
                 if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); }
                 Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
             }
-            else { Status.Text = "Draft ready"; StatusDetail.Text = "Review it here, or copy it when you are ready." + clipboardDetail; }
+            else { Status.Text = "Draft ready"; StatusDetail.Text = (destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
-        finally { active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); }
+        finally { active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); }
     }
     private async Task InsertReadyAsync(DraftTarget? suppliedTarget = null)
     {
         if (shutdownPending || processing || recorder != null || session?.State != SessionState.Ready) { StatusDetail.Text = "Choose a new ready draft first. Already inserted drafts cannot be inserted twice."; return; }
         var current = session; var destination = suppliedTarget ?? insertion.Capture();
+        activeApplication?.Refresh();
+        if (suppliedTarget != null && destinationContext.DestinationChanged) { Status.Text = "Draft ready"; StatusDetail.Text = "Focus changed. Your draft stayed in Sona."; overlay.Hide(); destinationContext.End(); return; }
         cancellation?.Dispose(); cancellation = new();
         try { escape.Arm(true); } catch (IOException ex) { StatusDetail.Text = ex.Message; return; }
         processing = true;
@@ -234,7 +251,7 @@ public partial class MainWindow : Window
             Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail;
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
-        finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); }
+        finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); }
     }
     private void PrepareTest_Click(object sender, RoutedEventArgs e)
     {
@@ -277,6 +294,7 @@ public partial class MainWindow : Window
         if (windowClosed) return;
         barPreview.Stop();
         preparedInsertionTest = insertionTestHolding = false;
+        destinationContext.End();
         try { cancellation?.Cancel(); } catch (ObjectDisposedException) { }
         session?.Cancel(); timer.Stop(); recorder?.Dispose(); recorder = null;
         protectionReleaseOperation = ReleaseOwnProtectionAsync();

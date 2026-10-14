@@ -17,7 +17,7 @@ welcome.
 
 ![Sona with a sample editable draft](docs/images/sona-home.png)
 
-All screenshots show the real 0.4.0 interface in Amethyst Glass, using the same
+All screenshots show the real 0.4.0 interface in Amethyst, using the same
 native window size, an isolated profile and synthetic text.
 
 ## Everyday dictation
@@ -28,7 +28,10 @@ native window size, an isolated profile and synthetic text.
   to submit a message; you review and send it yourself.
 - **Keep control of your words.** Home retains the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
-  into a different field. Clipboard backup is optional.
+  into a different field. Clipboard backup is optional. The recording display
+  identifies the active app using its installed icon where available. A focus
+  change during recording keeps the original destination and shows that the
+  draft will stay in Sona.
 - **Choose local recognition.** NVIDIA Parakeet v3 and six Whisper models
   offer CPU or NVIDIA CUDA options. Explicit downloads use pinned sizes and
   hashes. Selected and actually loaded models are shown separately.
@@ -45,23 +48,27 @@ native window size, an isolated profile and synthetic text.
   Sona or a watched ChatGPT/Codex app records, so others do not hear your
   dictation. Incoming audio can also be silenced. Overlapping recordings share
   protection, and restoration respects manual mute/deafen choices.
-- **Fit your workspace.** Nine light/dark themes, Inter typography, Panel or
+- **Fit your workspace.** Eight light/dark glass themes, Inter typography, Panel or
   Capsule recording displays, microphone level bars and local WAV transcription.
 - **Connect your tools.** A JSON CLI and stdio MCP interface manage status,
   validated settings, models and call protection without remote microphone control.
 
-Choose **Settings → Appearance → Amethyst Glass** to try near-black smoked violet
-surfaces, restrained illumination and soft lilac edges. On supported Windows 11
-systems with transparency enabled, it uses Mica; an opaque material fallback is available.
-The existing Amethyst theme and new-profile defaults remain available.
+Glass is the shared style across all eight themes. Choose **Settings → Appearance →
+Amethyst** for near-black smoked violet surfaces and soft lilac edges, or choose
+Charcoal, Fjord, Mocha, OLED, Paper, Linen or Mist for the same material in another
+palette. Supported Windows 11 systems use Mica when transparency is enabled;
+opaque and system high-contrast fallbacks preserve readability. Saved Amethyst Glass
+settings map to Amethyst. New profiles still start with Charcoal.
 
-![Amethyst Glass appearance in a synthetic native demo](docs/images/sona-amethyst-glass.png)
+![Amethyst glass appearance in a synthetic native demo](docs/images/sona-amethyst-glass.png)
 
 ![Parakeet and Whisper model choices](docs/images/sona-models.png)
 
 ## Build and run
 
-You need Windows x64 and PowerShell. A microphone is needed for live dictation.
+You need Windows x64 and PowerShell. The native UI is verified on Windows 11 x64.
+A microphone is needed for live dictation. macOS and Linux desktop ports are not
+available yet.
 Initial SDK, NuGet, engine and model downloads need internet access. The setup
 script below provisions the pinned .NET 8 SDK, Whisper CPU engine and Small
 model into a directory you choose.

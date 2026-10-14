@@ -1,5 +1,25 @@
 # Sona design
 
+October 14, shared glass identity: all eight palettes now use the same material
+structure, with surfaces, edges and restrained ambient light derived from each
+palette. Amethyst uses the approved near-black colors; the former amethyst-glass
+ID resolves to amethyst so saved settings survive without a duplicate menu option.
+Light palettes retain dark text. Opaque fallback surfaces keep alpha at255; system
+high contrast uses system brushes and removes decorative effects. Charcoal remains
+the default color choice.
+
+The recording displays follow the selected Frost layout with the darker glass
+material: smaller app identity row, regular Segoe UI Variable Text/Segoe UI, ample
+spacing, a measured waveform, elapsed time and stop/cancel actions. Panel width420,
+minimum height216; Capsule width310, minimum height82. Real installed executable
+icons are read locally with a bounded cache and a neutral fallback. No website
+identity is inferred from a browser process. Live active-app observation never
+retargets a recording; the original destination stays fixed, and a focus change
+shows a retention warning. Physical Codex/Discord typing acceptance remains open.
+
+Earlier design checkpoints follow for context; the shared glass identity above
+supersedes the optional-material and original-Amethyst descriptions.
+
 October 14, 0.4.0: optional Amethyst Glass uses a darker smoked violet material,
 requested to match the product film's studio. The base canvas is #09070E, panels
 #181320, inset #0D0B12 and edges #655775. Text remains #FAF7FF, secondary text

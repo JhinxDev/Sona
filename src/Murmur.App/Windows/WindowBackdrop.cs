@@ -46,7 +46,7 @@ public static class WindowBackdrop
             {
                 // No layered/per-pixel Window transparency. DWM owns the backdrop.
                 source.CompositionTarget.BackgroundColor = Colors.Transparent;
-                return state.Status = new(requested, supported, true, "Native Mica with Amethyst material layers", set, frame, read, actual);
+                return state.Status = new(requested, supported, true, "Native Mica with palette-derived glass", set, frame, read, actual);
             }
         }
         if (state.Touched)
@@ -64,7 +64,7 @@ public static class WindowBackdrop
             read = DwmGetWindowAttribute(handle, SystemBackdrop, out actual, sizeof(int));
         }
         return state.Status = new(requested, supported, false,
-            state.Touched ? "Opaque surface; native backdrop reset needs retry" : requested ? "Opaque Amethyst material fallback" : "Opaque palette", set, frame, read, actual);
+            state.Touched ? "Opaque surface; native backdrop reset needs retry" : requested ? "Opaque glass material fallback" : "Opaque palette", set, frame, read, actual);
     }
     private static bool TransparencyEnabled()
     {

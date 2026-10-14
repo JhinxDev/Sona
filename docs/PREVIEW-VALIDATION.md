@@ -15,22 +15,34 @@ into personal microphone or target-app acceptance.
 - 19 agent-interface checks cover the JSON CLI and its 18 MCP tools. Normal and
   compact model UI checks passed; prior theme/cleanup checks were reused where
   their implementation stayed unchanged.
-- Fresh trailer/screenshots use the unchanged 0.4.0 application assembly, a
+- Retained initial trailer/screenshots used the original 0.4.0 application assembly, a
   separate demo profile and synthetic text. The supplied generated narration was
   transcribed through the real local-model path. No live microphone, clipboard
   insertion or Discord call was recorded. The demo's disconnected Discord state
   is expected when Discord is closed.
 
-The optional Amethyst Glass addition was checked separately on October 14:
-279 core checks passed, followed by 26 native theme checks and eight captures.
-The real selector saved the theme in an isolated profile; Windows Mica readback,
-forced opaque fallback, compact layout and switching back to Amethyst/Paper were
-verified. Native theme checks preserve foreground, owner preferences and the
-installed application. Source default appearance is unchanged. The added glass
-screenshots use the new candidate rather than the earlier application assembly.
-Older Windows and an actual high-contrast policy change were not physically tested.
-The source includes OS, transparency and high-contrast guards with an opaque
-fallback; those guards are not a claim of testing every Windows configuration.
+The shared glass style and recording display changes were checked separately on
+October 14. All eight themes use palette-derived materials. The former
+amethyst-glass setting resolves to Amethyst, preserving existing preferences.
+280 core checks passed. The current Release candidate passed 31 focused active-app,
+destination and installed-icon checks, plus 76 isolated material/contrast checks.
+A separate startup check loads the actual App.xaml resources while intercepting
+production startup, so resource tests cannot accidentally open the app or its
+services. This pass did not rerun the entire earlier Windows suite.
+
+Native checks cover all eight palettes, the real appearance selector, guarded Mica,
+opaque fallback and both recording display sizes. A later 22-check capture pass
+verifies the actual installed Codex icon and its dark plate on light themes,
+normal Sona title, long labels and retained-draft warnings. Captures use separate
+synthetic profiles. Foreground, owner preferences and the installed app are
+preserved. The source keeps Charcoal as the default palette; glass is now the
+shared material rather than a separate optional theme. The source title remains
+Sona in both normal and microphone-disabled previews.
+
+The current host is Windows 11 x64. Other Windows versions and an actual
+high-contrast policy change were not physically tested. Source guards provide
+opaque/system-color fallbacks; this does not claim every Windows configuration
+passed. macOS and Linux desktop builds are not implemented.
 
 Run `tools/theme-material-smoke.ps1` with explicit candidate, output and SDK paths
 for a bounded native material check. It requires the existing `winapp` capture CLI

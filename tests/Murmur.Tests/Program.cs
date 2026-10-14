@@ -215,10 +215,26 @@ using (var appearancePatch = System.Text.Json.JsonDocument.Parse("{\"theme\":\"a
     var originalSettings = new Preferences(); var changedSettings = AgentSettings.Apply(originalSettings, appearancePatch.RootElement);
     Check(changedSettings.Theme == "amethyst" && changedSettings.RecordingDisplay == "Panel" && changedSettings.ModelIdleMinutes == 30 && originalSettings.Theme == "charcoal", "Agent appearance and idle preferences clone without mutating current settings");
 }
-Check(ThemeCatalog.All.Count == 9 && ThemeCatalog.All.Count(t => t.IsDark) == 6 && ThemeCatalog.All.Select(t => t.Id).Distinct().Count() == 9, "Theme catalog contains nine distinct palettes grouped into six dark and three light");
-Check(ThemeCatalog.Resolve("amethyst-glass").UsesGlassMaterial && ThemeCatalog.Resolve("amethyst-glass").Label == "Amethyst Glass" && ThemeCatalog.All.Count(t => t.UsesGlassMaterial) == 1, "Only the optional Amethyst Glass theme enables native material treatment");
+Check(ThemeCatalog.All.Count == 8 && ThemeCatalog.All.Count(t => t.IsDark) == 5 && ThemeCatalog.All.Select(t => t.Id).Distinct().Count() == 8, "Theme catalog contains eight distinct palettes grouped into five dark and three light");
+Check(ThemeCatalog.All.All(t => t.UsesGlassMaterial) && ThemeCatalog.Resolve("amethyst-glass").Id == "amethyst", "Every palette uses shared glass materials and the former glass ID resolves to canonical Amethyst");
 var glassPreferences = new Preferences { Theme = "amethyst-glass" }; glassPreferences.Normalize();
-Check(glassPreferences.Theme == "amethyst-glass" && new Preferences().Theme == ThemeCatalog.DefaultId && ThemeCatalog.Resolve("amethyst").Colors["Accent"] == ThemeCatalog.Resolve("amethyst-glass").Colors["Accent"], "Glass preference is valid while defaults and original Amethyst accent remain unchanged");
+Check(glassPreferences.Theme == "amethyst" && new Preferences().Theme == ThemeCatalog.DefaultId && ThemeCatalog.Resolve("amethyst").Colors["Canvas"] == "#09070E" && ThemeCatalog.Resolve("amethyst").Colors["Accent"] == "#C4A6FF", "Legacy glass preference normalizes to the approved Amethyst palette while the default stays Charcoal");
+double Luminance(string value)
+{
+    var hex = value.TrimStart('#');
+    double Channel(int index)
+    {
+        var channel = Convert.ToInt32(hex.Substring(index, 2), 16) / 255d;
+        return channel <= .04045 ? channel / 12.92 : Math.Pow((channel + .055) / 1.055, 2.4);
+    }
+    return .2126 * Channel(0) + .7152 * Channel(2) + .0722 * Channel(4);
+}
+double Contrast(string foreground, string background)
+{
+    var a = Luminance(foreground); var b = Luminance(background);
+    return (Math.Max(a, b) + .05) / (Math.Min(a, b) + .05);
+}
+Check(ThemeCatalog.All.All(theme => Contrast(theme.Colors["Ink"], theme.Colors["Canvas"]) >= 4.5 && Contrast(theme.Colors["Ink"], theme.Colors["Panel"]) >= 4.5 && Contrast(theme.Colors["PrimaryInk"], theme.Colors["Primary"]) >= 4.5 && Contrast(theme.Colors["SelectedInk"], theme.Colors["Selection"]) >= 4.5), "All eight palettes preserve readable canvas, panel, primary-action, and selected-state contrast");
 var invalidAppearance = new Preferences { Theme = "unknown", RecordingDisplay = "unknown", ModelIdleMinutes = -1 }; invalidAppearance.Normalize();
 Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDisplay == "Capsule" && invalidAppearance.ModelIdleMinutes == 0, "Malformed saved appearance and memory preferences normalize safely");
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))

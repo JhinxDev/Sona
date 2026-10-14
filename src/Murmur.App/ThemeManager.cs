@@ -22,7 +22,7 @@ public static class ThemeManager
         Current = ThemeCatalog.Resolve(id);
         foreach (var pair in Current.Colors)
         {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(pair.Value));
+            var brush = new SolidColorBrush(AccessibleColor(pair.Key, Parse(pair.Value)));
             brush.Freeze();
             app.Resources[pair.Key] = brush;
         }
@@ -58,15 +58,16 @@ public static class ThemeManager
             if (Current.UsesGlassMaterial) window.Background = material.NativeActive ? Brushes.Transparent : (Brush)Application.Current.Resources["MaterialCanvas"];
             else window.ClearValue(Window.BackgroundProperty);
         }
-        var caption = material.NativeActive ? -1 : ColorRef(Current.Colors["Canvas"]);
-        var text = ColorRef(Current.Colors["Ink"]);
+        var caption = material.NativeActive ? -1 : ColorRef(AccessibleColor("Canvas", PaletteColor("Canvas")));
+        var text = ColorRef(AccessibleColor("Ink", PaletteColor("Ink")));
         // Unsupported DWM attributes return HRESULTs and leave system defaults intact.
         _ = DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 35, ref caption, sizeof(int));
         _ = DwmSetWindowAttribute(handle, 36, ref text, sizeof(int));
         if (window is MainWindow)
         {
-            var edge = Current.UsesGlassMaterial ? ColorRef("#493B5A") : -1;
+            var edgeColor = Mix(PaletteColor("Line"), PaletteColor("Accent"), .22);
+            var edge = Current.UsesGlassMaterial && !SystemParameters.HighContrast ? ColorRef(edgeColor) : -1;
             _ = DwmSetWindowAttribute(handle, 34, ref edge, sizeof(int));
         }
     }
@@ -74,78 +75,142 @@ public static class ThemeManager
     private static void ApplyMaterialResources(bool native)
     {
         var resources = Application.Current.Resources;
-        var glass = Current.UsesGlassMaterial;
-        resources["MaterialCanvas"] = resources["Canvas"];
-        resources["MaterialAmbient"] = Brushes.Transparent;
-        resources["MaterialEdge"] = resources["Line"];
-        resources["MaterialNavEdge"] = Brushes.Transparent;
-        resources["MaterialNavThickness"] = new Thickness(0);
-        resources["MaterialPanelRadius"] = new CornerRadius(10);
-        resources["MaterialPanelEffect"] = null;
-        resources["MaterialActionEffect"] = null;
-        if (!glass) return;
-        var opaque = !native || SystemParameters.HighContrast;
-        if (!SystemParameters.HighContrast && (RenderCapability.Tier >> 16) > 0)
-            resources["MaterialAmbient"] = AmbientLight();
-        resources["MaterialCanvas"] = Gradient(opaque ? "#FF100B18" : "#E8100B18", opaque ? "#FF07060D" : "#EB07060D", opaque ? "#FF0C0912" : "#E80C0912", new Point(0, 0), new Point(1, 1));
-        resources["Sidebar"] = Gradient("#F50F0C16", "#F50B0911", "#F5130E1D", new Point(0, 0), new Point(.5, 1));
-        resources["Panel"] = Gradient(opaque ? "#FF21192C" : "#DC21192C", opaque ? "#FF141019" : "#E4141019", opaque ? "#FF1B1324" : "#DE1B1324", new Point(0, 0), new Point(.75, 1));
-        resources["Inset"] = Gradient("#F8100C17", "#F809080E", "#F8130E1B", new Point(0, 0), new Point(1, 1));
-        resources["Button"] = Gradient("#F5251B32", "#F015101E", "#F01C1426", new Point(0, 0), new Point(0, 1));
-        resources["Primary"] = Gradient("#FF704B98", "#FF553575", "#FF3E2657", new Point(0, 0), new Point(0, 1));
-        resources["Selection"] = Gradient("#F05F3F88", "#EA39264F", "#EC2A1E3B", new Point(0, 0), new Point(1, 1));
-        resources["Hover"] = Gradient("#EB2D203D", "#EB1D1528", "#EB241A31", new Point(0, 0), new Point(1, 1));
-        resources["MaterialEdge"] = Gradient("#90BBA4D2", "#50594A6D", "#704F3A68", new Point(0, 0), new Point(.7, 1));
-        resources["MaterialNavEdge"] = Gradient("#ABA98DCB", "#80694D8B", "#60543C70", new Point(0, 0), new Point(1, 1));
+        var highContrast = SystemParameters.HighContrast;
+        var translucent = native && !highContrast;
+        var canvas = PaletteColor("Canvas");
+        var panel = PaletteColor("Panel");
+        var inset = PaletteColor("Inset");
+        var accent = PaletteColor("Accent");
+
+        resources["MaterialCanvas"] = highContrast ? SystemColors.WindowBrush : Surface(canvas, panel, accent, .025, .08, translucent, 230);
+        resources["Sidebar"] = highContrast ? SystemColors.WindowBrush : Surface(PaletteColor("Sidebar"), panel, accent, .025, .06, translucent, 246);
+        resources["Panel"] = highContrast ? SystemColors.WindowBrush : Surface(panel, canvas, accent, .035, .07, translucent, 250);
+        resources["Inset"] = highContrast ? SystemColors.WindowBrush : Surface(inset, canvas, accent, .018, .05, translucent, 252);
+        resources["Button"] = highContrast ? SystemColors.ControlBrush : Surface(PaletteColor("Button"), panel, accent, .045, .08, translucent, 248);
+        resources["Primary"] = highContrast ? SystemColors.HighlightBrush : PrimarySurface(PaletteColor("Primary"));
+        resources["Selection"] = highContrast ? SystemColors.HighlightBrush : Surface(PaletteColor("Selection"), accent, accent, .10, .10, translucent, 246);
+        resources["Hover"] = highContrast ? SystemColors.HighlightBrush : Surface(PaletteColor("Hover"), panel, accent, .04, .05, translucent, 244);
+
+        var line = highContrast ? SystemColors.WindowTextColor : PaletteColor("Line");
+        var edge = Mix(line, accent, highContrast ? 0 : .28);
+        resources["MaterialAmbient"] = !highContrast && translucent && (RenderCapability.Tier >> 16) > 0
+            ? AmbientLight(accent)
+            : Brushes.Transparent;
+        resources["MaterialEdge"] = highContrast ? SystemColors.WindowTextBrush : translucent
+            ? EdgeGradient(line, accent)
+            : new SolidColorBrush(edge);
+        resources["MaterialNavEdge"] = highContrast ? SystemColors.WindowTextBrush : translucent
+            ? Gradient(WithAlpha(Mix(line, accent, .72), 0xC8), WithAlpha(accent, 0xA0), WithAlpha(Mix(line, accent, .5), 0xB8), new Point(0, 0), new Point(1, 1))
+            : new SolidColorBrush(accent);
         resources["MaterialNavThickness"] = new Thickness(1);
         resources["MaterialPanelRadius"] = new CornerRadius(14);
-        if (!SystemParameters.HighContrast && (RenderCapability.Tier >> 16) > 0)
-        {
-            resources["MaterialActionEffect"] = Shadow("#8858BD", .16, 10, 0);
-        }
+        resources["MaterialPanelEffect"] = !highContrast && (RenderCapability.Tier >> 16) > 0
+            ? Shadow(accent, .08, 14, 1)
+            : null;
+        resources["MaterialActionEffect"] = !highContrast && (RenderCapability.Tier >> 16) > 0
+            ? Shadow(accent, .12, 10, 1)
+            : null;
+
+        // Protected surfaces remain almost opaque over native backdrops. These aliases
+        // also give the overlay a stable material contract without theme-specific hues.
+        resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(32, 30, 36));
+        resources["OverlaySurface"] = resources["Panel"];
+        resources["OverlayEdge"] = resources["MaterialEdge"];
     }
-    private static Brush AmbientLight()
+
+    private static Brush Surface(Color baseColor, Color neighbor, Color accent, double accentMix, double neighborMix, bool translucent, byte opacity)
     {
-        // Static code-native illumination: broad fields, never a copied wallpaper or animation.
+        var first = Mix(baseColor, accent, accentMix);
+        var middle = Mix(baseColor, neighbor, neighborMix);
+        var last = Mix(baseColor, accent, accentMix * .45);
+        var alpha = translucent ? opacity : byte.MaxValue;
+        return Gradient(WithAlpha(first, alpha), WithAlpha(middle, alpha), WithAlpha(last, alpha), new Point(0, 0), new Point(1, 1));
+    }
+
+    private static Brush PrimarySurface(Color primary)
+    {
+        static Color Shade(Color color, double factor) => Color.FromRgb(
+            (byte)Math.Clamp(Math.Round(color.R * factor), 0, 255),
+            (byte)Math.Clamp(Math.Round(color.G * factor), 0, 255),
+            (byte)Math.Clamp(Math.Round(color.B * factor), 0, 255));
+        return Gradient(Shade(primary, 1), Shade(primary, .94), Shade(primary, .88), new Point(0, 0), new Point(0, 1));
+    }
+
+    private static Brush EdgeGradient(Color line, Color accent) => Gradient(
+        WithAlpha(Mix(line, accent, .38), 0xB5),
+        WithAlpha(Mix(line, accent, .16), 0x85),
+        WithAlpha(Mix(line, accent, .32), 0xA0), new Point(0, 0), new Point(.7, 1));
+
+    private static Brush AmbientLight(Color accent)
+    {
+        // Static code-native illumination uses only the selected palette's accent.
         var drawing = new DrawingGroup();
         var bounds = new RectangleGeometry(new Rect(0, 0, 1, 1));
-        foreach (var (color, center, radiusX, radiusY) in new[]
+        foreach (var (alpha, center, radiusX, radiusY) in new[]
         {
-            ("#24674389", new Point(.16, .12), .72, .62),
-            ("#205A497E", new Point(.91, .52), .68, .78),
-            ("#1851305D", new Point(.35, 1.04), .70, .62)
+            ((byte)0x24, new Point(.16, .12), .72, .62),
+            ((byte)0x20, new Point(.91, .52), .68, .78),
+            ((byte)0x18, new Point(.35, 1.04), .70, .62)
         })
         {
             var light = new RadialGradientBrush
             {
                 Center = center, GradientOrigin = center, RadiusX = radiusX, RadiusY = radiusY
             };
-            var tint = (Color)ColorConverter.ConvertFromString(color);
+            var tint = WithAlpha(accent, alpha);
             light.GradientStops.Add(new(tint, 0));
             light.GradientStops.Add(new(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
             drawing.Children.Add(new GeometryDrawing(light, null, bounds));
         }
-        drawing.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(60, 6, 5, 11)), null, bounds));
         var brush = new DrawingBrush(drawing) { Stretch = Stretch.Fill };
         brush.Freeze(); return brush;
     }
-    private static Brush Gradient(string first, string middle, string last, Point start, Point end)
+
+    private static Brush Gradient(Color first, Color middle, Color last, Point start, Point end)
     {
         var brush = new LinearGradientBrush { StartPoint = start, EndPoint = end };
-        brush.GradientStops.Add(new((Color)ColorConverter.ConvertFromString(first), 0));
-        brush.GradientStops.Add(new((Color)ColorConverter.ConvertFromString(middle), .48));
-        brush.GradientStops.Add(new((Color)ColorConverter.ConvertFromString(last), 1));
+        brush.GradientStops.Add(new(first, 0));
+        brush.GradientStops.Add(new(middle, .48));
+        brush.GradientStops.Add(new(last, 1));
         brush.Freeze(); return brush;
     }
-    private static Effect Shadow(string color, double opacity, double radius, double depth)
+
+    private static Effect Shadow(Color color, double opacity, double radius, double depth)
     {
-        var effect = new DropShadowEffect { Color = (Color)ColorConverter.ConvertFromString(color), Opacity = opacity, BlurRadius = radius, ShadowDepth = depth, RenderingBias = RenderingBias.Performance };
+        var effect = new DropShadowEffect { Color = color, Opacity = opacity, BlurRadius = radius, ShadowDepth = depth, RenderingBias = RenderingBias.Performance };
         effect.Freeze(); return effect;
     }
 
-    private static int ColorRef(string value)
+    private static Color PaletteColor(string key) => AccessibleColor(key, Parse(Current.Colors[key]));
+
+    private static Color AccessibleColor(string key, Color paletteColor)
     {
-        var color = (Color)ColorConverter.ConvertFromString(value);
+        if (!SystemParameters.HighContrast) return paletteColor;
+        return key switch
+        {
+            "Canvas" or "Sidebar" or "Panel" or "Inset" or "Button" or "SwitchKnob" => SystemColors.WindowColor,
+            "Ink" or "Muted" or "Line" or "SwitchOff" or "ScrollThumb" or "Success" or "Warning" or "Danger" => SystemColors.WindowTextColor,
+            "PrimaryInk" or "SelectedInk" => SystemColors.HighlightTextColor,
+            "SwitchKnobOn" => SystemColors.HighlightColor,
+            "Accent" or "Focus" or "Primary" or "Hover" or "Selection" => SystemColors.HighlightColor,
+            _ => SystemColors.WindowTextColor
+        };
+    }
+
+    private static Color Parse(string value) => (Color)ColorConverter.ConvertFromString(value);
+    private static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
+
+    private static Color Mix(Color left, Color right, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromRgb(
+            (byte)Math.Clamp(Math.Round(left.R + (right.R - left.R) * amount), 0, 255),
+            (byte)Math.Clamp(Math.Round(left.G + (right.G - left.G) * amount), 0, 255),
+            (byte)Math.Clamp(Math.Round(left.B + (right.B - left.B) * amount), 0, 255));
+    }
+
+    private static int ColorRef(Color color)
+    {
         return color.R | color.G << 8 | color.B << 16;
     }
 

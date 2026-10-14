@@ -5,6 +5,23 @@ using Murmur.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 1 && args[0] == "--active-target-fixture") { Console.WriteLine($"{await ActiveApplicationChecks.RunAsync()} active-target checks passed."); return; }
+if (args.Length == 1 && args[0] == "--theme-material-fixture")
+{
+    var report = ThemeMaterialFixture.RunIsolated();
+    Console.WriteLine(JsonSerializer.Serialize(report));
+    if (!report.StartupCallbackObserved || !report.ProductionStartupSuppressed || report.Failures.Length > 0)
+        throw new InvalidOperationException("Theme material fixture failed: " + string.Join("; ", report.Failures));
+    return;
+}
+if (args.Length == 1 && args[0] == "--theme-startup-fixture")
+{
+    var report = ThemeMaterialFixture.RunStartupInterception();
+    Console.WriteLine(JsonSerializer.Serialize(report));
+    if (!report.StartupCallbackObserved || !report.ProductionStartupSuppressed || !report.AppResourcesLoaded || report.Failures.Length > 0)
+        throw new InvalidOperationException("Theme startup fixture failed: " + string.Join("; ", report.Failures));
+    return;
+}
 ProcessStartInfo Self(params string[] args) { var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true }; foreach (var arg in args) info.ArgumentList.Add(arg); return info; }
 if (args.Length == 2 && args[0] == "--cleanup-fixture")
 {
@@ -151,18 +168,24 @@ if (!shortcutTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Sho
 if (shortcutFailure != null) throw new Exception("Native shortcut listener test failed", shortcutFailure);
 Check(shortcutStarted, "Dedicated native keyboard hook and message timer initialize without a microphone");
 Check(shortcutStopped && shortcutCallbacks == 0, "Shortcut reset and disposal stop the listener without starting capture or sending input");
-Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false, handsFreeTestSafe = false;
+Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false, handsFreeTestSafe = false, themeMaterialSafe = false, themeStartupIntercepted = false;
+var themeMaterialFailureDetails = new List<string>();
 var preparationRoot = Path.Combine(Path.GetTempPath(), "sona-preparation-test-" + Guid.NewGuid().ToString("N"));
 var preparationPriorData = Environment.GetEnvironmentVariable("MURMUR_DATA"); Environment.SetEnvironmentVariable("MURMUR_DATA", preparationRoot);
 var preparationThread = new Thread(() =>
 {
     var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
     SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
-    var application = new Murmur.App.App(); application.InitializeComponent();
+    var application = new Murmur.App.ThemeResourceTestApplication(); application.InitializeComponent();
     dispatcher.BeginInvoke(new Action(async () =>
     {
         try
         {
+            themeStartupIntercepted = application.StartupCallbackObserved && application.MainWindow is null && application.Windows.Count == 0;
+            if (!themeStartupIntercepted) themeMaterialFailureDetails.Add("WPF startup callback was not intercepted before production window initialization");
+            themeMaterialFailureDetails.AddRange(ThemeMaterialFixture.CheckResources(application));
+            themeMaterialSafe = themeMaterialFailureDetails.Count == 0;
+            Murmur.App.ThemeManager.Apply(Murmur.Core.ThemeCatalog.DefaultId);
             var window = new Murmur.App.MainWindow(new[] { "--test-ui" });
             var barrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); var fake = new FakeCapture();
             window.PreparationForTests = _ => barrier.Task; window.RecorderForTests = () => new Recorder(_ => fake);
@@ -185,6 +208,8 @@ if (preparationFailure != null) throw new Exception("Preparation regression fail
 Check(replacementBlocked, "Shortcut-test preparation cannot replace a session awaiting voice protection");
 Check(cancelledBeforeCapture, "Cancelling during asynchronous preparation prevents even a fake microphone from starting");
 Check(handsFreeTestSafe, "Double-tap cannot start a microphone during the explicitly microphone-free insertion test");
+Check(themeStartupIntercepted, "Theme resource checks intercept WPF startup before production window or service initialization");
+Check(themeMaterialSafe, "All eight WPF themes create palette-derived glass materials with stable overlay surface and edge resources" + (themeMaterialFailureDetails.Count == 0 ? "" : ": " + string.Join("; ", themeMaterialFailureDetails)));
 if (Directory.Exists(preparationRoot)) Directory.Delete(preparationRoot, true);
 var time = new TestClock(); var capture = new FakeCapture();
 using (var recorder = new Recorder(_ => capture, time))
