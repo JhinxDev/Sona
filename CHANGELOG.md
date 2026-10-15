@@ -20,6 +20,8 @@ Source preview; no public binary release yet.
 
 - Compact Whisper and Parakeet model families with a green selected-family marker.
 - Seven settings sections, improved description spacing and round toggle thumbs.
+- Microphone label aligned with its selector; compact Models footer hides empty
+  feedback and keeps automatic scrolling only when the content overflows.
 - Smaller translucent recording displays with bounded recent phrases, installed
   app icons and quiet unknown-focus states. The capsule retains a readable
   waveform and removes the Open draft button and provisional-text label.

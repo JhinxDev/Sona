@@ -16,6 +16,10 @@ and 224/255 for light themes; it respects Windows transparency-off and high
 contrast. Overlay labels use Ink at full opacity, and the inset stays protected.
 This supersedes the historical 232/255 native-Mica-dependent overlay note below.
 
+The microphone label aligns to the selector row; Refresh remains beneath it.
+Models uses automatic scrolling, pairs runtime status with the engine selector,
+and collapses empty action feedback so it reserves no blank footer space.
+
 Completed insertion now uses one guarded paste by default. Submission requires
 explicit opt-in physical Enter intent and complete composer readback. Earlier
 Unicode-only/no-submission notes describe the original implementation.

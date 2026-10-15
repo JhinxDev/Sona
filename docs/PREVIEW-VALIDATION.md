@@ -198,3 +198,21 @@ The earlier staged waveform screenshots were layout evidence. They do not prove
 speech responsiveness. The new real-audio receipt supplies that separate proof;
 media may replay its measured events through the production animation step for
 smooth high-resolution capture, with that replay clearly identified.
+
+## Settings and Models layout follow-up
+
+The native layout fixture (`--layout-polish-fixture <fresh-output>`) checks the
+microphone label against the actual selector center at normal and minimum window
+sizes. It also measures Models extent/viewport and automatic scrollbar state at
+1280 x 900, 1280 x 1100 and 740 x 530, and verifies nonempty feedback remains
+visible and reachable. Eighteen checks pass without microphone input or changing
+the foreground application; captures use an isolated profile and real WPF controls.
+
+The original 900-DIP view really overflowed by 51.46 DIP: the runtime status and
+an empty feedback line extended below the visible engine selector. Pairing the
+runtime status with that selector and collapsing empty feedback gives a measured
+668.85-DIP extent in a 672.43-DIP viewport on the capture machine. Smaller windows
+still scroll, and longer feedback can legitimately restore the scrollbar. The
+microphone label's former 21.47-DIP center offset is now below 0.5 DIP.
+
+Recognition timing is unchanged; fast completions are not artificially delayed.
