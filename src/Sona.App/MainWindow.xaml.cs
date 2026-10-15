@@ -26,7 +26,7 @@ public partial class MainWindow : Window
     public string ActiveAppName => (string)GetValue(ActiveAppNameProperty);
     private readonly EscapeGuard escape;
     private readonly Overlay overlay = new();
-    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(60) };
     private readonly DispatcherTimer barPreview = new() { Interval = TimeSpan.FromSeconds(5) };
     private Hotkeys? hotkeys;
     private Recorder? recorder;
@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private bool preparing;
     internal Func<CancellationToken, Task>? PreparationForTests { get; set; }
     internal Func<Recorder>? RecorderForTests { get; set; }
+    internal Overlay OverlayForTests => overlay;
     internal Task<bool> BeginForTestsAsync() => arguments.Contains("--test-ui") ? BeginRecordingAsync() : Task.FromResult(false);
     internal Task<bool> BeginShortcutForTestsAsync(bool hold) => BeginShortcutAsync(hold);
     internal void PrepareShortcutForTests() => PrepareTest_Click(this, new RoutedEventArgs());

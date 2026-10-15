@@ -65,6 +65,12 @@ internal static class OverlayVisualFixture
                                 for (var sample=0;sample<28;sample++) overlay.Update("Listening", "Release the shortcut to finish", 18, .008+.035*Math.Pow(Math.Sin(sample*.32),2));
                                 var animate=typeof(Overlay).GetMethod("Animate",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
                                 for(var frame=0;frame<160;frame++) animate.Invoke(overlay,[null,EventArgs.Empty]);
+                                Check(Overlay.MapLevel(0) == 0 && Overlay.MapLevel(.002) == 0 && Overlay.MapLevel(double.NaN) == 0, display + " silence and invalid levels stay flat");
+                                Check(Overlay.MapLevel(.02) < Overlay.MapLevel(.05) && Overlay.MapLevel(.05) < Overlay.MapLevel(.12) && Overlay.MapLevel(.12) < 1, display + " ordinary speech levels retain distinct amplitudes without early saturation");
+                                Check(((TextBlock)overlay.FindName(display + "Label")).Text == "Recording" && ((Ellipse)overlay.FindName(display + "RecordingDot")).Visibility == Visibility.Visible, display + " explicitly identifies recording with a dot and label");
+                                var stopCount = 0; overlay.StopRequested += () => stopCount++;
+                                ((Button)overlay.FindName(display + "Stop")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                                Check(stopCount == 1, display + " square Stop invokes stop exactly once");
                                 overlay.UpdateTranscript("", "");
                                 var shell = (Border)overlay.FindName("Shell");
                                 Layout(shell, overlay.Width);
@@ -75,6 +81,8 @@ internal static class OverlayVisualFixture
                                 var recent = "Keep this recent phrase. The latest words stay visible.";
                                 overlay.UpdateTranscript(oldText + " " + recent, "Live raw · provisional"); Layout(shell, overlay.Width);
                                 var live = (TextBlock)overlay.FindName("LiveTranscript");
+                                var inset = (Border)overlay.FindName("TranscriptArea");
+                                Check(inset.Padding.Left >= 8 && inset.Padding.Bottom >= 7 && inset.Background != null, display + " transcript is integrated in a padded inset");
                                 Check(((TextBlock)overlay.FindName("TranscriptStage")).Visibility == (display == "Panel" ? Visibility.Visible : Visibility.Collapsed), display + " shows transcript metadata only in Panel mode");
                                 Check(live.Text.EndsWith("The latest words stay visible.", StringComparison.Ordinal) && !live.Text.Contains("Earlier phrase", StringComparison.Ordinal), display + " displays only recent phrases and preserves the latest words");
                                 Check(live.ActualHeight <= 36 && live.Text.Length <= 240, display + " live tail is bounded to two readable lines");
@@ -83,12 +91,15 @@ internal static class OverlayVisualFixture
                                 Check(display == "Capsule" ? review.Visibility == Visibility.Collapsed : review.ActualHeight >= 26 && review.Visibility == Visibility.Visible, display + (display == "Capsule" ? " omits Open draft to keep the capsule focused" : " preserves an explicit Open draft action"));
                                 Capture(shell, display.ToLowerInvariant() + "-live.png", overlay.Width);
                                 overlay.Update("Preparing your draft", "Transcribing locally"); Layout(shell, overlay.Width);
+                                Check(((Ellipse)overlay.FindName(display + "RecordingDot")).Visibility == Visibility.Collapsed, display + " processing never retains a recording indicator");
                                 var busyName = display == "Panel" ? "PanelBusy" : "CapsuleBusy";
                                 Check(overlay.FindName(busyName) is ProgressBar { Visibility: Visibility.Visible }, display + " gives processing a truthful busy indicator");
                                 Capture(shell, display.ToLowerInvariant() + "-busy.png", overlay.Width);
                                 var before = shell.ActualHeight;
                                 overlay.UpdateTranscript(oldText + " " + oldText + " " + recent, "Live raw · provisional"); Layout(shell, overlay.Width);
                                 Check(Math.Abs(shell.ActualHeight - before) < .5, display + " does not grow as recognition text accumulates");
+                                overlay.UpdateTranscript("", ""); overlay.SetReviewAction(true);
+                                Check(((Border)overlay.FindName("TranscriptArea")).Visibility == (display == "Panel" ? Visibility.Visible : Visibility.Collapsed), display + " never leaves an empty transcript inset when review text is absent");
                             }
                             finally { overlay.Close(); }
                         }

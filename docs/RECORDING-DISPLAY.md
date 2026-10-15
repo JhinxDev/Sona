@@ -2,7 +2,7 @@
 
 October 15, 2026 owner repair. The Panel uses 320 DIP width and a 144 DIP
 minimum height; Capsule uses 272 and 66 DIP. Both retain app identity, elapsed
-time, measured microphone levels, Stop, Cancel and an explicit Open draft action.
+time, measured microphone levels, Stop and Cancel. Only Panel offers Open draft.
 Native glass gives the display surface alpha 232/255; opaque and high-contrast
 fallbacks retain their readable surfaces. Main-window surfaces are unaffected.
 
@@ -83,3 +83,37 @@ Panel retains its review action.
 
 Capsule also omits the transcript-stage label (such as Live raw · provisional),
 showing the recent phrases directly below the waveform. Panel keeps the label.
+
+
+## Recording indicator and real-audio waveform refinement
+
+The recording state reads Recording, with a red semantic Danger-colored dot
+(7 DIP in Capsule, 8 DIP in Panel) and matching square Stop glyph/border. Stop
+still finishes recording; it is never Pause. The dot breathes between 0.64 and
+1 opacity over 1.8 seconds only during recording. Reduced motion and high
+contrast use a static dot; high contrast uses the system semantic brush.
+
+The transcript sits within a rounded inset, with 8 DIP horizontal and 7 DIP
+vertical padding. Its measured width accounts for that padding and retains the
+two-line tail. Capsule hides both the stage label and review action, including
+an empty inset after completion. Panel keeps its explicit review action.
+
+Waveform sampling follows the recorder's 60 ms buffers. RMS levels map through
+`clamp((20 log10(RMS) + 54) / 42, 0, 1)^1.15`, with silence at or below .002
+remaining flat. Attack is 35 ms and release 95 ms. The old linear mapper clipped
+all levels above .052; the decibel range preserves variation in normal speech.
+There is no synthetic idle waveform or assumed spoken-word timing.
+
+`Sona.WindowsTests --recording-audio-fixture <licensed-WAV> <fresh-output>` runs
+4–30 seconds of 16 kHz mono PCM16 through the real Recorder, MainWindow live
+polling and Whisper Turbo. It uses no recognition override. The app and overlay
+never create native windows in this fixture; input, clipboard, sound, history and
+production services remain disabled. JSON records actual RMS/time, provisional
+and final text/time, stop/completion time, assembly/audio hashes, worker exit and
+actual rendered frame timestamps. Frames are variable-rate; use their timestamps,
+not an assumed 30 fps. Internal `AdvanceVisuals(seconds)` supports deterministic
+offscreen rendering without changing public update or stop semantics.
+
+The accepted prerecorded phrase “Let's review the design tomorrow” produced a
+real provisional result and a matching final draft. This proves prerecorded audio
+through the genuine local pipeline, not a live microphone or external submission.

@@ -181,3 +181,20 @@ live Discord calls are not implied by this one successful send.
 The README now uses current native WPF client captures from isolated profiles.
 See [image provenance](images/README.md). No live microphone, private transcript,
 foreground change or real message submission was used to produce those images.
+
+
+## Recording refinement from trailer review
+
+The affected native display fixture passes 49 checks, including distinct speech
+amplitudes, silence, explicit recording state, Stop invocation, bounded inset text,
+and no empty completion inset. A new maintained real-audio fixture passes 11
+checks through Recorder, the real MainWindow live polling and Whisper Turbo,
+using the accepted prerecorded phrase “Let's review the design tomorrow.”
+It records actual provisional/final text and timestamps, level/frame histories,
+input/module hashes and confirmed worker exit. No live microphone, audible
+playback, global input, clipboard change or production profile is involved.
+
+The earlier staged waveform screenshots were layout evidence. They do not prove
+speech responsiveness. The new real-audio receipt supplies that separate proof;
+media may replay its measured events through the production animation step for
+smooth high-resolution capture, with that replay clearly identified.

@@ -27,6 +27,8 @@ public partial class Overlay : Window
     private HwndSource? source;
     private bool listening;
     private bool hasSamples;
+    private double indicatorSeconds;
+    internal bool SuppressNativeDisplayForTests { get; set; }
     private string display = "Panel";
     private string transcriptText = "";
 
@@ -112,6 +114,7 @@ public partial class Overlay : Window
 
     public void ShowFor(nint target)
     {
+        if (SuppressNativeDisplayForTests) return;
         targetScreen = System.Windows.Forms.Screen.FromHandle(target == 0 ? GetForegroundWindow() : target);
         Show();
         Position();
@@ -133,7 +136,9 @@ public partial class Overlay : Window
     {
         var wasListening = listening;
         listening = label == "Listening";
-        PanelLabel.Text = CapsuleLabel.Text = label;
+        PanelLabel.Text = CapsuleLabel.Text = listening ? "Recording" : label;
+        PanelRecordingDot.Visibility = CapsuleRecordingDot.Visibility = listening ? Visibility.Visible : Visibility.Collapsed;
+        if (!wasListening || !listening) { indicatorSeconds = 0; PanelRecordingDot.Opacity = CapsuleRecordingDot.Opacity = 1; }
         var busy = label is "Preparing your draft" or "Transcribing" or "Polishing" or "Preparing";
         PanelBusy.Visibility = CapsuleBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         PanelBusy.IsIndeterminate = CapsuleBusy.IsIndeterminate = busy && SystemParameters.ClientAreaAnimation;
@@ -149,14 +154,14 @@ public partial class Overlay : Window
         CapsuleHint.Text = hint;
         CapsuleHint.Visibility = listening || string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
         Shell.ToolTip = string.IsNullOrWhiteSpace(hint) ? label : $"{label}. {hint}";
-        System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona listening, {elapsed}. {hint}" : $"Sona {label}. {hint}");
+        System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona recording, {elapsed}. {hint}" : $"Sona {label}. {hint}");
         PanelStop.Visibility = CapsuleStop.Visibility = listening ? Visibility.Visible : Visibility.Hidden;
         if (listening)
         {
             if (!wasListening) ResetWaveform();
             // Each point is one actual recorder RMS sample. No idle or preview signal is synthesized.
             Array.Copy(samples, 1, samples, 0, SampleCount - 1);
-            samples[^1] = double.IsFinite(level) ? Math.Clamp((level - .002) * 20, 0, 1) : 0;
+            samples[^1] = MapLevel(level);
             hasSamples = true;
         }
         else ResetWaveform();
@@ -166,11 +171,26 @@ public partial class Overlay : Window
     {
         var dt = Math.Clamp(frameClock.Elapsed.TotalSeconds, .001, .1);
         frameClock.Restart();
+        AdvanceVisuals(dt);
+    }
+
+    // A decibel scale retains variation in ordinary speech instead of clipping
+    // every RMS sample above .052. The recorder silence threshold stays flat.
+    internal static double MapLevel(double rms) => !double.IsFinite(rms) || rms <= .002
+        ? 0 : Math.Pow(Math.Clamp((20 * Math.Log10(rms) + 54) / 42, 0, 1), 1.15);
+
+    internal void AdvanceVisuals(double seconds)
+    {
+        var dt = double.IsFinite(seconds) ? Math.Clamp(seconds, 0, .1) : 0;
         if (!listening || !hasSamples) return;
+        indicatorSeconds += dt;
+        var opacity = SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast
+            ? .82 + .18 * Math.Cos(indicatorSeconds * Math.PI * 2 / 1.8) : 1;
+        PanelRecordingDot.Opacity = CapsuleRecordingDot.Opacity = opacity;
         for (var i = 0; i < SampleCount; i++)
         {
             var target = samples[i];
-            var duration = target > displayed[i] ? .065 : .17;
+            var duration = target > displayed[i] ? .035 : .095;
             displayed[i] += (target - displayed[i]) * (1 - Math.Exp(-dt / duration));
             if (displayed[i] < .001) displayed[i] = 0;
             panelBars[i].Height = 3 + displayed[i] * 29;
@@ -193,15 +213,15 @@ public partial class Overlay : Window
         TranscriptStage.Visibility = display == "Panel" && !string.IsNullOrEmpty(stage) ? Visibility.Visible : Visibility.Collapsed;
         LiveTranscript.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
         RefreshTranscriptTail();
-        TranscriptArea.Visibility = string.IsNullOrEmpty(stage) ? Visibility.Collapsed : Visibility.Visible;
+        TranscriptArea.Visibility = !string.IsNullOrEmpty(stage) && (display == "Panel" || !string.IsNullOrEmpty(text)) ? Visibility.Visible : Visibility.Collapsed;
     }
     private void RefreshTranscriptTail()
     {
-        var width = Math.Max(1, Width - Shell.Padding.Left - Shell.Padding.Right - Shell.Margin.Left - Shell.Margin.Right - 4);
+        var width = Math.Max(1, Width - Shell.Padding.Left - Shell.Padding.Right - Shell.Margin.Left - Shell.Margin.Right - TranscriptArea.Padding.Left - TranscriptArea.Padding.Right - 4);
         var typeface = new Typeface(LiveTranscript.FontFamily, LiveTranscript.FontStyle, LiveTranscript.FontWeight, LiveTranscript.FontStretch);
         LiveTranscript.Text = RecentTranscriptTail.Fit(transcriptText, width, typeface, LiveTranscript.FontSize, LiveTranscript.Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
-    public void SetReviewAction(bool visible) => TranscriptArea.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    public void SetReviewAction(bool visible) => TranscriptArea.Visibility = visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed;
     private void Review_Click(object sender, RoutedEventArgs e) => ReviewRequested?.Invoke();
     private void Stop_Click(object sender, RoutedEventArgs e) => StopRequested?.Invoke();
     private void Cancel_Click(object sender, RoutedEventArgs e) => CancelRequested?.Invoke();
