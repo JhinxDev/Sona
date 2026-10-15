@@ -42,3 +42,24 @@ Windows transparency preference accessor. Recognition, recording, live polling
 and waveform code are unchanged. This is a measured-event UI replay, not a new
 recognition run, live microphone capture or external-app delivery claim. The
 Demo app label and neutral icon deliberately avoid implying a real destination.
+
+## Settings alignment and Models footer
+
+`sona-models-polished-042.png` and `sona-audio-typing-042.png` use the actual
+0.4.2 release assembly from source `ce9cd00ad1799184cc84684ed1d8832576d17aac`,
+build `ce5ce3d84ebe`. They supersede the earlier Models screenshot in the README;
+the original image remains as historical evidence. They are 2x WPF client renders
+at 1280 x 900 and 1280 x 1000 DIP outer-window sizes, using an isolated Amethyst
+profile. The tested assembly is byte-identical to the install package.
+
+The microphone label aligns with its selector. Models pairs the runtime status
+with the engine selector and removes empty feedback space. Its automatic scrollbar
+collapses at the captured size because all content fits; smaller windows and
+nonempty feedback still scroll when necessary. No live microphone, owner profile,
+clipboard, target app, call or global input was involved. The foreground was
+preserved. The unchanged Home, General settings and capsule images above retain
+their original source identities.
+
+- Models PNG SHA-256: `3d66f4692a5471aac2ad8d63136fa3e3d4b96bc3301c5200fac235fc384a9ee0`.
+- Audio PNG SHA-256: `47191e8bb9f486154f961b98f938dd3da3d4cb7c829396d6b208a7a2ee1da074`.
+- App DLL SHA-256: `d7d9f0aa37c7323c90af83f346c7c64ea67769ef3797c4d9a585d61a8984ca24`.

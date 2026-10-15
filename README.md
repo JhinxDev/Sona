@@ -116,7 +116,9 @@ settings map to Amethyst. New profiles still start with Charcoal.
 
 ![Seven settings sections and optional sound feedback in Sona 0.4.2](docs/images/sona-settings-042.png)
 
-![Compact Whisper cards with separate Parakeet navigation and a green active-family indicator](docs/images/sona-models-042.png)
+![Audio and typing settings with aligned microphone controls](docs/images/sona-audio-typing-042.png)
+
+![Compact Whisper cards with separate Parakeet navigation and a green active-family indicator](docs/images/sona-models-polished-042.png)
 
 </details>
 
