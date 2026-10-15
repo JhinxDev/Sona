@@ -29,7 +29,7 @@ not record your microphone, change a real Discord call or send test messages.
 
 6. In General, try Sound effects on and off. Listen for a soft start cue before
    capture, a ready cue after processing, and a distinct cue after an intentional
-   Enter submission. Confirm the sidebar GitHub and Star links open Sona’s repo.
+   Enter submission. Confirm the sidebar GitHub link opens Sona’s repo.
 
 Report the first failed step and visible status. No private draft or recording
 needs to be shared. Existing theme persistence, cancellation and microphone

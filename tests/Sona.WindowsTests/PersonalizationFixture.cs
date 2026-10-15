@@ -46,13 +46,12 @@ internal static class PersonalizationFixture
                     }
                     var pages = (TabControl)Field("Pages"); pages.ApplyTemplate(); window.UpdateLayout();
                     var repositoryButton = (Button)pages.Template.FindName("SidebarRepository", pages);
-                    var starButton = (Button)pages.Template.FindName("SidebarStar", pages);
-                    foreach (var link in new[] { repositoryButton, starButton })
+                    foreach (var link in new[] { repositoryButton })
                     {
                         ((System.Windows.Input.RoutedCommand)link.Command).Execute(link.CommandParameter, link);
                         Check(window.LastRepositoryLinkForTests?.AbsoluteUri == "https://github.com/JhinxDev/Sona", "Sidebar " + link.Name + " routes to the exact repository without opening a browser in tests");
                     }
-                    Check(repositoryButton.ActualWidth > 0 && starButton.ActualWidth > 0, "Repository and Star actions are visible in the sidebar footer");
+                    Check(repositoryButton.ActualWidth > 0, "Repository action is visible in the sidebar footer");
                     var history = (ListBox)Field("History");
                     if (reopen)
                     {
@@ -108,8 +107,8 @@ internal static class PersonalizationFixture
                         Check(((FrameworkElement)Field("LiveTranscription")).Parent is StackPanel live && live.Margin.Bottom >= 14, "Live-description group has explicit bottom breathing room");
                         window.Width = 740; window.Height = 530; ((TabControl)Field("Pages")).SelectedIndex = 3; await Task.Delay(30); Capture("models-compact.png");
                         Check(((ScrollViewer)Field("ModelsScroll")).ScrollableWidth == 0, "Model family remains usable without horizontal scrolling at minimum size");
-                        var starOrigin = starButton.TranslatePoint(new Point(), window);
-                        Check(starOrigin.Y >= 0 && starOrigin.Y + starButton.ActualHeight <= window.ActualHeight && starOrigin.X + starButton.ActualWidth <= 210, "Sidebar repository actions remain inside the footer at minimum window size");
+                        var repositoryOrigin = repositoryButton.TranslatePoint(new Point(), window);
+                        Check(repositoryOrigin.Y >= 0 && repositoryOrigin.Y + repositoryButton.ActualHeight <= window.ActualHeight && repositoryOrigin.X + repositoryButton.ActualWidth <= 210, "Sidebar repository actions remain inside the footer at minimum window size");
                         var capture = new FakeCapture(); window.RecorderForTests = () => new Recorder(_ => capture); window.PreparationForTests = _ => Task.CompletedTask;
                         var complete = string.Join("\n", Enumerable.Repeat("Bonjour Codex, keep the entire draft together.", 50));
                         var recognized = new TaskCompletionSource<string>(); window.RecognitionForTests = (_, _) => recognized.Task;

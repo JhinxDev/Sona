@@ -203,3 +203,6 @@ The sidebar footer retains the version and adds compact GitHub and Star actions.
 Both open the public Sona repository only after a user click. The Star action
 does not claim a star was added or perform an authenticated action. The official
 Octicons mark uses the shared muted color; its MIT license ships with the app.
+
+Sidebar correction, October 15: retain one GitHub link. The duplicate Star
+action was removed because both opened the same repository page.

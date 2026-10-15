@@ -15,9 +15,8 @@ public partial class MainWindow
     private void OpenRepository(object sender, ExecutedRoutedEventArgs e)
     {
         e.Handled = true;
-        if (e.Parameter is not ("repository" or "star")) return;
-        // Both actions open the repository. Starring remains the visitor's choice
-        // on GitHub; no account, token or automated social action is used.
+        if (e.Parameter is not "repository") return;
+        // Open the fixed repository URL without account or token access.
         if (arguments.Contains("--test-ui")) { LastRepositoryLinkForTests = RepositoryLinks.Repository; return; }
         try { Process.Start(new ProcessStartInfo(RepositoryLinks.Repository.AbsoluteUri) { UseShellExecute = true }); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
