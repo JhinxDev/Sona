@@ -66,7 +66,7 @@ public static class WindowBackdrop
         return state.Status = new(requested, supported, false,
             state.Touched ? "Opaque surface; native backdrop reset needs retry" : requested ? "Opaque glass material fallback" : "Opaque palette", set, frame, read, actual);
     }
-    private static bool TransparencyEnabled()
+    internal static bool TransparencyEnabled()
     {
         try
         {

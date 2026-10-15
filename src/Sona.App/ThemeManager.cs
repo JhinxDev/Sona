@@ -114,8 +114,18 @@ public static class ThemeManager
         // Protected surfaces remain almost opaque over native backdrops. These aliases
         // also give the overlay a stable material contract without theme-specific hues.
         resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(32, 30, 36));
-        resources["OverlaySurface"] = translucent ? Surface(panel, canvas, accent, .035, .07, true, 232) : resources["Panel"];
+        resources["OverlaySurface"] = CreateOverlaySurface(Current.UsesGlassMaterial && WindowBackdrop.TransparencyEnabled(), highContrast);
         resources["OverlayEdge"] = resources["MaterialEdge"];
+    }
+
+    // Layered WPF recording windows composite their own alpha, independently of
+    // the main window's Mica support. Never fade the text or controls with the shell.
+    internal static Brush CreateOverlaySurface(bool transparencyEnabled, bool highContrast)
+    {
+        if (highContrast) return SystemColors.WindowBrush;
+        if (!transparencyEnabled) return (Brush)Application.Current.Resources["Panel"];
+        return Surface(PaletteColor("Panel"), PaletteColor("Canvas"), PaletteColor("Accent"),
+            .035, .07, true, Current.IsDark ? (byte)200 : (byte)224);
     }
 
     private static Brush Surface(Color baseColor, Color neighbor, Color accent, double accentMix, double neighborMix, bool translucent, byte opacity)

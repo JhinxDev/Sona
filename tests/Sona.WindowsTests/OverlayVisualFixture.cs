@@ -37,7 +37,7 @@ internal static class OverlayVisualFixture
                         }
                         ThemeManager.Apply("amethyst");
                         typeof(ThemeManager).GetMethod("ApplyMaterialResources", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.Invoke(null, [true]);
-                        Check(app.Resources["OverlaySurface"] is LinearGradientBrush overlayMaterial && overlayMaterial.GradientStops.All(stop => stop.Color.A == 232), "Controlled native-glass resource branch makes only the overlay slightly translucent");
+                        Check(app.Resources["OverlaySurface"] is LinearGradientBrush overlayMaterial && overlayMaterial.GradientStops.All(stop => stop.Color.A == 200), "Controlled native-glass resource branch preserves the independent translucent overlay");
                         foreach (var display in new[] { "Panel", "Capsule" })
                         {
                             var overlay = new Overlay();
@@ -92,6 +92,8 @@ internal static class OverlayVisualFixture
                                 var review = (Button)overlay.FindName("ReviewDraft");
                                 Check(display == "Capsule" ? review.Visibility == Visibility.Collapsed : review.ActualHeight >= 26 && review.Visibility == Visibility.Visible, display + (display == "Capsule" ? " omits Open draft to keep the capsule focused" : " preserves an explicit Open draft action"));
                                 Capture(shell, display.ToLowerInvariant() + "-live.png", overlay.Width);
+                                Capture(shell, display.ToLowerInvariant() + "-on-white.png", overlay.Width, Brushes.White);
+                                Capture(shell, display.ToLowerInvariant() + "-on-dark.png", overlay.Width, new SolidColorBrush(Color.FromRgb(20, 20, 24)));
                                 overlay.Update("Preparing your draft", "Transcribing locally"); Layout(shell, overlay.Width);
                                 Check(((Ellipse)overlay.FindName(display + "RecordingDot")).Visibility == Visibility.Collapsed, display + " processing never retains a recording indicator");
                                 var busyName = display == "Panel" ? "PanelBusy" : "CapsuleBusy";
@@ -119,11 +121,11 @@ internal static class OverlayVisualFixture
                 element.Measure(new Size(width, double.PositiveInfinity));
                 element.Arrange(new Rect(0, 0, width, element.DesiredSize.Height)); element.UpdateLayout();
             }
-            void Capture(FrameworkElement element, string name, double width)
+            void Capture(FrameworkElement element, string name, double width, Brush? backdrop = null)
             {
                 Layout(element, width);
                 var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth), (int)Math.Ceiling(element.ActualHeight), 96, 96, PixelFormats.Pbgra32);
-                var visual = new DrawingVisual(); using (var context = visual.RenderOpen()) context.DrawRectangle(new VisualBrush(element) { Stretch = Stretch.Fill }, null, new Rect(0, 0, element.ActualWidth, element.ActualHeight)); bitmap.Render(visual); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                var visual = new DrawingVisual(); using (var context = visual.RenderOpen()) { if (backdrop != null) context.DrawRectangle(backdrop, null, new Rect(0, 0, element.ActualWidth, element.ActualHeight)); context.DrawRectangle(new VisualBrush(element) { Stretch = Stretch.Fill }, null, new Rect(0, 0, element.ActualWidth, element.ActualHeight)); } bitmap.Render(visual); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 using (var stream = File.Create(System.IO.Path.Combine(output, name))) encoder.Save(stream);
                 captures.Add(new { Image = name, Width = element.ActualWidth, Height = element.ActualHeight });
             }

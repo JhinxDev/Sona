@@ -3,8 +3,9 @@
 October 15, 2026 owner repair. The Panel uses 320 DIP width and a 144 DIP
 minimum height; Capsule uses 272 and 66 DIP. Both retain app identity, elapsed
 time, measured microphone levels, Stop and Cancel. Only Panel offers Open draft.
-Native glass gives the display surface alpha 232/255; opaque and high-contrast
-fallbacks retain their readable surfaces. Main-window surfaces are unaffected.
+The recording surface uses alpha 200/255 in dark themes and 224/255 in light
+themes, independently of the main window Mica backdrop. Windows transparency-off
+and high-contrast fallbacks remain opaque. Main-window surfaces are unaffected.
 
 The identity row can show the active app outside an editable field while keeping
 the insertion target null. Unknown/no-field states start with a quiet neutral
@@ -117,3 +118,27 @@ offscreen rendering without changing public update or stop semantics.
 The accepted prerecorded phrase “Let's review the design tomorrow” produced a
 real provisional result and a matching final draft. This proves prerecorded audio
 through the genuine local pipeline, not a live microphone or external submission.
+
+
+## Independent translucent recording surface
+
+The layered WPF recording window uses its own surface alpha rather than depending
+on a successfully attached main-window Mica backdrop. This makes the actual
+background visible in both recording sizes; it does not claim a blur effect.
+Dark themes use 200/255 (78.4%) surface alpha; light themes use 224/255 (87.8%).
+Text, waveform, controls and the window itself retain full opacity. Header,
+identity, timer and hint text use Ink so they remain legible over bright content.
+The transcript inset stays protected by its existing near-opaque material.
+
+The existing Windows EnableTransparency preference is honored independently of
+Mica support; inaccessible settings fail opaque. High contrast selects the
+system Window brush. A controlled fallback test does not toggle Windows settings.
+Across all eight themes, text clears 4.5:1 and waveform clears 3:1 against black
+and white backgrounds at every gradient endpoint. The material fixture passes
+100 checks and display fixture 51. Bright/dark native WPF composite screenshots
+show the actual surface blending, with no whole-window opacity trick.
+
+Recognition, recorder timing, transcript events and waveform animation code are
+unchanged from source f4d7432194c307b59922b1d108180675f21c9c74. Its real-audio
+receipt remains valid for measured-event replay in the new material build; the
+old and new assembly hashes are intentionally different.

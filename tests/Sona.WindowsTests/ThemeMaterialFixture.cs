@@ -475,10 +475,31 @@ internal static class ThemeMaterialFixture
             var edge = application.Resources["MaterialEdge"];
             var overlaySurface = application.Resources["OverlaySurface"];
             var overlayEdge = application.Resources["OverlayEdge"];
-            var aliasesMatch = ReferenceEquals(overlaySurface, application.Resources["Panel"])
+            var allowOverlay = !highContrast && Sona.App.Windows.WindowBackdrop.TransparencyEnabled();
+            var expectedAlpha = theme.IsDark ? 200 : 224;
+            var overlayMatches = (allowOverlay
+                ? overlaySurface is LinearGradientBrush glass && glass.GradientStops.All(stop => stop.Color.A == expectedAlpha)
+                : ReferenceEquals(overlaySurface, application.Resources["Panel"]) || highContrast && ReferenceEquals(overlaySurface, SystemColors.WindowBrush))
                 && ReferenceEquals(overlayEdge, edge);
-            if (aliasesMatch) checks.Add(prefix + "overlay aliases point to the selected panel and edge resources");
-            else failures.Add(prefix + "overlay aliases do not point to Panel/MaterialEdge");
+            if (overlayMatches) checks.Add(prefix + "overlay honors independent transparency preference and theme edge");
+            else failures.Add(prefix + "overlay transparency contract failed");
+            if (ReferenceEquals(ThemeManager.CreateOverlaySurface(false, false), application.Resources["Panel"])
+                && ReferenceEquals(ThemeManager.CreateOverlaySurface(true, true), SystemColors.WindowBrush))
+                checks.Add(prefix + "disabled transparency and high contrast retain opaque fallback");
+            else failures.Add(prefix + "recording fallback failed");
+            if (!highContrast)
+            {
+                var recording = (LinearGradientBrush)ThemeManager.CreateOverlaySurface(true, false);
+                foreach (var backdrop in new[] { Colors.Black, Colors.White })
+                {
+                    var ink = ((SolidColorBrush)application.Resources["Ink"]).Color;
+                    var accent = ((SolidColorBrush)application.Resources["Accent"]).Color;
+                    var backgrounds = recording.GradientStops.Select(stop => Composite(stop.Color, backdrop)).ToArray();
+                    if (backgrounds.All(bg => Contrast(ink, bg) >= 4.5 && Contrast(accent, bg) >= 3))
+                        checks.Add(prefix + "recording text and waveform meet contrast over " + backdrop);
+                    else failures.Add(prefix + "recording contrast failed over " + backdrop);
+                }
+            }
 
             if (theme.UsesGlassMaterial)
                 checks.Add(prefix + "theme retains its glass-material selection");
@@ -610,6 +631,13 @@ internal static class ThemeMaterialFixture
     }
 
     private static Color Parse(string value) => (Color)ColorConverter.ConvertFromString(value);
+
+    private static Color Composite(Color surface, Color background)
+    {
+        var alpha = surface.A / 255d;
+        byte Blend(byte front, byte back) => (byte)Math.Round(front * alpha + back * (1 - alpha));
+        return Color.FromRgb(Blend(surface.R, background.R), Blend(surface.G, background.G), Blend(surface.B, background.B));
+    }
 
     private static double Contrast(Color foreground, Color background)
     {

@@ -26,6 +26,8 @@ Source preview; no public binary release yet.
 - Recording indicator and neutral square Stop, integrated padded transcript inset,
   and a decibel waveform scale that preserves speech dynamics instead of
   saturating early. Verified with prerecorded speech through the real recognizer.
+- More translucent recording surfaces independent of main-window Mica, with
+  opaque text/controls and Windows transparency-off/high-contrast fallbacks.
 - Softer original cues for opening, recording, draft readiness and explicit Enter,
   with a Sound effects setting. Sent feedback denotes input, not server delivery.
 - One GitHub link in the sidebar.

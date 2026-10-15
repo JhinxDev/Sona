@@ -11,6 +11,10 @@ under reduced motion/high contrast), a Recording label and neutral square Stop.
 The transcript uses an Inset brush, radius 10 and padding 8 horizontal/7 vertical.
 Waveform levels use a -54 to -12 dB scale, 60 ms samples and 35/95 ms attack/release.
 This replaces the earlier linear mapper that saturated above .052 RMS.
+The recording shell independently composites at alpha 200/255 for dark themes
+and 224/255 for light themes; it respects Windows transparency-off and high
+contrast. Overlay labels use Ink at full opacity, and the inset stays protected.
+This supersedes the historical 232/255 native-Mica-dependent overlay note below.
 
 Completed insertion now uses one guarded paste by default. Submission requires
 explicit opt-in physical Enter intent and complete composer readback. Earlier
