@@ -16,6 +16,10 @@ try
     $taskStatus=$null
     for($taskTry=0;$taskTry -lt 40;$taskTry++){$taskStatus=Agent @('status');if($taskStatus.ok){break};Start-Sleep -Milliseconds 100}
     Verify ($taskStatus.ok -and $taskStatus.data.state -eq 'idle' -and -not $taskStatus.data.microphoneControl) 'Local agent discovers isolated idle app without microphone controls'
+    $taskInitialSettings=Agent @('settings','get')
+    Verify ($taskInitialSettings.data.pasteCompletedDraft -and -not $taskInitialSettings.data.enterToSend) 'Whole-draft paste defaults on while Enter submission requires opt-in'
+    $taskPersonalization=Agent @('settings','patch','{"pasteCompletedDraft":false,"enterToSend":true,"liveTranscription":true,"soundEffects":false}')
+    Verify ($taskPersonalization.ok -and -not $taskPersonalization.data.pasteCompletedDraft -and $taskPersonalization.data.enterToSend -and $taskPersonalization.data.liveTranscription -and -not $taskPersonalization.data.soundEffects) 'Dictation and sound preferences round trip without starting microphone or sending input'
     $taskModels=Agent @('models','list')
     Verify ($taskModels.ok -and $taskModels.data.Count -eq 7 -and @($taskModels.data | Where-Object id -eq 'small')[0].installed) 'Agent lists seven local choices and actual installed state'
     $taskParakeetInfo=Agent @('models','info','parakeet-v3')
@@ -61,6 +65,7 @@ try
     Verify ($taskReplies[2].result.structuredContent.ok -and $taskReplies[2].result.structuredContent.data.language -eq 'fr' -and -not $taskReplies[2].result.isError) 'MCP tool calls use the same live validated settings layer'
     $taskMcpSettings=@($taskReplies[1].result.tools | Where-Object name -eq 'sona_settings_patch')[0].inputSchema.properties
     Verify ($taskMcpSettings.cleanupEnabled.type -eq 'boolean' -and $taskMcpSettings.cleanupTone.enum.Count -eq 3 -and $taskMcpSettings.cleanupEngine.enum.Count -eq 2 -and $taskMcpSettings.cleanupIdleMinutes.maximum -eq 240) 'MCP publishes the same bounded cleanup settings contract'
+    Verify ($taskMcpSettings.pasteCompletedDraft.type -eq 'boolean' -and $taskMcpSettings.enterToSend.type -eq 'boolean' -and $taskMcpSettings.liveTranscription.type -eq 'boolean' -and $taskMcpSettings.soundEffects.type -eq 'boolean') 'MCP publishes the same dictation preference contract'
     if($DownloadTiny)
     {
         $taskDownload=Agent @('models','install','tiny');Verify ($taskDownload.ok -and $taskDownload.data.accepted) 'Explicit Tiny model installation starts through the desktop service'

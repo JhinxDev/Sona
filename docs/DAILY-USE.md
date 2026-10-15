@@ -1,5 +1,8 @@
 # Daily-use repair and live draft, 0.4.1
 
+Historical repair record. For the current whole-draft paste, optional explicit
+Enter-to-send gesture and saved-draft behavior, see [Personalization](PERSONALIZATION.md).
+
 The October 15 wave covers recording, draft review, insertion recovery, theme
 persistence and cancellation/history ownership. It does not claim that the
 owner's microphone/accent or Discord composer has passed acceptance.

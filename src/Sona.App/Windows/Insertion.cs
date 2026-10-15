@@ -4,7 +4,7 @@ using System.Windows.Automation;
 namespace Sona.App.Windows;
 
 public sealed record DraftTarget(nint Window, int ProcessId, int[] RuntimeId, long FocusEpoch);
-public sealed class Insertion : IDisposable
+public sealed partial class Insertion : IDisposable
 {
     private long focusEpoch;
     private readonly WinEventDelegate callback;
@@ -56,6 +56,7 @@ public sealed class Insertion : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
     }
+    public bool IsForegroundCurrent(DraftTarget? target) => target != null && target.Window == GetForegroundWindow() && target.FocusEpoch == FocusEpoch;
     public static bool Same(DraftTarget? target, DraftTarget? current) => target != null && current != null && target.Window == current.Window && target.ProcessId == current.ProcessId && target.RuntimeId.SequenceEqual(current.RuntimeId) && target.FocusEpoch == current.FocusEpoch;
     public async Task<(bool Inserted, string Detail)> InsertAsync(DraftTarget? target, string text, CancellationToken cancellation = default)
     {

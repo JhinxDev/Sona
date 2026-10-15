@@ -3,7 +3,7 @@ using System.Windows.Threading;
 
 public static class ActiveApplicationChecks
 {
-    public static async Task<int> RunAsync()
+    public static async Task<int> RunAsync(bool includeIcons = true)
     {
         var passed = 0;
         void Check(bool value, string name) { if (!value) throw new IOException(name); Console.WriteLine("PASS " + name); passed++; }
@@ -37,7 +37,7 @@ public static class ActiveApplicationChecks
         context.End(); context.Begin(target, "Codex"); context.Observe(new ActiveApplication((nint)1, 11, "Other app", 0));
         Check(context.DestinationChanged && context.Label.Contains("Codex → Other app"), "A reused foreground window with a different process is flagged as destination drift");
         context.End(); context.Begin(null, "No focused text field"); context.Observe(discord);
-        Check(context.Destination == null && context.Label == "No focused text field", "No editable capture never becomes an insertion destination");
+        Check(context.Destination == null && context.Label == "Discord", "Active-app identity outside an editable field never creates an insertion destination");
         var sends = 0;
         using var insertion = new Insertion(() => target, () => false, text => { sends++; return (uint)text.Length * 2; });
         Check((await insertion.InsertAsync(target, "Hello Codex.")).Inserted && sends == 1, "Stable single-line destination still reaches the injected input sink once");
@@ -46,6 +46,6 @@ public static class ActiveApplicationChecks
         Check(!(await changed.InsertAsync(target, "Do not redirect")).Inserted && sends == 1, "Actual insertion guard independently refuses focus drift");
         using var modifiers = new Insertion(() => target, () => true, _ => { sends++; return 2; });
         Check(!(await modifiers.InsertAsync(target, "Held modifiers")).Inserted && sends == 1, "Held modifier keys still refuse insertion");
-        return passed + await ApplicationIconChecks.RunAsync();
+        return passed + (includeIcons ? await ApplicationIconChecks.RunAsync() : 0);
     }
 }

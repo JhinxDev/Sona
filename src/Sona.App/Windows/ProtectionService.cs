@@ -13,6 +13,8 @@ internal sealed class ProtectionService : IAsyncDisposable
     private bool enabled;
     private bool ownRecording;
     private bool connectedBefore;
+    private bool connectionSuppressed;
+    private bool pausedBeforeDisconnect;
     private int changed;
     private DateTime reconnectAfter;
     private int failures;
@@ -22,6 +24,7 @@ internal sealed class ProtectionService : IAsyncDisposable
     public bool Paused => controller.Paused;
     public bool Connected => transport.Connected;
     public bool OwnsChanges => controller.OwnsChanges;
+    public bool ConnectionSuppressed => connectionSuppressed;
     public ProtectionService(ProtectedCredentials vault, string pipePrefix = "discord-ipc-", Func<IReadOnlyList<string>, HashSet<string>>? scan = null)
     {
         transport = new(vault, pipePrefix); controller = new(transport); this.scan = scan ?? MicrophoneSources.Scan; production = pipePrefix == "discord-ipc-";
@@ -36,8 +39,10 @@ internal sealed class ProtectionService : IAsyncDisposable
             watched = settings.WatchedApps.ToArray();
             if (!settings.ProtectionEnabled && enabled) await controller.PauseAsync(true, cancellation);
             await controller.ConfigureAsync(settings.SilenceIncoming, settings.ProtectionReleaseDelayMs, cancellation);
+            if (settings.DiscordDisconnected && !connectionSuppressed) await DisconnectUnderGateAsync(cancellation);
             enabled = settings.ProtectionEnabled;
-            if (!enabled) Status = "Off";
+            if (connectionSuppressed) Status = "Disconnected";
+            else if (!enabled) Status = "Off";
             else if (controller.Paused) { await controller.PauseAsync(false, cancellation); Status = "Ready"; }
         }
         finally { gate.Release(); }
@@ -45,8 +50,41 @@ internal sealed class ProtectionService : IAsyncDisposable
     public async Task ConnectAsync(bool interactive, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try { await ConnectUnderGateAsync(interactive, cancellation); }
+        try
+        {
+            var resume = connectionSuppressed;
+            if (!transport.Connected) await ConnectUnderGateAsync(interactive, cancellation);
+            if (resume) await controller.PauseAsync(pausedBeforeDisconnect, cancellation);
+            if (enabled && !controller.Paused)
+            {
+                await controller.SetSourcesAsync(Sources(), cancellation);
+                if (Sources().Count > 0) await controller.EnsureProtectedAsync(cancellation);
+            }
+            connectionSuppressed = false;
+            Status = enabled ? controller.Status : "Connected; protection off";
+        }
         finally { gate.Release(); }
+    }
+    public async Task DisconnectAsync(CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try { await DisconnectUnderGateAsync(cancellation); }
+        finally { gate.Release(); }
+    }
+    private async Task DisconnectUnderGateAsync(CancellationToken cancellation)
+    {
+        if (!connectionSuppressed) pausedBeforeDisconnect = controller.Paused;
+        // Keep the transport and owned changes on a failed restoration.
+        connectionSuppressed = true;
+        try
+        {
+            await controller.PauseAsync(true, cancellation);
+            await controller.SetSourcesAsync(Array.Empty<string>(), cancellation);
+            await transport.DisconnectAsync();
+            connectedBefore = false; Interlocked.Exchange(ref changed, 0);
+            Status = "Disconnected";
+        }
+        catch { Status = "Restoration needs retry; connection retained"; throw; }
     }
     private async Task ConnectUnderGateAsync(bool interactive, CancellationToken cancellation)
     {
@@ -64,6 +102,11 @@ internal sealed class ProtectionService : IAsyncDisposable
         await gate.WaitAsync(cancellation);
         try
         {
+            if (enabled && connectionSuppressed)
+            {
+                if (controller.OwnsChanges) throw new IOException("Discord restoration needs retry before recording.");
+                return;
+            }
             if (!enabled || controller.Paused) return;
             if (!transport.Connected) await ConnectUnderGateAsync(false, cancellation);
             ownRecording = true;
@@ -76,13 +119,13 @@ internal sealed class ProtectionService : IAsyncDisposable
     public async Task EndOwnRecordingAsync(CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try { ownRecording = false; if (enabled || controller.OwnsChanges) { await controller.SetSourcesAsync(Sources(), cancellation); Status = controller.Status; } }
+        try { ownRecording = false; if (connectionSuppressed) { Status = "Disconnected"; return; } if (enabled || controller.OwnsChanges) { await controller.SetSourcesAsync(Sources(), cancellation); Status = controller.Status; } }
         finally { gate.Release(); }
     }
     public async Task PauseAsync(bool pause, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try { if (!enabled && !pause) { Status = "Off"; return; } await controller.PauseAsync(pause, cancellation); Status = controller.Status; }
+        try { if (connectionSuppressed && !pause) { Status = "Disconnected"; return; } if (!enabled && !pause) { Status = "Off"; return; } await controller.PauseAsync(pause, cancellation); Status = controller.Status; }
         finally { gate.Release(); }
     }
     private HashSet<string> Sources()
@@ -97,7 +140,7 @@ internal sealed class ProtectionService : IAsyncDisposable
             await gate.WaitAsync(stop.Token);
             try
             {
-                if (!enabled) continue;
+                if (!enabled || connectionSuppressed) continue;
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop.Token); deadline.CancelAfter(TimeSpan.FromSeconds(12));
                 if (!transport.Connected)
                 {

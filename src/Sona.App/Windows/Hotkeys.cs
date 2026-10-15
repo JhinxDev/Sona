@@ -12,6 +12,8 @@ public sealed class Hotkeys : IDisposable
     private readonly Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
     private readonly Func<bool, Task<bool>> begin;
     private readonly Action finish;
+    private readonly Action? finishAndSend;
+    private readonly Func<bool>? canFinishAndSend;
     private readonly Action cancel;
     private readonly Action insert;
     private readonly Func<bool> toggleMode;
@@ -38,7 +40,7 @@ public sealed class Hotkeys : IDisposable
     private const uint ReconcileMessage = 0x8003;
     public Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { }
     internal Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null) : this(handle, hold => Task.FromResult(begin(hold)), finish, cancel, insert, registerLegacy, toggleMode) { }
-    public Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { }
+    public Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null, Action? finishAndSend = null, Func<bool>? canFinishAndSend = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { this.finishAndSend = finishAndSend; this.canFinishAndSend = canFinishAndSend; }
     private Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null)
     {
         this.handle = handle; this.begin = begin; this.finish = finish; this.cancel = cancel; this.insert = insert;
@@ -103,7 +105,7 @@ public sealed class Hotkeys : IDisposable
     {
         if (code >= 0 && Volatile.Read(ref disposed) == 0 && (message == 0x100 || message == 0x101 || message == 0x104 || message == 0x105))
         {
-            var change = gesture.Key(Marshal.ReadInt32(data), message == 0x100 || message == 0x104, Now, (Marshal.ReadInt32(data, 8) & 0x10) != 0, toggleMode());
+            var change = gesture.Key(Marshal.ReadInt32(data), message == 0x100 || message == 0x104, Now, (Marshal.ReadInt32(data, 8) & 0x10) != 0, toggleMode(), (gesture.PendingSubmit || Interlocked.Read(ref activeGeneration) != 0 && !activeIsHold) && canFinishAndSend?.Invoke() == true);
             Dispatch(change);
             if (change.Suppress) return 1;
         }
@@ -149,7 +151,7 @@ public sealed class Hotkeys : IDisposable
             else if (activeGeneration == change.Generation)
             {
                 activeGeneration = 0; watchdog.Stop();
-                if (change.Action == HoldAction.Finish) finish(); else cancel();
+                if (change.Action == HoldAction.Finish) { if (change.Submit) finishAndSend?.Invoke(); else finish(); } else cancel();
             }
         }));
     }

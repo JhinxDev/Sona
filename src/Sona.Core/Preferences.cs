@@ -15,6 +15,9 @@ public sealed class Preferences
     private static readonly HashSet<string> unavailablePaths = new(StringComparer.OrdinalIgnoreCase);
     private const string RecoveryMessage = "Saved preferences could not be read. Temporary defaults are in use. Your saved file is preserved; restore access or repair the file, then restart Sona before saving settings.";
     public bool LiveTranscription { get; set; }
+    public bool PasteCompletedDraft { get; set; } = true;
+    public bool EnterToSend { get; set; }
+    public bool SoundEffects { get; set; } = true;
     public string Language { get; set; } = "auto";
     public string Engine { get; set; } = "Auto";
     public string Model { get; set; } = "auto";
@@ -35,6 +38,7 @@ public sealed class Preferences
     public bool CloseToTray { get; set; } = true;
     public bool Startup { get; set; }
     public bool ProtectionEnabled { get; set; }
+    public bool DiscordDisconnected { get; set; }
     public bool SilenceIncoming { get; set; } = true;
     public int ProtectionReleaseDelayMs { get; set; } = 200;
     public string ProtectionShortcut { get; set; } = "ctrl+shift+h";

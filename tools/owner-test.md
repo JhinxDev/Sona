@@ -1,33 +1,44 @@
 # Owner-started Sona test
 
-## Short October 15 acceptance run
+## Short 0.4.2 acceptance run
 
-Use the coordinated, exact private 0.4.1 candidate. In Settings About, record the
-build ID and confirm the preferences path is your existing profile. Do not send
-any test message.
+Use the coordinated private candidate. Settings → About shows the exact build
+and existing profile path. These are owner-started checks; automated fixtures do
+not record your microphone, change a real Discord call or send test messages.
 
-1. Choose Amethyst, quit using Quit Sona, reopen the usual shortcut, and verify
-   both Amethyst and the same build/profile identity. Appearance saves immediately.
-2. Choose Test shortcut, click an empty Discord composer, hold Ctrl+Win briefly,
-   then release. The fixed test sentence should appear once and remain unsent.
-   Merely hovering another chat must not retarget it. Moving to another field
-   should retain the draft with an Open draft recovery notice. Clipboard backup
-   stays at your existing choice; the test does not need it enabled.
-3. Enable Show live transcription and save. Double-tap Ctrl+Win in an empty
-   composer, then speak for several seconds. Verify words appear provisionally
-   before stopping. Open draft, correct some words while speaking, then stop.
-   Your edits should remain, with final raw/cleaned text available separately.
-   Press Esc in another short recording and verify no late insertion.
+1. In an empty unsent composer, dictate a longer paragraph and stop normally.
+   Expect a compact processing display and one complete paste. Change focus in a
+   separate attempt: the draft must stay in Sona. Confirm Discord's app icon and
+   the quiet display outside a text field.
+2. Enable Enter to finish and send under Audio & typing and save. First use a
+   disposable text-editor document: double-tap Ctrl+Win, speak, then press Enter.
+   Expect the completed draft followed by one Enter when readback is supported.
+   Repeat using configured Toggle. Missing/ambiguous readback must withhold Enter
+   and tell you to review manually. Only use a real chat send for a message you
+   deliberately intend to send; there is no automatic test submission.
+3. Save an edited draft, approve a short correction, and reopen it from History.
+   Verify original/generated/edited text and the removable Vocabulary rule.
+   With disposable recent entries, preview a date-range clear and cancel once,
+   then confirm. Saved drafts and the current editable text must remain.
+4. Review the compact model cards, green selected-family marker, Settings sections,
+   toggle geometry and recording tail. Switch to Parakeet's page without selecting
+   its model: the selected family must remain unchanged.
+5. When using a real Discord call intentionally, verify Connected, Disconnect
+   restoration and later Connect. Restart once while disconnected to confirm it
+   stays disconnected. A successful fake transport test is not real-call acceptance.
 
-Report the first failed step and the visible status/destination label. Private
-chat contents and microphone recordings are not needed. Actual owner microphone,
-Discord consumption and theme behavior in the installed candidate remain open
-until this run completes.
+6. In General, try Sound effects on and off. Listen for a soft start cue before
+   capture, a ready cue after processing, and a distinct cue after an intentional
+   Enter submission. Confirm the sidebar GitHub and Star links open Sona’s repo.
+
+Report the first failed step and visible status. No private draft or recording
+needs to be shared. Existing theme persistence, cancellation and microphone
+acceptance checks below remain available for targeted follow-up.
 
 ## Extended checks
 
 
-The agent does not start a live microphone or inject global key/input tests. Open **Sona 0.4.1** intentionally and record the exact version/build you use. Close competing dictation tools while testing the shared Ctrl+Win shortcut. These owner-started checks remain open for the new Parakeet integration.
+The agent does not start a live microphone or inject global key/input tests. Open **Sona 0.4.2** intentionally and record the exact version/build you use. Close competing dictation tools while testing the shared Ctrl+Win shortcut. These owner-started checks remain open for the new Parakeet integration.
 
 1. In Settings choose **Test shortcut**. Focus an empty unsent Codex composer, hold **Ctrl + Windows** for at least 250 ms, then release. The capsule says Test shortcut/No microphone and the fixed Sona test sentence should appear once. Do not submit. Check no duplicate on a second attempt and clipboard preservation. The prepared test deliberately uses Hold even if normal recording is configured as Toggle.
 2. Cancel/clear the test. Focus an empty composer, hold Ctrl+Win and speak, then release both keys. The capsule should show measured audio level, then transcription. Keep focus until the result. Review before sending. Test a short English, French and mixed technical utterance.

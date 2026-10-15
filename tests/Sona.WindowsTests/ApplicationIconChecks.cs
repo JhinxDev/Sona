@@ -50,10 +50,19 @@ public static class ApplicationIconChecks
         Check(ReferenceEquals(context.Icon, codexIcon) && context.DestinationChanged, "Returning to the original app cannot retarget or clear the retained icon warning");
         context.End(); context.Observe(new((nint)2, 20, "Discord", 3, discordIcon));
         Check(ReferenceEquals(context.Icon, discordIcon), "Idle icon resumes following foreground after the recording context ends");
+        var observedRequests = new List<(nint Window, int Process)>();
+        using var windowIcons = new ApplicationIconCache((_, window, process) => { observedRequests.Add((window, process)); return window == 1 && process == 10 ? codexIcon : discordIcon; }, 3);
+        _ = windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)1, 10); await windowIcons.Pending;
+        _ = windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)2, 10); await windowIcons.Pending;
+        Check(ReferenceEquals(windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)1, 10), codexIcon) && ReferenceEquals(windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)2, 10), discordIcon) && observedRequests.Count == 2, "Two windows of one executable keep their own supplied icon metadata without guessing website names");
+        _ = windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)1, 11); await windowIcons.Pending;
+        Check(ReferenceEquals(windowIcons.Get(@"C:\icon-fixture\browser.exe", (nint)1, 11), discordIcon) && observedRequests.Count == 3, "Reused HWNDs with a new process cannot inherit another window's cached icon");
         using var native = new ApplicationIconCache();
-        _ = native.Get(Environment.ProcessPath); await native.Pending.WaitAsync(TimeSpan.FromSeconds(5));
-        var nativeIcon = native.Get(Environment.ProcessPath);
-        Check(nativeIcon.IsFrozen && (nativeIcon is BitmapSource || ReferenceEquals(nativeIcon, ApplicationIconCache.DefaultIcon)), "Real local executable extraction produces a frozen bitmap or a safe fallback and releases its native handles");
+        var executable = Path.ChangeExtension(typeof(ApplicationIconCache).Assembly.Location, ".exe");
+        Check(File.Exists(executable), "The compiled Sona executable with the maintained multi-size application icon is available");
+        _ = native.Get(executable); await native.Pending.WaitAsync(TimeSpan.FromSeconds(5));
+        var nativeIcon = native.Get(executable);
+        Check(nativeIcon.IsFrozen && nativeIcon is BitmapSource, "A real executable with small and large resources produces a frozen bitmap instead of caching a false extraction failure");
         return passed;
     }
 }

@@ -1,5 +1,19 @@
 # Sona design
 
+October 15, owner recording-display correction: Panel is now 320 DIP wide with
+144 DIP minimum height; Capsule is 272 / 66 DIP. Both keep Stop, Cancel and
+Open draft. The live transcript shows a measured two-line tail of the last two
+phrases, with the complete text retained in Home. Processing gets a busy line;
+measured microphone bars remain exclusive to recording. Native-glass overlay
+alpha is 232/255, retaining the existing opaque/high-contrast fallbacks. The
+shared settings switch now centers its 16 DIP thumb inside the track without
+oversized margins. Actual Discord window-class and Codex package icons were
+read back and visually inspected. Browser website identity is not inferred.
+Offscreen WPF captures and focused icon checks are detailed in
+[Recording display](RECORDING-DISPLAY.md); owner live recording and foreground
+target-app acceptance remain open.
+
+
 October 15, 0.4.1 daily-use wave: the existing Amethyst and glass palette values
 are unchanged. Home adds a wrapping 12 DIP draft-state line below Latest draft:
 Live raw / provisional, final raw, cleaned, or manual edits protected. Editing
@@ -152,3 +166,40 @@ Default Ctrl+Win Hold has a 200 ms dwell and ends on release. Explicit Toggle st
 Local recording is 16 kHz mono, at most 120 seconds. Each transcription request has a 90-second deadline; resident workers retain CPU 1.5 GiB and Turbo CUDA 3 GiB host job ceilings. GPU device allocation is separate from host job memory. The selected model stays resident until configured inactivity, switching, explicit unload or quit. Default history is memory-only; explicitly saved text has a 200-record/16 MiB load limit, no audio, atomic replacement, and malformed existing files are preserved.
 
 Insertion retains the original captured field identity, focus epoch/window/process/runtime ID and released modifier requirements. It uses Unicode input without Enter, Tab, clipboard overwrite or automatic retry. Focus drift preserves the draft. Multiline/large text uses explicit copy. Owner-started physical key/microphone, Codex delivery, Hush call and creative acceptance are distinct required proof.
+
+
+## October 15 personalization and model browsing
+
+Whisper and Parakeet have fixed family navigation above the model scroll area.
+The green marker means selected for next use; browsing another family does not
+select a model. Resident memory state remains separately labeled. Cards are
+304 DIP wide and wrap into one column at the minimum window width, keeping the
+action near the model rather than at the far edge of an empty full-width row.
+
+Home offers explicit Save draft, Review corrections and Export draft actions.
+Learning is a visible, removable vocabulary substitution. Generated and manually
+edited text remain distinct. The finished-draft pipeline uses one paste with a
+processing indicator; optional physical Enter intent is visibly separate from
+ordinary Stop. No recording preview is streamed into another application's field.
+
+October 15, Settings navigation and explicit Discord connection: Settings now uses
+seven wrapping section choices (General, Audio & typing, Appearance, Text cleanup,
+Privacy, Discord, About) above a shared section viewport. Hidden sections retain
+all named controls and unsaved form values; only one section is visible. Navigation
+wraps at the minimum window size, with vertical scrolling inside the chosen section.
+About retains version/build information and Quit Sona. Existing semantic brushes,
+materials and main navigation are preserved.
+
+The Discord section uses a green connected surface with explicit Disconnect;
+disconnected state exposes Connect Discord and explains that call protection is
+inactive. Successful disconnect first restores owned voice changes, then saves
+the manual connection choice while retaining setup and watched apps. Error text
+keeps restoration/persistence failures explicit. Ten fake service checks and 23
+isolated native click-path checks passed, with normal/minimum-size screenshots.
+No fresh live Discord/call acceptance is claimed. See DISCORD-SETUP.md.
+
+
+The sidebar footer retains the version and adds compact GitHub and Star actions.
+Both open the public Sona repository only after a user click. The Star action
+does not claim a star was added or perform an authenticated action. The official
+Octicons mark uses the shared muted color; its MIT license ships with the app.

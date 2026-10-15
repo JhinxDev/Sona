@@ -73,7 +73,7 @@ and uses a microphone-disabled test profile.
 The public README screenshots show real native controls and actual Parakeet /
 cleanup residency. They are demonstrations, not an accuracy or latency promise.
 
-## Current presentation qualification
+## October 14 presentation qualification
 
 The final October 14 candidate passed a Release build with zero warnings/errors,
 31 isolated presentation/settings checks and 76 material/contrast checks. Earlier
@@ -122,3 +122,48 @@ See [verification](VERIFICATION.md), [Parakeet](PARAKEET.md) and
 [cleanup](LOCAL-CLEANUP.md) for retained methodology and runtime provenance.
 There is no published binary release yet. Contributions and feature suggestions
 are welcome; the main README links to the current build instructions.
+
+
+## October 15, 0.4.2 qualification
+
+The 0.4.2 wave adds explicit saved-draft review, approved correction learning,
+whole-draft paste, opt-in physical Enter-to-send, compact model families,
+sectioned Settings, persistent Discord connection controls and calendar History.
+Production microphone, actual chat submission and live-call acceptance are
+separate owner-started checks; no automated test sends a real message.
+
+Affected checks passed: 336 core checks, 14 completed-paste checks, 23 native
+personalization checks plus ten checks in a fresh native process, and 22 CLI/MCP
+checks. Native display evidence covers 17 icon checks, 17 active-app state checks,
+33 overlay/switch checks and four shared button-content checks. Discord passed
+ten fake transport/service checks and 23 native Settings checks. History's
+calendar checks passed 17 cases and its final retention-off native fixture passed
+22 cases; see [Personalization](PERSONALIZATION.md). Sound feedback passed 22
+silent PCM/concurrency checks, and native integration verified capture waits for
+the start cue and the off setting survives relaunch. No automated test played
+audible audio; listening quality remains an owner check. The guarded upgrade
+rehearsal passed 14 checks without touching the installed production profile.
+The previous 27 live-draft checks passed earlier in this wave and retain their
+provenance; unchanged speech-engine qualification was not replayed.
+
+Native screenshots were visually inspected for section navigation, description
+spacing, round switches, compact Whisper/Parakeet cards, connected Discord and
+bounded recording tails. These use isolated synthetic profiles and fake input
+boundaries. Actual installed Codex, Discord and Edge icon metadata was separately
+read without foreground changes. No claim of browser-tab favicon extraction is made.
+
+Review fixes include preventing an existing matching composer substring from
+authorizing a partial paste, preserving a copy made before the clipboard write,
+explicit uncertainty after partial Enter input, preventing deleted saved drafts
+from reappearing through a stale recent-history copy, and avoiding automatic
+History selection during refresh. Readback ambiguity withholds submission.
+
+`tools/package-smoke.ps1` verifies every packaged file against its receipt,
+launches the exact package with an isolated profile, checks native version/build
+and saved preferences across relaunch, then quits through About. The guarded
+upgrader retains an encrypted draft checkpoint, refuses busy dictation/owned
+voice changes, and keeps the prior installed version. Installation and source
+convergence receipts belong to the private candidate checkpoint.
+
+See [Discord setup](DISCORD-SETUP.md), [recording display](RECORDING-DISPLAY.md),
+[cleanup evaluation](CLEANUP-MODEL-EVALUATION.md) and [owner checks](../tools/owner-test.md).

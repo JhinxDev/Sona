@@ -243,7 +243,7 @@ Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDispla
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))
 {
     var fullSettings = AgentSettings.Apply(new Preferences(), fullSettingsPatch.RootElement);
-    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete twenty-two-field settings response round trips through a validated agent patch");
+    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete settings response round trips through a validated agent patch");
 }
 using (var clipboardPatch = System.Text.Json.JsonDocument.Parse("{\"copyToClipboard\":true}"))
 {
@@ -267,6 +267,7 @@ using (var lateCancel = new CancellationTokenSource())
     try { await CleanupProcessor.RunAsync("keep Sona", cleanupPrefs, "Codex", (prompt, ct) => { lateCancel.Cancel(); return Task.FromResult("Keep [TERM_0]."); }, lateCancel.Token); } catch (OperationCanceledException) { rejected = true; }
     Check(rejected, "Cancellation after inference cannot return a late polished result");
 }
+PersonalizationChecks.Run(Check);
 ReleaseVersionChecks.Run(Check);
 Console.WriteLine($"{count} checks passed.");
 

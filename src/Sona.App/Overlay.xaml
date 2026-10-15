@@ -1,58 +1,57 @@
-<Window x:Class="Sona.App.Overlay" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{StaticResource {x:Type Window}}" Title="Sona recording display" Width="420" MinHeight="216" SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ShowActivated="False" Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True" AutomationProperties.Name="Sona recording display">
+<Window x:Class="Sona.App.Overlay" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{StaticResource {x:Type Window}}" Title="Sona recording display" Width="320" MinHeight="144" SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ShowActivated="False" Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True" AutomationProperties.Name="Sona recording display">
  <Window.Resources>
-  <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-   <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="TextWrapping" Value="NoWrap"/>
-  </Style>
+  <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="TextWrapping" Value="NoWrap"/></Style>
   <Style x:Key="OverlayAction" TargetType="Button">
-   <Setter Property="Background" Value="{DynamicResource Button}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource MaterialEdge}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Focusable" Value="False"/><Setter Property="IsTabStop" Value="False"/><Setter Property="Cursor" Value="Hand"/><Setter Property="MinWidth" Value="32"/><Setter Property="MinHeight" Value="32"/><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
-   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18" Padding="8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource Hover}"/><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+   <Setter Property="Background" Value="{DynamicResource Button}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource MaterialEdge}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Focusable" Value="False"/><Setter Property="IsTabStop" Value="False"/><Setter Property="Cursor" Value="Hand"/><Setter Property="MinWidth" Value="28"/><Setter Property="MinHeight" Value="28"/><Setter Property="Padding" Value="7,4"/><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource Hover}"/><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
+  <Style x:Key="BusyLine" TargetType="ProgressBar"><Setter Property="Height" Value="3"/><Setter Property="Foreground" Value="{DynamicResource Accent}"/><Setter Property="Background" Value="{DynamicResource Inset}"/><Setter Property="BorderThickness" Value="0"/><Setter Property="IsIndeterminate" Value="True"/><Setter Property="IsHitTestVisible" Value="False"/><Setter Property="Visibility" Value="Collapsed"/></Style>
  </Window.Resources>
- <Border x:Name="Shell" CornerRadius="24" BorderBrush="{DynamicResource OverlayEdge}" BorderThickness="1" Background="{DynamicResource OverlaySurface}" Padding="20" Margin="4">
+ <Border x:Name="Shell" CornerRadius="18" BorderBrush="{DynamicResource OverlayEdge}" BorderThickness="1" Background="{DynamicResource OverlaySurface}" Padding="10" Margin="3">
   <Grid>
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
    <Grid x:Name="PanelDisplay">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="68"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="28"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>
-     <Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-     <Viewbox Width="25" Height="28" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
-     <TextBlock x:Name="PanelLabel" Grid.Column="1" Text="Listening" FontSize="20" VerticalAlignment="Center"/>
-     <TextBlock x:Name="PanelTime" Grid.Column="2" Text="0:00" FontSize="14" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="14,0,0,0" Typography.NumeralAlignment="Tabular"/>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <Viewbox Width="18" Height="20" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
+     <TextBlock x:Name="PanelLabel" Grid.Column="1" Text="Listening" FontSize="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+     <TextBlock x:Name="PanelTime" Grid.Column="2" Text="0:00" FontSize="12" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0" Typography.NumeralAlignment="Tabular"/>
     </Grid>
-    <Grid Grid.Row="1" Margin="0,14,0,0">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Border Width="20" Height="20" HorizontalAlignment="Left" CornerRadius="4" Background="{DynamicResource AppIconPlate}"><Image Width="16" Height="16" Source="{Binding ActiveAppIcon, RelativeSource={RelativeSource AncestorType=Window}}" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/></Border>
-     <TextBlock x:Name="PanelTarget" Grid.Column="1" Text="No focused text field" FontSize="14" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Muted}" AutomationProperties.Name="Recording destination app"/>
+    <Grid Grid.Row="1" Margin="0,6,0,0">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Border Width="16" Height="16" HorizontalAlignment="Left" CornerRadius="3" Background="{DynamicResource AppIconPlate}"><Image x:Name="PanelAppImage" Width="14" Height="14" Source="{Binding ActiveAppIcon, RelativeSource={RelativeSource AncestorType=Window}}" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/></Border>
+     <TextBlock x:Name="PanelTarget" Grid.Column="1" Text="" Visibility="Collapsed" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Muted}" AutomationProperties.Name="Recording destination app"/>
     </Grid>
-    <StackPanel x:Name="PanelWave" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.Name="Measured microphone waveform"/>
-    <Grid Grid.Row="3" Margin="0,4,0,0">
+    <Grid Grid.Row="2"><StackPanel x:Name="PanelWave" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" AutomationProperties.Name="Measured microphone waveform"/><ProgressBar x:Name="PanelBusy" Style="{StaticResource BusyLine}" Width="120" VerticalAlignment="Center" AutomationProperties.Name="Preparing draft locally"/></Grid>
+    <Grid Grid.Row="3">
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-     <Button Style="{StaticResource OverlayAction}" HorizontalAlignment="Left" Padding="10,6" Click="Cancel_Click" ToolTip="Cancel dictation (Escape)" AutomationProperties.Name="Cancel dictation"><StackPanel Orientation="Horizontal"><TextBlock Text="Cancel" FontSize="13"/><TextBlock Text="Esc" FontSize="11" Margin="12,2,0,0" Foreground="{DynamicResource Muted}"/></StackPanel></Button>
-     <Button x:Name="PanelStop" Grid.Column="1" Style="{StaticResource OverlayAction}" Width="40" Height="40" Click="Stop_Click" ToolTip="Stop recording" AutomationProperties.Name="Stop recording"><Rectangle Width="12" Height="12" RadiusX="2" RadiusY="2" Fill="{DynamicResource Ink}"/></Button>
+     <Button Style="{StaticResource OverlayAction}" HorizontalAlignment="Left" Click="Cancel_Click" ToolTip="Cancel dictation (Escape)" AutomationProperties.Name="Cancel dictation"><StackPanel Orientation="Horizontal"><TextBlock Text="Cancel" FontSize="12"/><TextBlock Text="Esc" FontSize="10" Margin="8,1,0,0" Foreground="{DynamicResource Muted}"/></StackPanel></Button>
+     <Button x:Name="PanelStop" Grid.Column="1" Style="{StaticResource OverlayAction}" Width="28" Height="28" Click="Stop_Click" ToolTip="Stop recording" AutomationProperties.Name="Stop recording"><Rectangle Width="9" Height="9" RadiusX="2" RadiusY="2" Fill="{DynamicResource Ink}"/></Button>
     </Grid>
-    <TextBlock x:Name="PanelHint" Grid.Row="4" Text="Esc to cancel" Margin="0,9,0,0" FontSize="11" Foreground="{DynamicResource Muted}" TextWrapping="Wrap"/>
+    <TextBlock x:Name="PanelHint" Grid.Row="4" Text="Esc to cancel" Margin="0,4,0,0" FontSize="10.5" Foreground="{DynamicResource Muted}" TextWrapping="Wrap"/>
     <TextBlock x:Name="ModelName" Visibility="Collapsed" Text="On-device dictation"/>
    </Grid>
    <Grid x:Name="CapsuleDisplay" Visibility="Collapsed">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="24"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="14"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>
-     <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="38"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-     <Viewbox Width="22" Height="25" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
-     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,5,0">
-      <TextBlock x:Name="CapsuleLabel" Text="Listening" FontSize="13" TextTrimming="CharacterEllipsis"/>
-      <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="14" Height="14" HorizontalAlignment="Left" CornerRadius="3" Background="{DynamicResource AppIconPlate}"><Image Width="12" Height="12" Source="{Binding ActiveAppIcon, RelativeSource={RelativeSource AncestorType=Window}}" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/></Border><TextBlock x:Name="CapsuleTarget" Grid.Column="1" Text="No focused text field" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Muted}" AutomationProperties.Name="Recording destination app"/></Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="32"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
+     <Viewbox Width="17" Height="20" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
+     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="3,0,3,0">
+      <TextBlock x:Name="CapsuleLabel" Text="Listening" FontSize="12" TextTrimming="CharacterEllipsis"/>
+      <Grid Margin="0,2,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="15"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="12" Height="12" HorizontalAlignment="Left" CornerRadius="2" Background="{DynamicResource AppIconPlate}"><Image x:Name="CapsuleAppImage" Width="12" Height="12" Source="{Binding ActiveAppIcon, RelativeSource={RelativeSource AncestorType=Window}}" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/></Border><TextBlock x:Name="CapsuleTarget" Grid.Column="1" Text="" Visibility="Collapsed" FontSize="10.5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Muted}" AutomationProperties.Name="Recording destination app"/></Grid>
      </StackPanel>
-     <TextBlock x:Name="CapsuleTime" Grid.Column="2" Text="0:00" FontSize="11" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="3,0,5,0" Typography.NumeralAlignment="Tabular"/>
-     <Button x:Name="CapsuleStop" Grid.Column="3" Style="{StaticResource OverlayAction}" Margin="2,0" Click="Stop_Click" ToolTip="Stop recording" AutomationProperties.Name="Stop recording"><Rectangle Width="9" Height="9" RadiusX="2" RadiusY="2" Fill="{DynamicResource Ink}"/></Button>
-     <Button Grid.Column="4" Style="{StaticResource OverlayAction}" BorderThickness="0" Background="Transparent" Click="Cancel_Click" ToolTip="Cancel dictation (Escape)" AutomationProperties.Name="Cancel dictation"><Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{DynamicResource Muted}" StrokeThickness="1.5"/></Button>
+     <TextBlock x:Name="CapsuleTime" Grid.Column="2" Text="0:00" FontSize="10.5" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="2,0,3,0" Typography.NumeralAlignment="Tabular"/>
+     <Button x:Name="CapsuleStop" Grid.Column="3" Style="{StaticResource OverlayAction}" Padding="6,4" Margin="1,0" Click="Stop_Click" ToolTip="Stop recording" AutomationProperties.Name="Stop recording"><Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" Fill="{DynamicResource Ink}"/></Button>
+     <Button Grid.Column="4" Style="{StaticResource OverlayAction}" Padding="6,4" BorderThickness="0" Background="Transparent" Click="Cancel_Click" ToolTip="Cancel dictation (Escape)" AutomationProperties.Name="Cancel dictation"><Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{DynamicResource Muted}" StrokeThickness="1.5"/></Button>
     </Grid>
-    <Viewbox Grid.Row="1" Width="112" Height="20" Margin="33,2,0,2" HorizontalAlignment="Left" Stretch="Fill" IsHitTestVisible="False"><StackPanel x:Name="CapsuleWave" Height="30" Orientation="Horizontal" VerticalAlignment="Center" AutomationProperties.Name="Measured microphone waveform"/></Viewbox>
-    <TextBlock x:Name="CapsuleHint" Grid.Row="2" Visibility="Collapsed" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+    <Grid Grid.Row="1" Margin="25,1,0,0" HorizontalAlignment="Left"><Viewbox Width="96" Height="13" Stretch="Fill" IsHitTestVisible="False"><StackPanel x:Name="CapsuleWave" Height="22" Orientation="Horizontal" VerticalAlignment="Center" AutomationProperties.Name="Measured microphone waveform"/></Viewbox><ProgressBar x:Name="CapsuleBusy" Style="{StaticResource BusyLine}" Width="96" Height="2" VerticalAlignment="Center" AutomationProperties.Name="Preparing draft locally"/></Grid>
+    <TextBlock x:Name="CapsuleHint" Grid.Row="2" Visibility="Collapsed" FontSize="10.5" Foreground="{DynamicResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
    </Grid>
-   <StackPanel Grid.Row="1" Margin="0,10,0,0" x:Name="TranscriptArea" Visibility="Collapsed">
-    <TextBlock x:Name="TranscriptStage" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Muted}"/>
-    <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,7,0,0"><TextBlock x:Name="LiveTranscript" TextWrapping="Wrap" FontSize="14" AutomationProperties.Name="Provisional local transcript"/></ScrollViewer>
-    <Button x:Name="ReviewDraft" Content="Open draft" Click="Review_Click" Style="{StaticResource OverlayAction}" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Review or edit in Sona. Automatic insertion is stopped when focus changes."/>
+   <StackPanel Grid.Row="1" Margin="0,7,0,0" x:Name="TranscriptArea" Visibility="Collapsed">
+    <TextBlock x:Name="TranscriptStage" TextTrimming="CharacterEllipsis" FontSize="10.5" Foreground="{DynamicResource Muted}"/>
+    <TextBlock x:Name="LiveTranscript" Margin="0,5,0,0" TextWrapping="Wrap" FontSize="13" LineHeight="17" LineStackingStrategy="BlockLineHeight" MaxHeight="34" AutomationProperties.Name="Recent provisional local transcript"/>
+    <Button x:Name="ReviewDraft" Content="Open draft" FontSize="11" Click="Review_Click" Style="{StaticResource OverlayAction}" HorizontalAlignment="Left" Margin="0,6,0,0" ToolTip="Review the complete draft or edit in Sona. Automatic insertion stops when focus changes."/>
    </StackPanel>
   </Grid>
  </Border>

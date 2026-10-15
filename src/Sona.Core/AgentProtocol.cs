@@ -47,10 +47,10 @@ public static class AgentProtocol
 public static class AgentSettings
 {
     // No credentials, transcripts, microphone start, paths or startup registration.
-    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.CleanupEnabled, p.CleanupTone, p.CleanupEngine, p.CleanupIdleMinutes, p.Device, p.LiveTranscription, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
+    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.CleanupEnabled, p.CleanupTone, p.CleanupEngine, p.CleanupIdleMinutes, p.Device, p.SoundEffects, p.PasteCompletedDraft, p.EnterToSend, p.LiveTranscription, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
-        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 22) throw new ArgumentException("Settings must be a bounded JSON object.");
+        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 25) throw new ArgumentException("Settings must be a bounded JSON object.");
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
@@ -71,6 +71,9 @@ public static class AgentSettings
                 case "cleanupIdleMinutes": if (!property.Value.TryGetInt32(out var cleanupMinutes) || cleanupMinutes is < 0 or > 240) throw new ArgumentException("Invalid cleanup idle timeout."); next.CleanupIdleMinutes = cleanupMinutes; break;
                 case "style": next.Style = Choice(property.Value, "Clean", "Verbatim", "Notes"); break;
                 case "device": if (!property.Value.TryGetInt32(out var device) || device is < -1 or > 255) throw new ArgumentException("Invalid device."); next.Device = device; break;
+                case "pasteCompletedDraft": next.PasteCompletedDraft = Boolean(property.Value); break;
+                case "soundEffects": next.SoundEffects = Boolean(property.Value); break;
+                case "enterToSend": next.EnterToSend = Boolean(property.Value); break;
                 case "liveTranscription": next.LiveTranscription = Boolean(property.Value); break;
                 case "autoInsert": next.AutoInsert = Boolean(property.Value); break;
                 case "copyToClipboard": next.CopyToClipboard = Boolean(property.Value); break;

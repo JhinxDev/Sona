@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.1.** Build from source below. There is no published binary
+**Early preview: 0.4.2.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -34,8 +34,10 @@ Sona window title; recording is disabled in this profile.
 - **Hold Ctrl + Windows** to record, then release to finish. Double-tap the
   combination for hands-free recording and tap once to stop. Esc cancels.
   Sona inserts into compatible text fields while the original field remains
-  focused. It never presses Send or Enter
-  to submit a message; you review and send it yourself.
+  focused. By default you review and send yourself. Optionally enable
+  **Enter to finish and send**: during hands-free recording, your Enter gesture
+  waits for the complete draft, pastes once, and submits only after the same
+  composer exposes the full inserted text for verification.
 - **Keep control of your words.** Home retains the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
   into a different field. Click the destination composer before recording;
@@ -50,9 +52,14 @@ Sona window title; recording is disabled in this profile.
   Final recognition and optional cleanup run after stopping. Open draft to edit;
   your edits stay protected and the final cleaned suggestion remains separate.
   Partial text is never automatically typed into another app.
+- **Hear subtle feedback.** Original short cues mark opening, recording start, a ready draft and an explicit Enter submission. Turn Sound effects off under Settings → General.
+- **Keep useful drafts.** Save original, generated and corrected text locally,
+  reopen it in History, or export one draft for review. Approve a proposed spelling
+  correction to teach a removable Vocabulary rule. This does not train the speech model.
 - **Choose local recognition.** NVIDIA Parakeet v3 and six Whisper models
   offer CPU or NVIDIA CUDA options. Explicit downloads use pinned sizes and
-  hashes. Selected and actually loaded models are shown separately.
+  hashes. Compact cards are grouped under Whisper and Parakeet, with a green
+  indicator on the selected family. Selected and actually loaded models are shown separately.
 - **Keep models ready.** One speech worker stays resident for the configured
   idle timeout, until a switch, explicit unload or quit. Keep until quit is
   available; unloading keeps the downloads.
@@ -65,7 +72,10 @@ Sona window title; recording is disabled in this profile.
 - **Keep dictation out of Discord calls.** Optional protection mutes your microphone while
   Sona or a watched ChatGPT/Codex app records, so others do not hear your
   dictation. Incoming audio can also be silenced. Overlapping recordings share
-  protection, and restoration respects manual mute/deafen choices.
+  protection, and restoration respects manual mute/deafen choices. Settings shows
+  the connection state and explicit Connect/Disconnect actions. No separate bot
+  runs alongside Sona; [Discord setup and eligibility](docs/DISCORD-SETUP.md)
+  explain the required developer application and consent.
 - **Fit your workspace.** Eight light/dark glass themes, Inter typography, Panel or
   Capsule recording displays, microphone level bars and local WAV transcription.
 - **Connect your tools.** A JSON CLI and stdio MCP interface manage status,

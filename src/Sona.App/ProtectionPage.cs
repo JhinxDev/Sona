@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
+using System.Windows.Media;
 using Sona.Core;
 using Sona.App.Windows;
 namespace Sona.App;
@@ -8,20 +9,20 @@ namespace Sona.App;
 public partial class MainWindow
 {
     private ProtectedCredentials? credentialVault;
+    private bool discordConnectionBusy;
     private ProtectionService? protection;
     private ProtectionHotkey? protectionHotkey;
     private Task protectionReleaseOperation = Task.CompletedTask;
     private readonly DispatcherTimer protectionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private void InitializeProtection()
     {
-        ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming;
-        WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
-        ProtectionShortcutInput.Text = preferences.ProtectionShortcut;
+        RefreshProtectionFields();
         credentialVault = new(Path.Combine(Path.GetDirectoryName(preferencesPath)!, "discord-credentials.dpapi"));
         protection = new(credentialVault); protection.Start();
         UpdateProtectionHotkey();
         _ = ConfigureProtectionAsync();
-        protectionTimer.Tick += (_, _) => HushStatus.Text = protection?.Status ?? "Off"; protectionTimer.Start();
+        protectionTimer.Tick += (_, _) => RefreshDiscordConnection(); protectionTimer.Start();
+        RefreshDiscordConnection();
     }
     private void UpdateProtectionHotkey()
     {
@@ -85,9 +86,79 @@ public partial class MainWindow
     }
     private async void ConnectDiscord_Click(object sender, RoutedEventArgs e)
     {
-        if (SettingsBusy || protection == null) return;
-        try { ProtectionResult.Text = "Connecting Discord; approve its prompt if shown."; using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(75)); await protection.ConnectAsync(true, deadline.Token); ProtectionResult.Text = protection.Status; }
-        catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException or JsonException) { ProtectionResult.Text = "Discord connection failed. Check setup and pause/quit standalone Hush first."; }
+        if (SettingsBusy || discordConnectionBusy || protection == null || protection.Connected) return;
+        discordConnectionBusy = true; preferencesApplying = true; RefreshSettingsActions();
+        try
+        {
+            ProtectionResult.Text = "Approve the connection in Discord if asked.";
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(75));
+            await protection.ConnectAsync(true, deadline.Token);
+            ProtectionResult.Text = PersistDiscordConnectionChoice(false) ? "Discord connected." : "Connected for now. Could not save this choice; reconnect may be needed after restarting Sona.";
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException or JsonException)
+        { ProtectionResult.Text = "Could not connect. Open Discord, check your setup, and try again."; }
+        finally { discordConnectionBusy = false; preferencesApplying = false; RefreshSettingsActions(); RefreshDiscordConnection(); }
+    }
+    private async void DisconnectDiscord_Click(object sender, RoutedEventArgs e)
+    {
+        if (SettingsBusy || discordConnectionBusy || protection == null || !protection.Connected && !protection.OwnsChanges && !protection.ConnectionSuppressed) return;
+        discordConnectionBusy = true; preferencesApplying = true; RefreshSettingsActions();
+        try
+        {
+            ProtectionResult.Text = "Restoring Discord before disconnecting...";
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+            await protection.DisconnectAsync(deadline.Token);
+            ProtectionResult.Text = PersistDiscordConnectionChoice(true) ? "Disconnected. Your saved setup is kept." : "Disconnected for now. Could not save this choice; restarting Sona may reconnect. Retry Disconnect.";
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException)
+        { ProtectionResult.Text = "Restoration could not finish. The connection is kept; retry Disconnect."; }
+        finally { discordConnectionBusy = false; preferencesApplying = false; RefreshSettingsActions(); RefreshDiscordConnection(); }
+    }
+    private bool PersistDiscordConnectionChoice(bool disconnected)
+    {
+        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        next.DiscordDisconnected = disconnected;
+        try { next.Save(preferencesPath); preferences.DiscordDisconnected = disconnected; return true; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+    private void RefreshProtectionFields()
+    {
+        ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming;
+        WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
+        ProtectionShortcutInput.Text = preferences.ProtectionShortcut;
+    }
+    internal void AttachProtectionForTests(ProtectionService service)
+    {
+        if (!arguments.Contains("--test-ui")) throw new InvalidOperationException("Fake protection requires isolated UI mode.");
+        protection = service; RefreshProtectionFields(); RefreshDiscordConnection();
+    }
+    private void RefreshDiscordConnection()
+    {
+        if (ConnectDiscordButton == null || DiscordConnectionBadge == null) return;
+        var connected = protection?.Connected == true;
+        HushStatus.Text = connected ? "Connected" : "Not connected";
+        DiscordConnectionDetail.Text = discordConnectionBusy ? "Updating the Discord connection..." : connected ? protection!.Status : protection?.ConnectionSuppressed == true ? "Disconnected; call protection is inactive. Your saved setup is kept." : "Connect Discord to use call protection. Your saved setup is kept.";
+        ConnectDiscordButton.Content = discordConnectionBusy && !connected ? "Connecting..." : "Connect Discord";
+        ConnectDiscordButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
+        ConnectDiscordButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && protection != null;
+        DisconnectDiscordButton.Visibility = connected || protection?.OwnsChanges == true || protection?.ConnectionSuppressed == true && !preferences.DiscordDisconnected ? Visibility.Visible : Visibility.Collapsed;
+        DisconnectDiscordButton.IsEnabled = !SettingsBusy && !discordConnectionBusy;
+        DisconnectDiscordButton.Content = protection?.ConnectionSuppressed == true && !preferences.DiscordDisconnected ? "Retry disconnect" : "Disconnect";
+        PauseProtectionButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && connected && (preferences.ProtectionEnabled || protection!.Paused || protection.OwnsChanges);
+        SaveDiscordSetupButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && !connected;
+        if (connected && !SystemParameters.HighContrast)
+        {
+            DiscordConnectionBadge.Background = new SolidColorBrush(Color.FromRgb(0x20,0x65,0x42));
+            DiscordConnectionBadge.BorderBrush = new SolidColorBrush(Color.FromRgb(0x66,0xC2,0x91));
+            HushStatus.Foreground = DiscordConnectionDetail.Foreground = Brushes.White;
+        }
+        else
+        {
+            DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "Inset");
+            DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "Line");
+            HushStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Ink");
+            DiscordConnectionDetail.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Muted");
+        }
     }
     private async void PauseProtection_Click(object sender, RoutedEventArgs e)
     {
@@ -103,7 +174,7 @@ public partial class MainWindow
     }
     private void SaveDiscordSetup_Click(object sender, RoutedEventArgs e)
     {
-        if (SettingsBusy || credentialVault == null || protection?.Connected == true) { ProtectionResult.Text = "Disconnect by quitting Sona before replacing existing Discord setup."; return; }
+        if (SettingsBusy || credentialVault == null || protection?.Connected == true) { ProtectionResult.Text = "Disconnect Discord before replacing its saved setup."; return; }
         var id = DiscordClientId.Text.Trim(); var secret = DiscordClientSecret.Password;
         if (id.Length is < 5 or > 50 || !id.All(char.IsAsciiDigit) || secret.Length is < 8 or > 256) { ProtectionResult.Text = "Enter a Discord application ID and secret from your own developer application."; return; }
         try { credentialVault.Save(new DiscordCredentials { ClientId = id, ClientSecret = secret }); DiscordClientId.Clear(); DiscordClientSecret.Clear(); ProtectionResult.Text = "Discord setup saved with Windows encryption. Connect Discord when ready."; }

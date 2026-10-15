@@ -55,6 +55,8 @@ $taskRecovery=SaveRecovery $taskPayload $taskRecoveryDirectory
 if((ReadRecovery $taskRecovery)-cne$taskPayload){throw 'Encrypted recovery readback differs; app preserved'}
 if(!(Idle)-or(Value 'Draft')-cne$taskDraft){throw 'App or draft changed; app preserved; encrypted checkpoint retained'}
 SelectTab 'SettingsTab'
+$taskAbout=ById 'SettingsAboutNav'
+if($taskAbout){$taskAbout.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()}
 $taskQuit=$taskRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)))
 if($taskQuit.Count-ne1){throw 'Quit control not unique; app preserved'}
 function LaunchPrivate([string]$Path,[string]$Payload){$taskLaunch=[Diagnostics.ProcessStartInfo]::new($Path);$taskLaunch.UseShellExecute=$false;$taskLaunch.Environment['SONA_DRAFT_TRANSFER']=$Payload;if($RehearsalRoot){$taskLaunch.ArgumentList.Add('--test-ui');$taskLaunch.ArgumentList.Add('--test-transfer');$taskLaunch.Environment['SONA_DATA']=Join-Path $RehearsalRoot 'profile';$taskLaunch.Environment['MURMUR_DATA']=Join-Path $RehearsalRoot 'profile'};try{return [Diagnostics.Process]::Start($taskLaunch)}finally{$taskLaunch.Environment.Remove('SONA_DRAFT_TRANSFER')|Out-Null}}

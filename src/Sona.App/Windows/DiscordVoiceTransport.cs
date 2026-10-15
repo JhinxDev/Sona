@@ -161,5 +161,6 @@ internal sealed class DiscordVoiceTransport(ProtectedCredentials vault, string p
         authenticated = false; readerStop?.Cancel(); pipe?.Dispose();
         if (reader != null) await reader; readerStop?.Dispose(); readerStop = null; reader = null; pipe = null;
     }
+    public ValueTask DisconnectAsync() => new(DisposeConnectionAsync());
     public ValueTask DisposeAsync() => new(DisposeConnectionAsync());
 }

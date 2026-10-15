@@ -1,8 +1,9 @@
 using System.Text.Json;
 namespace Sona.Core;
 
-public sealed record HistoryItem(Guid Id, DateTimeOffset CreatedAt, string Original, string Draft, bool Inserted = false)
+public sealed record HistoryItem(Guid Id, DateTimeOffset CreatedAt, string Original, string Draft, bool Inserted = false, bool Saved = false, string? Generated = null)
 {
+    public string SavedLabel => Saved ? "Saved on this device" : "Recent dictation";
     public string TimeLabel => CreatedAt.ToLocalTime().ToString("MMM d · HH:mm");
     public string Preview => Draft.Length > 240 ? Draft[..240] + "…" : Draft;
 }
@@ -11,7 +12,7 @@ public static class HistoryStore
 {
     public const int Capacity = 200;
     public static List<HistoryItem> Bounded(IEnumerable<HistoryItem> entries) => entries
-        .Where(x => x != null && x.Id != Guid.Empty && x.CreatedAt != default && x.Original != null && x.Draft != null && x.Original.Length <= 6000 && x.Draft.Length is > 0 and <= 6000)
+        .Where(x => x != null && x.Id != Guid.Empty && x.CreatedAt != default && x.Original != null && x.Draft != null && x.Original.Length <= 6000 && x.Draft.Length is > 0 and <= 6000 && (x.Generated == null || x.Generated.Length <= 6000))
         .DistinctBy(x => x.Id).Take(Capacity).ToList();
     public static List<HistoryItem> Search(IEnumerable<HistoryItem> entries, string query)
     {
@@ -22,7 +23,7 @@ public static class HistoryStore
     {
         if (!File.Exists(path)) return [];
         if (new FileInfo(path).Length > 16 * 1024 * 1024) throw new IOException("The saved history is too large. The existing file was preserved.");
-        return Bounded(JsonSerializer.Deserialize<List<HistoryItem>>(File.ReadAllText(path)) ?? []);
+        return Bounded(JsonSerializer.Deserialize<List<HistoryItem>>(File.ReadAllText(path)) ?? throw new JsonException("Saved drafts must be a list."));
     }
     public static void Save(string path, IEnumerable<HistoryItem> entries)
     {

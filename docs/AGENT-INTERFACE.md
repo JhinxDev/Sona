@@ -1,5 +1,11 @@
 # Sona agent interface
 
+0.4.2 adds `pasteCompletedDraft` (default true) and `enterToSend` (default false)
+boolean settings, plus `soundEffects` (default true). Enter-to-send still requires the owner's physical Enter gesture
+during an admitted hands-free recording and verified insertion into the same field.
+The agent API cannot start a recording or submit a draft. `liveTranscription` is
+also a validated boolean (default false).
+
 0.3.2 adds optional local cleanup controls: `cleanupEnabled` (boolean),
 `cleanupTone` (`formal`, `casual`, `very casual`), `cleanupEngine` (`Auto`, `Cpu`),
 and `cleanupIdleMinutes` (integer 0..240, zero Keep until quit). Defaults are
@@ -70,7 +76,7 @@ It defaults off for new installations and is enabled for the owner on request.
 Supported settings: `language`, `engine`, `model`, `modelIdleMinutes`, `theme`,
 `recordingDisplay`, `shortcutMode`, `style`, `cleanupEnabled`, `cleanupTone`,
 `cleanupEngine`, `cleanupIdleMinutes`,
-`device`, `autoInsert`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
+`device`, `soundEffects`, `liveTranscription`, `pasteCompletedDraft`, `enterToSend`, `autoInsert`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
 `protectionReleaseDelayMs`, `protectionShortcut`, `watchedApps`. Credential setup, transcript/history
 export and microphone capture are intentionally outside this API. A same-user
 agent is trusted to make the requested local settings changes; this interface

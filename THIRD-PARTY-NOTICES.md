@@ -17,3 +17,12 @@ Sona original source is licensed under MIT and is published as an early source p
 - NVIDIA CUDA 12.4/cuBLAS: optional portable cleanup runtime dependencies from the pinned official llama.cpp release assets. They remain subject to the [NVIDIA CUDA 12.4 agreement](https://docs.nvidia.com/cuda/archive/12.4.0/eula/index.html), independently of Sona's MIT source. No NVIDIA driver/global toolkit is installed, and CUDA DLLs are not bundled in the Sona app/source package.
 
 The English/French FLEURS evaluation audio is CC-BY-4.0, credited in `docs/VERIFICATION.md`, and is not bundled in the application or source repository. Synthetic fixtures contain no owner speech.
+
+
+## GitHub Octicons mark
+
+The sidebar uses GitHub's `mark-github-16` vector path from
+https://github.com/primer/octicons (retrieved October 15, 2026), under the MIT
+license. Copyright (c) 2026 GitHub Inc. The license is included in
+`licenses/Octicons-MIT.txt`. The mark identifies the linked repository and does
+not imply GitHub endorsement. Starring is performed only by the visitor on GitHub.

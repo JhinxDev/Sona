@@ -1,6 +1,6 @@
 # Local text cleanup
 
-Sona 0.3.2 optionally runs Spokenly Cleanup 1 after Whisper. It cleans up
+Sona optionally runs Spokenly Cleanup 1 after Whisper or Parakeet. It cleans up
 punctuation, filler words, repeated phrases and spoken corrections while keeping
 the original transcript available in Home. It runs locally without an account,
 API key or cloud inference. New installations start with this feature off.
@@ -22,6 +22,12 @@ Cleanup has its own 10-minute default idle timeout. Choose 1, 5, 10 or 30 minute
 or Keep until quit. Load/Unload are explicit actions. A backend change, disabling
 cleanup, Verbatim, cancellation and quit release its contained worker. Downloads
 are kept for reuse. When an idle model unloads, the next dictation loads it again.
+
+The [October 15 candidate evaluation](CLEANUP-MODEL-EVALUATION.md) compares
+Spokenly with Ochre Refine 4B and Qwen3.5 4B on short, long, French and mixed
+technical dictation. The larger candidates were not promoted because observed
+meaning changes outweighed their improvements. This is a bounded selection for
+this application and hardware, not a claim of universal model superiority.
 
 ## Preservation and limits
 

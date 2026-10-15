@@ -5,6 +5,19 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 1 && args[0] == "--sound-feedback-checks") { Console.WriteLine($"{await SoundFeedbackChecks.RunAsync()} silent sound-feedback checks passed."); return; }
+if (args.Length == 1 && args[0] == "--history-range-checks") { Console.WriteLine($"{HistoryFilteringChecks.Run()} history range checks passed."); return; }
+if (args.Length == 2 && args[0] == "--discord-settings-fixture") { Console.WriteLine(JsonSerializer.Serialize(DiscordSettingsFixture.Run(args[1]))); return; }
+if (args.Length == 2 && args[0] == "--history-filter-fixture") { Console.WriteLine(JsonSerializer.Serialize(HistoryFilteringFixture.Run(args[1]))); return; }
+if (args.Length == 2 && args[0] == "--history-retention-off-fixture") { Console.WriteLine(JsonSerializer.Serialize(HistoryFilteringFixture.Run(args[1], true))); return; }
+if (args.Length == 1 && args[0] == "--discord-disconnect-checks") { Console.WriteLine($"{await DiscordDisconnectChecks.RunAsync()} Discord disconnect checks passed."); return; }
+if (args.Length == 1 && args[0] == "--active-app-state-fixture") { Console.WriteLine($"{await ActiveApplicationChecks.RunAsync(false)} active-app state checks passed."); return; }
+if (args.Length == 2 && args[0] == "--shared-button-fixture") { Console.WriteLine(JsonSerializer.Serialize(SharedButtonContentFixture.Run(args[1]))); return; }
+if (args.Length == 2 && args[0] is "--personalization-fixture" or "--personalization-reopen") { Console.WriteLine(JsonSerializer.Serialize(PersonalizationFixture.Run(args[1], args[0].EndsWith("reopen")))); return; }
+if (args.Length == 1 && args[0] == "--completed-paste-fixture") { Console.WriteLine($"{await CompletedDraftPasteChecks.RunAsync()} completed-paste checks passed."); return; }
+if (args.Length == 2 && args[0] == "--overlay-fixture") { Console.WriteLine(JsonSerializer.Serialize(OverlayVisualFixture.Run(args[1]))); return; }
+if (args.Length == 2 && args[0] == "--native-app-icons") { Console.WriteLine(JsonSerializer.Serialize(await NativeApplicationIconFixture.RunAsync(args[1]))); return; }
+if (args.Length == 1 && args[0] == "--application-icon-fixture") { Console.WriteLine($"{await ApplicationIconChecks.RunAsync()} icon checks passed."); return; }
 if (args.Length == 3 && args[0] == "--live-speech-fixture") { BoundedProcess.ContainApplication(); Console.WriteLine(JsonSerializer.Serialize(await LiveSpeechFixture.RunAsync(args[1], args[2]))); return; }
 if (args.Length == 2 && args[0] == "--live-draft-fixture") { Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(LiveDictationFixture.Run(args[1]))); return; }
 if (args.Length == 1 && args[0] == "--insertion-fixture") { Console.WriteLine($"{await InsertionChecks.RunAsync()} insertion checks passed."); return; }

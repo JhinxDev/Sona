@@ -18,28 +18,51 @@ public partial class MainWindow
     private bool preferencesApplying;
     private bool SettingsBusy => !preferencesLoad.CanSave || processing || recorder != null || shutdownPending || cleanupInstalling || preferencesApplying || preparing || session?.State == SessionState.Recording;
     private readonly Dictionary<string, TextBlock> modelStateLabels = new();
+    private string? viewedModelFamily;
 
     private void RefreshModelCards()
     {
         overlay.UpdateModel(ModelCatalog.Get(Transcriber.SelectedModel(preferences)).Name);
         RefreshResidentStatusIfReady();
         ModelCards.Children.Clear(); modelStateLabels.Clear();
-        foreach (var model in ModelCatalog.All)
+        var selectedModel = ModelCatalog.Get(Transcriber.SelectedModel(preferences));
+        var activeFamily = selectedModel.IsParakeet ? "Parakeet" : "Whisper";
+        viewedModelFamily ??= activeFamily;
+        SelectedModelSummary.Text = "Selected for next dictation: " + selectedModel.Name;
+        ModelFamilies.Children.Clear();
+        foreach (var family in new[] { "Whisper", "Parakeet" })
+        {
+            var label = new StackPanel { Orientation = Orientation.Horizontal };
+            if (family == activeFamily)
+            {
+                var dot = new System.Windows.Shapes.Ellipse { Width = 7, Height = 7, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
+                dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Success"); label.Children.Add(dot);
+            }
+            label.Children.Add(ModelText(family, 13, false));
+            var button = new Button { Content = label, Margin = new Thickness(0, 0, 10, 0), Padding = new Thickness(14, 9, 14, 9), BorderThickness = new Thickness(family == viewedModelFamily ? 2 : 1), ToolTip = family == activeFamily ? "Contains your selected model" : "Browse " + family + " models" };
+            button.SetResourceReference(Button.BorderBrushProperty, family == viewedModelFamily ? "Accent" : "Line");
+            AutomationProperties.SetAutomationId(button, "ModelFamily-" + family);
+            AutomationProperties.SetName(button, family + (family == activeFamily ? ", contains selected model" : " models"));
+            button.Click += (_, _) => { viewedModelFamily = family; RefreshModelCards(); ModelsScroll.ScrollToTop(); };
+            ModelFamilies.Children.Add(button);
+        }
+        foreach (var model in ModelCatalog.All.Where(x => (x.IsParakeet ? "Parakeet" : "Whisper") == viewedModelFamily))
         {
             var installed = modelStore.Present(model.Id);
             var active = Transcriber.SelectedModel(preferences) == model.Id;
             var loaded = transcriber.LoadedModel == model.Id;
             var downloading = downloadingModel == model.Id;
-            var row = new Grid { Margin = new Thickness(20), UseLayoutRounding = true };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
+            var row = new Grid { Margin = new Thickness(16), UseLayoutRounding = true };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(94) });
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             // Original speech waveform badge; provider identity stays in the text.
-            var mark = new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, ToolTip = model.Provider + " speech model. Original Sona waveform; not an official provider logo." };
+            var mark = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, ToolTip = model.Provider + " speech model. Original Sona waveform; not an official provider logo." };
             mark.SetResourceReference(Border.BackgroundProperty, "Inset"); mark.SetResourceReference(Border.BorderBrushProperty, "Line");
             var waveform = new System.Windows.Shapes.Path
             {
-                Width = 26, Height = 24, Stretch = Stretch.None,
+                Width = 24, Height = 24, Stretch = Stretch.None,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                 Data = Geometry.Parse("M2,9 L2,15 M7.5,5 L7.5,19 M13,2 L13,22 M18.5,6 L18.5,18 M24,10 L24,14"),
                 StrokeThickness = 2.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
@@ -67,9 +90,9 @@ public partial class MainWindow
 
             var action = new Button { Content = downloading ? "Downloading" : installed ? active ? "Verify" : "Use model" : "Download", Tag = model.Id, IsEnabled = !SettingsBusy && downloadingModel == null, Padding = new Thickness(9, 7, 9, 7), MinHeight = 32, VerticalAlignment = VerticalAlignment.Top, FontSize = 11 };
             action.SetResourceReference(Button.BackgroundProperty, "Inset"); action.SetResourceReference(Button.ForegroundProperty, "Ink"); action.SetResourceReference(Button.BorderBrushProperty, "Line");
-            AutomationProperties.SetAutomationId(action, "ModelAction-" + model.Id); AutomationProperties.SetName(action, (installed ? active ? "Verify active " : "Verify and use " : "Download ") + model.Name); action.Click += ModelAction_Click; Grid.SetColumn(action, 2); row.Children.Add(action);
-            var shell = new ModelRowBorder { BorderThickness = new Thickness(0, 0, 0, model == ModelCatalog.All[^1] ? 0 : 1), Child = row };
-            shell.SetResourceReference(Border.BorderBrushProperty, "Line");
+            AutomationProperties.SetAutomationId(action, "ModelAction-" + model.Id); AutomationProperties.SetName(action, (installed ? active ? "Verify active " : "Verify and use " : "Download ") + model.Name); action.Click += ModelAction_Click; Grid.SetColumn(action, 1); Grid.SetRow(action, 1); action.HorizontalAlignment = HorizontalAlignment.Left; action.Margin = new Thickness(0, 12, 0, 0); row.Children.Add(action);
+            var shell = new ModelRowBorder { Width = 304, Margin = new Thickness(0, 0, 12, 12), CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Child = row };
+            shell.SetResourceReference(Border.BorderBrushProperty, "Line"); shell.SetResourceReference(Border.BackgroundProperty, "Panel");
             AutomationProperties.SetAutomationId(shell, "ModelRow-" + model.Id);
             AutomationProperties.SetName(shell, model.Name + ", " + (active ? "active for next use, " : "") + (loaded ? "loaded in memory, " : "not loaded in memory, ") + (installed ? "installed" : "not installed")); ModelCards.Children.Add(shell);
         }

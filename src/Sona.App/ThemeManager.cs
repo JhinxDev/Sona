@@ -114,7 +114,7 @@ public static class ThemeManager
         // Protected surfaces remain almost opaque over native backdrops. These aliases
         // also give the overlay a stable material contract without theme-specific hues.
         resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(32, 30, 36));
-        resources["OverlaySurface"] = resources["Panel"];
+        resources["OverlaySurface"] = translucent ? Surface(panel, canvas, accent, .035, .07, true, 232) : resources["Panel"];
         resources["OverlayEdge"] = resources["MaterialEdge"];
     }
 

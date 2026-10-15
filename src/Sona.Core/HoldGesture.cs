@@ -1,7 +1,7 @@
 namespace Sona.Core;
 
 public enum HoldAction { None, Begin, Finish, Cancel }
-public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false, bool HandsFree = false);
+public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false, bool HandsFree = false, bool Submit = false);
 
 // Only current physical down-state, never typed text or key history. One listener
 // thread advances this reducer; the UI reads only the admitted generation.
@@ -16,7 +16,11 @@ public sealed class HoldGesture
     private bool draining;
     private bool latched;
     private bool toggleGesture;
+    private bool toggleSession;
     private bool handsFree;
+    private bool swallowEnter;
+    private int pendingSubmit;
+    public bool PendingSubmit => Volatile.Read(ref pendingSubmit) != 0;
     private bool tapPending;
     private bool secondTap;
     private long tapReleased;
@@ -37,13 +41,27 @@ public sealed class HoldGesture
     public void Invalidate()
     {
         Interlocked.Exchange(ref current, 0); Interlocked.Exchange(ref pendingToggle, 0); arming = holding = false;
-        handsFree = tapPending = secondTap = false;
+        handsFree = toggleSession = tapPending = secondTap = false; Volatile.Write(ref pendingSubmit, 0);
         draining = Control || Windows; latched = latched && draining;
     }
-    public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false)
+    public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false, bool finishOnEnter = false)
     {
         key = Normalize(key);
         if (injected || key < 0 || key >= 256) return default;
+        if (key == 0x0D && swallowEnter)
+        {
+            down[key] = pressed; if (!pressed) swallowEnter = false;
+            return new(HoldAction.None, generation, Suppress: true);
+        }
+        // Only an admitted hands-free session consumes a bare physical Enter.
+        // Drain repeat/up events so the original key cannot submit stale text.
+        if (key == 0x0D && pressed && (handsFree || toggleSession) && PendingToggle == 0 && finishOnEnter && !Control && !Windows && !Other)
+        {
+            var token = generation; Invalidate(); down[key] = true; swallowEnter = true; Volatile.Write(ref pendingSubmit, 1);
+            return new(HoldAction.Finish, token, Suppress: true, Toggle: true, HandsFree: true, Submit: true);
+        }
+        if (key == 0x0D && pressed && PendingSubmit && finishOnEnter && !Control && !Windows && !Other)
+        { down[key] = true; swallowEnter = true; return new(HoldAction.None, generation, Suppress: true); }
         var repeat = pressed && down[key];
         if (repeat) return new(HoldAction.None, generation, latched && key is (0x5B or 0x5C));
         down[key] = pressed;
@@ -103,7 +121,7 @@ public sealed class HoldGesture
             secondTap = !toggle && tapPending && milliseconds - tapReleased <= 350;
             tapPending = false;
             Interlocked.Exchange(ref current, ++generation);
-            if (toggle) { arming = false; holding = true; Interlocked.Exchange(ref pendingToggle, generation); return new(HoldAction.Begin, generation, Toggle: true); }
+            if (toggle) { arming = false; holding = true; toggleSession = true; Interlocked.Exchange(ref pendingToggle, generation); return new(HoldAction.Begin, generation, Toggle: true); }
         }
         return default;
     }
