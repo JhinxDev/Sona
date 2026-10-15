@@ -206,3 +206,7 @@ Octicons mark uses the shared muted color; its MIT license ships with the app.
 
 Sidebar correction, October 15: retain one GitHub link. The duplicate Star
 action was removed because both opened the same repository page.
+
+Owner feedback refinement: the capsule keeps its 272 DIP width, with its voice
+waveform enlarged from 96 × 13 to 176 × 26 DIP. The panel gives the waveform
+36 DIP of height. Measured audio, smoothing and the bounded transcript tail remain.

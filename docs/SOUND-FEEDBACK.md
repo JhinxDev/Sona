@@ -5,20 +5,25 @@ General → Sound effects** enables or disables the set; save preferences to app
 the choice. The default is enabled. Test UI mode suppresses actual playback
 independently of this preference.
 
-| Cue | Design | Duration | Measured digital peak |
-| --- | --- | ---: | ---: |
-| Open | Soft paired glass tone | 180 ms | -27.67 dBFS |
-| Start | Single clear, short tone | 100 ms | -27.34 dBFS |
-| Ready | Gentle ascending pair | 220 ms | -26.72 dBFS |
-| Sent | Short descending pair | 180 ms | -26.41 dBFS |
+The initial glassy cues were rejected in owner listening as squeaky. The revised
+set uses low, damped tones with an 18 ms smooth attack and a 70 ms soft release.
+Fundamentals stay between 174 and 294 Hz, with a restrained lower body and a
+brief, quiet upper component below 441 Hz. There are no pitch sweeps or high
+bell-like overtones. This targets smoother, less intrusive feedback; listening
+acceptance belongs to the owner.
 
-The sound intent is quiet confirmation rather than an alert. Eight-millisecond
-smooth attacks, 35-millisecond smooth releases and decaying harmonic tones avoid
-hard sample edges. The first and last samples are zero. A 0.05 full-scale ceiling
-keeps every cue below -26 dBFS; actual loudness still depends on Windows volume,
-the selected device and the listener. The cues use 24 kHz mono, signed 16-bit PCM
-WAV data synthesized in memory. There are no downloaded recordings, temporary
-audio files, remote services, added packages or third-party sound assets.
+| Cue | Design | Duration |
+| --- | --- | ---: |
+| Open | Warm overlapping body | 200 ms |
+| Start | Rounded single pulse | 140 ms |
+| Ready | Soft overlapping confirmation | 220 ms |
+| Sent | Low, settled finish | 180 ms |
+
+The first and last samples are zero. A 0.05 full-scale ceiling keeps every cue
+below -26 dBFS; actual loudness depends on Windows volume, device and listener.
+The cues use 24 kHz mono, signed 16-bit PCM WAV data synthesized in memory.
+There are no downloaded recordings, remote services, added packages or
+third-party sound assets.
 
 ## Playback boundary
 
@@ -49,13 +54,9 @@ playback, skipped overlap, Start ordering, nonfatal errors, cancellation and
 disposal. Every playback test injected a fake action. No sound was played, no
 audio device was opened and no microphone was used.
 
-The numeric owner-machine receipt is
-`E:/Temp/qazws/sona-personalization/sound-feedback.json`, bound to
-`SoundFeedback.cs` SHA256
-`597191530875c70d2f3194cae48a0d7e0632c0f4552c0199f61d67e176a93c64`.
-Its waveform hashes identify the exact generated cue bytes. Subjective listening
-and physical-device behavior remain owner checks; technical PCM tests do not
-claim that the cues have been auditioned.
+The original waveform receipt belongs to the rejected first design. The revised
+waveforms rerun the same silent integrity, level, fade and concurrency checks.
+Subjective listening and physical-device behavior remain owner checks.
 
 With the README's isolated SDK environment:
 

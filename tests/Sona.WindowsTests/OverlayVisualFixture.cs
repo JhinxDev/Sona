@@ -61,7 +61,10 @@ internal static class OverlayVisualFixture
                                     if (!icons.Pending.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException("Actual Discord icon exceeded five seconds.");
                                     overlay.UpdateAppIcon(icons.Get(executable, process.MainWindowHandle, process.Id)); break;
                                 }
-                                overlay.Update("Listening", "Release the shortcut to finish", 18, .02);
+                                // Feed an explicit synthetic RMS pattern through the real level mapper.
+                                for (var sample=0;sample<28;sample++) overlay.Update("Listening", "Release the shortcut to finish", 18, .008+.035*Math.Pow(Math.Sin(sample*.32),2));
+                                var animate=typeof(Overlay).GetMethod("Animate",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+                                for(var frame=0;frame<160;frame++) animate.Invoke(overlay,[null,EventArgs.Empty]);
                                 overlay.UpdateTranscript("", "");
                                 var shell = (Border)overlay.FindName("Shell");
                                 Layout(shell, overlay.Width);

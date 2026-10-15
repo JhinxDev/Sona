@@ -71,7 +71,7 @@ internal sealed class SoundFeedback(Action<byte[]>? playback = null) : IDisposab
     internal static byte[] Synthesize(FeedbackCue cue)
     {
         const int rate=24000;
-        var duration=cue switch{FeedbackCue.Open=>.180,FeedbackCue.Start=>.100,FeedbackCue.Ready=>.220,FeedbackCue.Sent=>.180,_=>throw new ArgumentOutOfRangeException(nameof(cue))};
+        var duration=cue switch{FeedbackCue.Open=>.200,FeedbackCue.Start=>.140,FeedbackCue.Ready=>.220,FeedbackCue.Sent=>.180,_=>throw new ArgumentOutOfRangeException(nameof(cue))};
         var count=(int)Math.Round(duration*rate);var wav=new byte[44+count*2];var header=wav.AsSpan();
         "RIFF"u8.CopyTo(header);BinaryPrimitives.WriteInt32LittleEndian(header[4..],wav.Length-8);"WAVEfmt "u8.CopyTo(header[8..]);BinaryPrimitives.WriteInt32LittleEndian(header[16..],16);
         BinaryPrimitives.WriteInt16LittleEndian(header[20..],1);BinaryPrimitives.WriteInt16LittleEndian(header[22..],1);BinaryPrimitives.WriteInt32LittleEndian(header[24..],rate);BinaryPrimitives.WriteInt32LittleEndian(header[28..],rate*2);BinaryPrimitives.WriteInt16LittleEndian(header[32..],2);BinaryPrimitives.WriteInt16LittleEndian(header[34..],16);"data"u8.CopyTo(header[36..]);BinaryPrimitives.WriteInt32LittleEndian(header[40..],count*2);
@@ -79,18 +79,22 @@ internal sealed class SoundFeedback(Action<byte[]>? playback = null) : IDisposab
         static double Tone(double time,double start,double length,double frequency)
         {
             var local=time-start;if(local<0||local>=length)return 0;
-            var envelope=Smooth(local/.008)*Smooth((length-local)/.035)*Math.Exp(-local*7);
-            return envelope*(.88*Math.Sin(2*Math.PI*frequency*local)+.12*Math.Sin(2*Math.PI*frequency*2*local));
+            // Low, rounded body with a soft onset and long damped release.
+            // No high register oscillator, pitch sweep or bell-like overtone.
+            var envelope=Smooth(local/.018)*Smooth((length-local)/.070)*Math.Exp(-local*9);
+            return envelope*(.80*Math.Sin(2*Math.PI*frequency*local)
+                +.14*Math.Sin(2*Math.PI*frequency*.5*local)
+                +.06*Math.Exp(-local*28)*Math.Sin(2*Math.PI*frequency*1.5*local));
         }
         for(var index=1;index<count-1;index++)
         {
             var time=index/(double)rate;
             var signal=cue switch
             {
-                FeedbackCue.Open=>.62*Tone(time,0,.180,523.25)+.38*Tone(time,0,.180,783.99),
-                FeedbackCue.Start=>Tone(time,0,.100,830.61),
-                FeedbackCue.Ready=>.70*Tone(time,0,.135,659.25)+.70*Tone(time,.085,.135,880),
-                FeedbackCue.Sent=>.70*Tone(time,0,.115,987.77)+.70*Tone(time,.065,.115,739.99),
+                FeedbackCue.Open=>.72*Tone(time,0,.200,196)+.28*Tone(time,.015,.185,293.66),
+                FeedbackCue.Start=>Tone(time,0,.140,246.94),
+                FeedbackCue.Ready=>.68*Tone(time,0,.160,196)+.60*Tone(time,.060,.160,261.63),
+                FeedbackCue.Sent=>.78*Tone(time,0,.180,174.61)+.22*Tone(time,.012,.168,261.63),
                 _=>0
             };
             // -26 dBFS peak ceiling, with no limiter distortion in the designed

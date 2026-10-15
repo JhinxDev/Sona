@@ -11,7 +11,7 @@
   <Grid>
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
    <Grid x:Name="PanelDisplay">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="28"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="36"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>
      <Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <Viewbox Width="18" Height="20" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
@@ -33,7 +33,7 @@
     <TextBlock x:Name="ModelName" Visibility="Collapsed" Text="On-device dictation"/>
    </Grid>
    <Grid x:Name="CapsuleDisplay" Visibility="Collapsed">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="14"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="28"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>
      <Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="32"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
      <Viewbox Width="17" Height="20" HorizontalAlignment="Left"><Canvas Width="32" Height="32"><Path Data="{StaticResource SonaMark}" Fill="{DynamicResource Accent}"/></Canvas></Viewbox>
@@ -45,7 +45,7 @@
      <Button x:Name="CapsuleStop" Grid.Column="3" Style="{StaticResource OverlayAction}" Padding="6,4" Margin="1,0" Click="Stop_Click" ToolTip="Stop recording" AutomationProperties.Name="Stop recording"><Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" Fill="{DynamicResource Ink}"/></Button>
      <Button Grid.Column="4" Style="{StaticResource OverlayAction}" Padding="6,4" BorderThickness="0" Background="Transparent" Click="Cancel_Click" ToolTip="Cancel dictation (Escape)" AutomationProperties.Name="Cancel dictation"><Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{DynamicResource Muted}" StrokeThickness="1.5"/></Button>
     </Grid>
-    <Grid Grid.Row="1" Margin="25,1,0,0" HorizontalAlignment="Left"><Viewbox Width="96" Height="13" Stretch="Fill" IsHitTestVisible="False"><StackPanel x:Name="CapsuleWave" Height="22" Orientation="Horizontal" VerticalAlignment="Center" AutomationProperties.Name="Measured microphone waveform"/></Viewbox><ProgressBar x:Name="CapsuleBusy" Style="{StaticResource BusyLine}" Width="96" Height="2" VerticalAlignment="Center" AutomationProperties.Name="Preparing draft locally"/></Grid>
+    <Grid Grid.Row="1" Margin="25,1,0,0" HorizontalAlignment="Left"><Viewbox Width="176" Height="26" Stretch="Fill" IsHitTestVisible="False"><StackPanel x:Name="CapsuleWave" Height="22" Orientation="Horizontal" VerticalAlignment="Center" AutomationProperties.Name="Measured microphone waveform"/></Viewbox><ProgressBar x:Name="CapsuleBusy" Style="{StaticResource BusyLine}" Width="176" Height="2" VerticalAlignment="Center" AutomationProperties.Name="Preparing draft locally"/></Grid>
     <TextBlock x:Name="CapsuleHint" Grid.Row="2" Visibility="Collapsed" FontSize="10.5" Foreground="{DynamicResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
    </Grid>
    <StackPanel Grid.Row="1" Margin="0,7,0,0" x:Name="TranscriptArea" Visibility="Collapsed">

@@ -170,7 +170,7 @@ public partial class Overlay : Window
             var duration = target > displayed[i] ? .065 : .17;
             displayed[i] += (target - displayed[i]) * (1 - Math.Exp(-dt / duration));
             if (displayed[i] < .001) displayed[i] = 0;
-            panelBars[i].Height = 3 + displayed[i] * 22;
+            panelBars[i].Height = 3 + displayed[i] * 29;
             capsuleBars[i].Height = 3 + displayed[i] * 19;
         }
     }
