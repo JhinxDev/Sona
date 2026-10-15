@@ -23,7 +23,7 @@ Source preview; no public binary release yet.
 - Smaller translucent recording displays with bounded recent phrases, installed
   app icons and quiet unknown-focus states. The capsule retains a readable
   waveform and removes the Open draft button and provisional-text label.
-- Recording indicator and square red Stop, integrated padded transcript inset,
+- Recording indicator and neutral square Stop, integrated padded transcript inset,
   and a decibel waveform scale that preserves speech dynamics instead of
   saturating early. Verified with prerecorded speech through the real recognizer.
 - Softer original cues for opening, recording, draft readiness and explicit Enter,

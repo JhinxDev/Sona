@@ -88,7 +88,7 @@ showing the recent phrases directly below the waveform. Panel keeps the label.
 ## Recording indicator and real-audio waveform refinement
 
 The recording state reads Recording, with a red semantic Danger-colored dot
-(7 DIP in Capsule, 8 DIP in Panel) and matching square Stop glyph/border. Stop
+(7 DIP in Capsule, 8 DIP in Panel) and a neutral square Stop glyph/border. Stop
 still finishes recording; it is never Pause. The dot breathes between 0.64 and
 1 opacity over 1.8 seconds only during recording. Reduced motion and high
 contrast use a static dot; high contrast uses the system semantic brush.

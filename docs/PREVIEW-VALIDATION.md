@@ -185,7 +185,7 @@ foreground change or real message submission was used to produce those images.
 
 ## Recording refinement from trailer review
 
-The affected native display fixture passes 49 checks, including distinct speech
+The affected native display fixture passes 51 checks, including distinct speech
 amplitudes, silence, explicit recording state, Stop invocation, bounded inset text,
 and no empty completion inset. A new maintained real-audio fixture passes 11
 checks through Recorder, the real MainWindow live polling and Whisper Turbo,

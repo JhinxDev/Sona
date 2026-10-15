@@ -68,6 +68,8 @@ internal static class OverlayVisualFixture
                                 Check(Overlay.MapLevel(0) == 0 && Overlay.MapLevel(.002) == 0 && Overlay.MapLevel(double.NaN) == 0, display + " silence and invalid levels stay flat");
                                 Check(Overlay.MapLevel(.02) < Overlay.MapLevel(.05) && Overlay.MapLevel(.05) < Overlay.MapLevel(.12) && Overlay.MapLevel(.12) < 1, display + " ordinary speech levels retain distinct amplitudes without early saturation");
                                 Check(((TextBlock)overlay.FindName(display + "Label")).Text == "Recording" && ((Ellipse)overlay.FindName(display + "RecordingDot")).Visibility == Visibility.Visible, display + " explicitly identifies recording with a dot and label");
+                                var stopButton = (Button)overlay.FindName(display + "Stop");
+                                Check(ReferenceEquals(((Rectangle)stopButton.Content).Fill, app.Resources["Ink"]), display + " Stop stays neutral so red is reserved for recording");
                                 var stopCount = 0; overlay.StopRequested += () => stopCount++;
                                 ((Button)overlay.FindName(display + "Stop")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                                 Check(stopCount == 1, display + " square Stop invokes stop exactly once");

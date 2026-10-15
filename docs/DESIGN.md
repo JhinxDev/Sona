@@ -7,7 +7,7 @@ feedback, a 272 DIP capsule and 320 DIP panel. The capsule waveform is 176 × 26
 DIP and the panel waveform is 36 DIP tall. Recent transcript text is bounded;
 Open draft and the provisional stage label appear only in the panel. Recording
 uses a 7/8 DIP semantic red dot with a gentle 1.8-second opacity breath (static
-under reduced motion/high contrast), a Recording label and red square Stop.
+under reduced motion/high contrast), a Recording label and neutral square Stop.
 The transcript uses an Inset brush, radius 10 and padding 8 horizontal/7 vertical.
 Waveform levels use a -54 to -12 dB scale, 60 ms samples and 35/95 ms attack/release.
 This replaces the earlier linear mapper that saturated above .052 RMS.
