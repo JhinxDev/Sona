@@ -27,7 +27,7 @@ the workflow. The trailer includes AI-assisted narration, music and background a
 
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
-uses simulated audio levels. [Capture details](docs/images/README.md).
+replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
 
 ## New in 0.4.2
 
@@ -45,7 +45,10 @@ uses simulated audio levels. [Capture details](docs/images/README.md).
 
 [Full changelog](CHANGELOG.md) · [Drafts, corrections and Enter-to-send](docs/PERSONALIZATION.md)
 
-![Compact Sona capsule with Discord app identity, waveform and recent phrases](docs/images/sona-capsule-042.png)
+<img src="docs/images/sona-capsule-glass-042.png" width="408" alt="Sona recording capsule with a red recording dot, neutral Stop and inset transcript" />
+
+The capsule above is a native UI replay of measured prerecorded speech, using
+actual recognition timing. It does not show a live microphone or chat submission.
 
 ## Everyday dictation
 
