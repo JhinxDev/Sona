@@ -34,6 +34,13 @@ Source preview; no public binary release yet.
 - Clear Discord connection status and Connect/Disconnect controls, preserving
   credentials and restoring owned voice changes before disconnecting.
 
+### Daily-use repair
+
+- Fixed Ctrl + Windows appearing to do nothing when Discord was closed and call
+  protection was enabled: the protection preparation step had rejected recording
+  before the capsule appeared. Closed desktop Discord now permits dictation;
+  an open but unprotectable Discord connection still blocks protected recording.
+
 ### Qualification and limits
 
 The owner confirmed Enter-to-send in Codex on build `aa8b429e480b`, source

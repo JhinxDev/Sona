@@ -20,16 +20,35 @@ internal sealed class ProtectionService : IAsyncDisposable
     private int failures;
     private readonly Func<IReadOnlyList<string>, HashSet<string>> scan;
     private readonly bool production;
+    private readonly Func<bool> isDiscordRunning;
     public string Status { get; private set; } = "Off";
     public bool Paused => controller.Paused;
     public bool Connected => transport.Connected;
     public bool OwnsChanges => controller.OwnsChanges;
     public bool ConnectionSuppressed => connectionSuppressed;
-    public ProtectionService(ProtectedCredentials vault, string pipePrefix = "discord-ipc-", Func<IReadOnlyList<string>, HashSet<string>>? scan = null)
+    public ProtectionService(ProtectedCredentials vault, string pipePrefix = "discord-ipc-", Func<IReadOnlyList<string>, HashSet<string>>? scan = null, Func<bool>? isDiscordRunning = null)
     {
         transport = new(vault, pipePrefix); controller = new(transport); this.scan = scan ?? MicrophoneSources.Scan; production = pipePrefix == "discord-ipc-";
+        this.isDiscordRunning = isDiscordRunning ?? (production ? DiscordProcessRunning : () => true);
         transport.VoiceChanged += () => Interlocked.Exchange(ref changed, 1);
     }
+    private static bool DiscordProcessRunning()
+    {
+        try
+        {
+            foreach (var name in new[] { "Discord", "DiscordPTB", "DiscordCanary", "DiscordDevelopment" })
+            {
+                var processes = Process.GetProcessesByName(name);
+                var running = processes.Length > 0;
+                foreach (var process in processes) process.Dispose();
+                if (running) return true;
+            }
+            return false;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or System.Security.SecurityException)
+        { throw new IOException("Discord process state is unavailable. Check call protection before recording.", ex); }
+    }
+    private bool DiscordClosed() => !transport.Connected && !isDiscordRunning();
     public void Start() => loop = PollAsync();
     public async Task ConfigureAsync(Preferences settings, CancellationToken cancellation)
     {
@@ -108,6 +127,12 @@ internal sealed class ProtectionService : IAsyncDisposable
                 return;
             }
             if (!enabled || controller.Paused) return;
+            if (DiscordClosed())
+            {
+                if (controller.OwnsChanges) throw new IOException("Discord restoration needs retry before recording.");
+                // Retain the source so protection can engage if Discord opens mid-dictation.
+                ownRecording = true; Status = "Discord closed · dictation available"; return;
+            }
             if (!transport.Connected) await ConnectUnderGateAsync(false, cancellation);
             ownRecording = true;
             await controller.SetSourcesAsync(Sources(), cancellation);
@@ -119,7 +144,7 @@ internal sealed class ProtectionService : IAsyncDisposable
     public async Task EndOwnRecordingAsync(CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try { ownRecording = false; if (connectionSuppressed) { Status = "Disconnected"; return; } if (enabled || controller.OwnsChanges) { await controller.SetSourcesAsync(Sources(), cancellation); Status = controller.Status; } }
+        try { ownRecording = false; if (connectionSuppressed) { Status = "Disconnected"; return; } if (!transport.Connected && !controller.OwnsChanges) { Status = DiscordClosed() ? "Discord closed · dictation available" : "Discord protection unavailable; reconnect from Settings"; return; } if (enabled || controller.OwnsChanges) { await controller.SetSourcesAsync(Sources(), cancellation); Status = controller.Status; } }
         finally { gate.Release(); }
     }
     public async Task PauseAsync(bool pause, CancellationToken cancellation)
@@ -144,6 +169,11 @@ internal sealed class ProtectionService : IAsyncDisposable
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop.Token); deadline.CancelAfter(TimeSpan.FromSeconds(12));
                 if (!transport.Connected)
                 {
+                    if (DiscordClosed())
+                    {
+                        Status = controller.OwnsChanges ? "Discord restoration needs retry" : "Discord closed · dictation available";
+                        reconnectAfter = DateTime.MinValue; failures = 0; continue;
+                    }
                     if (DateTime.UtcNow < reconnectAfter) continue;
                     await ConnectUnderGateAsync(false, deadline.Token);
                 }

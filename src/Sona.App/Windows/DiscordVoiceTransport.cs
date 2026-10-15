@@ -37,7 +37,7 @@ internal sealed class DiscordVoiceTransport(ProtectedCredentials vault, string p
             catch (TimeoutException) { candidate.Dispose(); }
             catch (IOException) { candidate.Dispose(); }
         }
-        if (pipe == null) throw new IOException("Discord is not running.");
+        if (pipe == null) throw new IOException("Discord connection is unavailable. Open Discord or reconnect call protection from Settings.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(TimeSpan.FromSeconds(8));
         await WriteFrameAsync(0, JsonSerializer.SerializeToElement(new { v = 1, client_id = credentials.ClientId }), deadline.Token);
         var ready = await ReadFrameAsync(deadline.Token);

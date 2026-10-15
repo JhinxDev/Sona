@@ -87,3 +87,27 @@ Reproduce with the README's isolated SDK environment:
 
 Use a fresh evidence path. The fixture creates its own synthetic profile and
 encrypted fixture setup, and closes the test window and fake pipe afterward.
+
+
+## Dictating while Discord is closed
+
+Enabled call protection no longer requires the desktop Discord app to be open
+before Sona can record. When no Discord, DiscordPTB, DiscordCanary or
+DiscordDevelopment process is running, dictation starts without an RPC connection
+or credential read. Protection remains enabled; its polling loop can reconnect
+and protect the retained recording source if Discord opens during dictation.
+It cannot promise instantaneous protection during an app launch or connection
+failure, so the connection status remains meaningful.
+
+If Discord is running but its connection/authorization is unavailable, protected
+recording still waits for a working connection or an explicit user decision to
+pause/disconnect protection. Unknown process state or pending owned restoration
+never silently bypasses the guard. The no-IPC error now describes an unavailable
+connection instead of assuming the process is absent.
+
+The defect was reproduced as “Discord is not running” at the real protection
+admission boundary. Eleven maintained closed/reopen/blocked-state checks, ten
+existing disconnect checks and eight isolated native start/cancel checks pass.
+The native fixture reaches Recording through the actual MainWindow preparation
+path using fake capture only; no live microphone, physical shortcut, message or
+real Discord call is exercised by these checks.
