@@ -10,6 +10,7 @@
  </Window.Resources>
  <Border x:Name="Shell" CornerRadius="24" BorderBrush="{DynamicResource OverlayEdge}" BorderThickness="1" Background="{DynamicResource OverlaySurface}" Padding="20" Margin="4">
   <Grid>
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
    <Grid x:Name="PanelDisplay">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="68"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>
@@ -48,6 +49,11 @@
     <Viewbox Grid.Row="1" Width="112" Height="20" Margin="33,2,0,2" HorizontalAlignment="Left" Stretch="Fill" IsHitTestVisible="False"><StackPanel x:Name="CapsuleWave" Height="30" Orientation="Horizontal" VerticalAlignment="Center" AutomationProperties.Name="Measured microphone waveform"/></Viewbox>
     <TextBlock x:Name="CapsuleHint" Grid.Row="2" Visibility="Collapsed" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
    </Grid>
+   <StackPanel Grid.Row="1" Margin="0,10,0,0" x:Name="TranscriptArea" Visibility="Collapsed">
+    <TextBlock x:Name="TranscriptStage" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Muted}"/>
+    <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,7,0,0"><TextBlock x:Name="LiveTranscript" TextWrapping="Wrap" FontSize="14" AutomationProperties.Name="Provisional local transcript"/></ScrollViewer>
+    <Button x:Name="ReviewDraft" Content="Open draft" Click="Review_Click" Style="{StaticResource OverlayAction}" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Review or edit in Sona. Automatic insertion is stopped when focus changes."/>
+   </StackPanel>
   </Grid>
  </Border>
 </Window>

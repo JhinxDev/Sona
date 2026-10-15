@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.0.** Build from source below. There is no published binary
+**Early preview: 0.4.1.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -38,10 +38,18 @@ Sona window title; recording is disabled in this profile.
   to submit a message; you review and send it yourself.
 - **Keep control of your words.** Home retains the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
-  into a different field. Clipboard backup is optional. The recording display
+  into a different field. Click the destination composer before recording;
+  hovering over a chat does not select a text field. A retained-draft notice opens
+  review/copy, and Ctrl+Alt+Shift+V inserts a ready draft into a newly focused field
+  when that shortcut is available. Clipboard backup is optional. The recording display
   identifies the active app using its installed icon where available. A focus
   change during recording keeps the original destination and shows that the
   draft will stay in Sona.
+- **See a live draft.** Enable Show live transcription in Settings and save.
+  Local audio snapshots update provisional text every few seconds while you speak.
+  Final recognition and optional cleanup run after stopping. Open draft to edit;
+  your edits stay protected and the final cleaned suggestion remains separate.
+  Partial text is never automatically typed into another app.
 - **Choose local recognition.** NVIDIA Parakeet v3 and six Whisper models
   offer CPU or NVIDIA CUDA options. Explicit downloads use pinned sizes and
   hashes. Selected and actually loaded models are shown separately.

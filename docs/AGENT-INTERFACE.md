@@ -108,3 +108,7 @@ implements tools and ping, not resources, sampling or remote HTTP transport.
 instance without a microphone, global input or actual Discord connection.
 `-DownloadTiny` adds one explicit pinned download and selection pilot. Isolation
 uses `SONA_DATA`; normal clients must omit that test-only override.
+
+The settings interface also accepts `liveTranscription` (boolean, default false).
+Status includes the running module `buildId` and `preferencesLoad` result. These
+contain no transcript or filesystem path. Live text remains local to the UI.

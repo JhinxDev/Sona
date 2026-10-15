@@ -8,6 +8,7 @@ namespace Sona.App;
 
 public partial class MainWindow
 {
+    internal Func<string, CancellationToken, Task<string>>? CleanupForTests { get; set; }
     private readonly CleanupModel cleanupModel = new();
     private Task cleanupPreparation = Task.CompletedTask;
     private Task cleanupInstallOperation = Task.CompletedTask;
@@ -82,6 +83,7 @@ public partial class MainWindow
         var fallback = TextPipeline.Apply(original, preferences);
         var snippet = preferences.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
         if (!preferences.CleanupEnabled || preferences.Style == "Verbatim" || snippet) return new(fallback, false);
+        if (arguments.Contains("--test-ui") && CleanupForTests != null) return new(await CleanupForTests(original, token), true);
         if (!cleanupModel.AvailableFor(preferences)) { CleanupResult.Text = "Local cleanup is not ready. Basic cleanup was used."; return new(fallback, false); }
         Status.Text = "Polishing your draft"; StatusDetail.Text = "Cleaning up locally. Esc still cancels."; overlay.Update("Polishing", "Esc cancels");
         try

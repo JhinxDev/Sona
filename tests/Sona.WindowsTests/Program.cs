@@ -5,6 +5,9 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 3 && args[0] == "--live-speech-fixture") { BoundedProcess.ContainApplication(); Console.WriteLine(JsonSerializer.Serialize(await LiveSpeechFixture.RunAsync(args[1], args[2]))); return; }
+if (args.Length == 2 && args[0] == "--live-draft-fixture") { Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(LiveDictationFixture.Run(args[1]))); return; }
+if (args.Length == 1 && args[0] == "--insertion-fixture") { Console.WriteLine($"{await InsertionChecks.RunAsync()} insertion checks passed."); return; }
 if (args.Length == 1 && args[0] == "--presentation-fixture")
 {
     var report = ThemeMaterialFixture.RunPresentation();

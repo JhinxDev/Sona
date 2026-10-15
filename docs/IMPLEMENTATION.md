@@ -1,5 +1,7 @@
 # Local dictation implementation gates
 
+Current daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
+
 The primary owner executes the tightly coupled app work. The notification diagnosis is an independent read-only worker. Existing owners retain Hush, Tool Shed, shared catalogs and Vault Git control.
 
 1. Build `Sona.Core` for text transformation, original preservation and a single session state machine. Run the executable regression harness in `tests/Sona.Tests`.
@@ -10,7 +12,7 @@ The primary owner executes the tightly coupled app work. The notification diagno
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Create reviewed private Git history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current candidate identity is Sona 0.4.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current candidate identity is Sona 0.4.1; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 Parakeet qualification uses `Sona.WindowsTests --speech-fixture <corpus> <fresh
 JSON> <pinned CUDA ZIP> <pinned CPU ZIP>` and `--speech-memory-fixture <fresh JSON>`.

@@ -14,6 +14,7 @@ public partial class MainWindow
         if (preparedInsertionTest || string.IsNullOrWhiteSpace(Draft.Text) || Draft.Text.Length > 6000 || Original.Text.Length > 6000) return;
         var index = historyEntries.FindIndex(x => x.Id == historySelection);
         if (index >= 0) { historyEntries[index] = historyEntries[index] with { Original = Original.Text, Draft = Draft.Text }; SaveHistory(); RefreshHistory(); return; }
+        if (historyEntries.Any(x => x.Original == Original.Text && x.Draft == Draft.Text)) return;
         var retained = new DictationSession(); retained.Begin(); retained.Stop(); retained.Complete(Original.Text, Draft.Text);
         if (session?.State == SessionState.Inserted) retained.MarkInserted();
         AddHistory(retained);
@@ -73,7 +74,7 @@ public partial class MainWindow
         cancellation?.Cancel(); preparedInsertionTest = insertionTestHolding = false; target = null;
         session = new(); session.Begin(); session.Stop(); session.Complete(item.Original, item.Draft);
         if (item.Inserted) session.MarkInserted();
-        historySelection = item.Id; Render(session); Pages.SelectedIndex = 0;
+        ResetLiveReview(); historySelection = item.Id; Render(session); Pages.SelectedIndex = 0;
         Status.Text = "History draft opened"; StatusDetail.Text = "Review or copy this text. It was not inserted automatically.";
     }
     private void ClearHistory_Click(object sender, RoutedEventArgs e)

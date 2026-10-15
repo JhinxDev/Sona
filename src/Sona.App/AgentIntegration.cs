@@ -15,7 +15,7 @@ public partial class MainWindow
         if (shutdownPending) return new(false, Error: "Sona is shutting down.");
         switch (request.Method)
         {
-            case "status": return new(true, new { version = AppVersion.Number, state = recorder != null ? "recording" : processing || preparing || preferencesApplying || cleanupInstalling ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), loadedModel = transcriber.LoadedModel, residentProcessId = transcriber.ResidentProcessId, residentCleanupPending = transcriber.ResidentCleanupPending, downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, cleanupBackend = cleanupModel.LoadedBackend, cleanupProcessId = cleanupModel.ProcessId, cleanupInstalling, cleanupPercent, cleanupOutcome, microphoneControl = false });
+            case "status": return new(true, new { version = AppVersion.Number, buildId = AppVersion.BuildId, preferencesLoad = preferencesLoad.Status.ToString(), liveTranscription = preferences.LiveTranscription, state = recorder != null ? "recording" : processing || preparing || preferencesApplying || cleanupInstalling ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), loadedModel = transcriber.LoadedModel, residentProcessId = transcriber.ResidentProcessId, residentCleanupPending = transcriber.ResidentCleanupPending, downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, cleanupBackend = cleanupModel.LoadedBackend, cleanupProcessId = cleanupModel.ProcessId, cleanupInstalling, cleanupPercent, cleanupOutcome, microphoneControl = false });
             case "settings.get": return new(true, AgentSettings.View(preferences));
             case "settings.patch":
                 if (SettingsBusy) return new(false, Error: "Finish the current dictation before changing settings.");
@@ -32,7 +32,7 @@ public partial class MainWindow
                 catch { await ConfigureProtectionAsync(); throw; }
                 finally { preferencesApplying = false; }
                 preferences.Language = next.Language; preferences.Engine = next.Engine; preferences.Model = next.Model; preferences.ShortcutMode = next.ShortcutMode;
-                preferences.Style = next.Style; preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes; RefreshCleanupChoices(); preferences.Device = next.Device; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CloseToTray = next.CloseToTray;
+                preferences.Style = next.Style; preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes; RefreshCleanupChoices(); preferences.Device = next.Device; preferences.LiveTranscription = next.LiveTranscription; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CloseToTray = next.CloseToTray;
                 preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
                 ThemeManager.Apply(preferences.Theme); ThemeChoice.SelectedItem = ThemeCatalog.Resolve(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay); PanelDisplay.IsChecked = preferences.RecordingDisplay == "Panel"; CapsuleDisplay.IsChecked = !PanelDisplay.IsChecked;
                 SetIdleChoice(preferences.ModelIdleMinutes);
@@ -43,7 +43,7 @@ public partial class MainWindow
                 TranscriptionEngine.SelectedIndex = preferences.Engine == "FastCpu" ? 1 : 0;
                 ShortcutMode.SelectedIndex = preferences.ShortcutMode == "Toggle" ? 1 : 0;
                 DraftStyle.SelectedIndex = preferences.Style == "Verbatim" ? 1 : preferences.Style == "Notes" ? 2 : 0;
-                AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CloseToTray.IsChecked = preferences.CloseToTray;
+                LiveTranscription.IsChecked = preferences.LiveTranscription; AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CloseToTray.IsChecked = preferences.CloseToTray;
                 Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline(); RefreshDevices(); RefreshModelCards();
                 modelPreparation = WarmAllSelectedAsync();
                 return new(true, AgentSettings.View(preferences));

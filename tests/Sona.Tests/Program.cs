@@ -146,6 +146,8 @@ Check(invalidHistory && File.ReadAllText(historyPath) == "{malformed", "Malforme
 preferences = new Preferences { ShortcutMode = "Toggle", KeepHistory = true }; preferences.Save(path);
 Check(Preferences.Load(path).ShortcutMode == "Toggle" && Preferences.Load(path).KeepHistory, "Explicit toggle mode and opt-in history survive reload"); File.Delete(path);
 Check(ModelCatalog.All.Select(m => m.Id).Distinct().Count() == ModelCatalog.All.Count && ModelCatalog.All.All(m => m.Sha256.Length == 64 && m.Bytes > 0 && m.DownloadUrl.Contains(m.Revision)), "Speech model identities pin their provider conversion revision, file size and SHA256");
+LiveDraftChecks.Run(Check);
+PreferenceRecoveryChecks.Run(Check);
 SpeechProtocolChecks.Run(Check);
 SpeechAudioChecks.Run(Check);
 bool InvalidPatch(string json) { try { using var j = System.Text.Json.JsonDocument.Parse(json); AgentSettings.Apply(new(), j.RootElement); return false; } catch (ArgumentException) { return true; } }
@@ -241,7 +243,7 @@ Check(invalidAppearance.Theme == "charcoal" && invalidAppearance.RecordingDispla
 using (var fullSettingsPatch = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(AgentSettings.View(new Preferences()), AgentProtocol.Json)))
 {
     var fullSettings = AgentSettings.Apply(new Preferences(), fullSettingsPatch.RootElement);
-    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete twenty-one-field settings response round trips through a validated agent patch");
+    Check(fullSettings.ModelIdleMinutes == 10 && fullSettings.Theme == "charcoal" && fullSettings.RecordingDisplay == "Capsule", "The complete twenty-two-field settings response round trips through a validated agent patch");
 }
 using (var clipboardPatch = System.Text.Json.JsonDocument.Parse("{\"copyToClipboard\":true}"))
 {

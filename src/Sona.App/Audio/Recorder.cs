@@ -53,6 +53,22 @@ public sealed class Recorder : IDisposable
         stopped.TrySetException(new IOException(message, cause)); _ = stopped.Task.Exception;
         UnexpectedStop?.Invoke(message);
     }
+    // Independent, bounded in-memory copy. Never pauses or restarts capture.
+    // A quiet buffer yields no recognition request, avoiding silence hallucinations.
+    public byte[]? Snapshot()
+    {
+        lock (gate)
+        {
+            if (disposed || stopRequested || data.Length < 32000) return null;
+            var pcm = data.GetBuffer(); var length = (int)data.Length;
+            double energy = 0;
+            for (var i = 0; i + 1 < length; i += 2) { var sample = BitConverter.ToInt16(pcm, i) / 32768.0; energy += sample * sample; }
+            if (Math.Sqrt(energy / (length / 2)) < .002) return null;
+            using var wav = new MemoryStream();
+            using (var writer = new WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(wav), new WaveFormat(16000, 16, 1))) writer.Write(pcm, 0, length);
+            return wav.ToArray();
+        }
+    }
     public async Task<byte[]> StopAsync()
     {
         IWaveIn? capture; lock (gate) { ObjectDisposedException.ThrowIf(disposed, this); stopRequested = true; capture = input; }

@@ -1,5 +1,27 @@
 # Preview validation
 
+## October 15 daily-use candidate, 0.4.1
+
+The affected pass has 311 core checks, 8 focused insertion checks, 27 isolated
+native live-draft pipeline checks, 12 native theme save/relaunch checks, six
+profile-recovery checks, 19 agent-interface checks, 31 active-target checks and a
+four-check actual Parakeet audio-snapshot replay. The native pipeline uses fake
+capture and recognition, with delayed cleanup and cancellation. The real engine
+replay uses an existing licensed WAV and fake capture; it returns provisional
+text before stopping, then final text, clears audio copies and unloads its worker.
+These are separate forms of evidence, not physical microphone or Discord proof.
+
+Two initial native live-fixture runs reached their functional assertions but
+timed out because the custom test application's Dispatcher.Run loop was not
+explicitly stopped after Application.Exit. The repaired fixture exits cleanly.
+No production process was closed, input injected, clipboard changed or microphone
+started. The first focus regression failed before the filter repair and passed
+afterward. The owner's exact earlier Charcoal reset remains unproven; failed
+settings-load overwrite is a repaired independently reproduced failure mode.
+
+[Daily-use behavior and remaining acceptance](DAILY-USE.md).
+
+
 Sona 0.4.0 is an early source preview. The implementation was independently
 reviewed on October 13, 2026. Publishing the source does not turn fixture results
 into personal microphone or target-app acceptance.

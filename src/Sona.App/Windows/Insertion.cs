@@ -9,22 +9,36 @@ public sealed class Insertion : IDisposable
     private long focusEpoch;
     private readonly WinEventDelegate callback;
     private readonly nint hook;
+    private readonly nint foregroundHook;
+    private readonly WinEventDelegate? foregroundCallback;
     private readonly Func<DraftTarget?>? readTarget;
     private readonly Func<bool>? readModifiers;
     private readonly Func<string, uint>? send;
     internal long FocusEpoch => Interlocked.Read(ref focusEpoch);
-    public Insertion() { callback = (_, _, _, _, _, _, _) => Interlocked.Increment(ref focusEpoch); hook = SetWinEventHook(0x8005, 0x8005, 0, callback, 0, 0, 0); }
+    public Insertion() { callback = (_, _, hwnd, _, _, _, _) => ObserveFocusEvent(GetAncestor(hwnd, 2), GetForegroundWindow()); hook = SetWinEventHook(0x8005, 0x8005, 0, callback, 0, 0, 0); foregroundCallback = (_, _, _, _, _, _, _) => Interlocked.Increment(ref focusEpoch); foregroundHook = SetWinEventHook(3, 3, 0, foregroundCallback, 0, 0, 0); }
     internal Insertion(Func<DraftTarget?> readTarget, Func<bool> readModifiers, Func<string, uint> send) { callback = (_, _, _, _, _, _, _) => { }; this.readTarget = readTarget; this.readModifiers = readModifiers; this.send = send; }
+    internal void ObserveFocusEvent(nint eventRoot, nint foreground)
+    {
+        // Accessibility providers can report focus inside a background window.
+        // That is not a change to the user's foreground destination. Unknown
+        // events still invalidate capture, as do all foreground field changes.
+        if (eventRoot == 0 || foreground == 0 || eventRoot == foreground)
+            Interlocked.Increment(ref focusEpoch);
+    }
+    [DllImport("user32.dll")] private static extern nint GetAncestor(nint hwnd, uint flags);
     public DraftTarget? Capture()
     {
         if (readTarget != null) return readTarget();
         try
         {
-            if (hook == 0) return null;
+            if (hook == 0 || foregroundHook == 0) return null;
             var element = AutomationElement.FocusedElement;
             if (element == null || element.Current.ProcessId == Environment.ProcessId || element.Current.IsPassword || !element.Current.IsEnabled) return null;
             if (element.Current.ControlType != ControlType.Edit && element.Current.ControlType != ControlType.Document) return null;
-            return new(GetForegroundWindow(), element.Current.ProcessId, element.GetRuntimeId(), Interlocked.Read(ref focusEpoch));
+            var window = GetForegroundWindow();
+            if (window == 0 || GetWindowThreadProcessId(window, out var process) == 0 || process != element.Current.ProcessId) return null;
+            if (element.TryGetCurrentPattern(ValuePattern.Pattern, out var value) && ((ValuePattern)value).Current.IsReadOnly) return null;
+            return new(window, element.Current.ProcessId, element.GetRuntimeId(), Interlocked.Read(ref focusEpoch));
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException) { return null; }
     }
@@ -64,12 +78,13 @@ public sealed class Insertion : IDisposable
         var sent = send != null ? send(text) : SendInput((uint)input.Length, input, Marshal.SizeOf<Input>());
         if (sent == 0) return (false, "Windows blocked insertion. Check that the destination is not running as administrator.");
         if (sent != input.Length) return (true, "Windows accepted only part of the input. Check your draft; automatic retry is disabled to prevent duplicates.");
-        return (true, "Typed into the captured field. Nothing was submitted.");
+        return (true, "Text sent to the captured field. Check the result; nothing was submitted.");
     }
     private bool ModifiersDown() => readModifiers?.Invoke() ?? new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }.Any(k => (GetAsyncKeyState(k) & 0x8000) != 0);
-    public void Dispose() { if (hook != 0) UnhookWinEvent(hook); }
+    public void Dispose() { if (hook != 0) UnhookWinEvent(hook); if (foregroundHook != 0) UnhookWinEvent(foregroundHook); }
     private delegate void WinEventDelegate(nint hook, uint evt, nint hwnd, int objectId, int childId, uint thread, uint time);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hwnd, out uint process);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] private static extern nint SetWinEventHook(uint min, uint max, nint module, WinEventDelegate callback, uint process, uint thread, uint flags);
     [DllImport("user32.dll")] private static extern bool UnhookWinEvent(nint hook);

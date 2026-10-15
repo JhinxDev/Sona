@@ -165,6 +165,14 @@ public partial class Overlay : Window
         for (var i = 0; i < SampleCount; i++) panelBars[i].Height = capsuleBars[i].Height = 3;
     }
 
+    public event Action? ReviewRequested;
+    public void UpdateTranscript(string text, string stage)
+    {
+        LiveTranscript.Text = text; TranscriptStage.Text = stage;
+        TranscriptArea.Visibility = string.IsNullOrEmpty(stage) ? Visibility.Collapsed : Visibility.Visible;
+    }
+    public void SetReviewAction(bool visible) => TranscriptArea.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    private void Review_Click(object sender, RoutedEventArgs e) => ReviewRequested?.Invoke();
     private void Stop_Click(object sender, RoutedEventArgs e) => StopRequested?.Invoke();
     private void Cancel_Click(object sender, RoutedEventArgs e) => CancelRequested?.Invoke();
     [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }

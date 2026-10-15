@@ -3,8 +3,18 @@ namespace Sona.Core;
 
 public sealed record Replacement(string Spoken, string Written);
 public sealed record Snippet(string Trigger, string Expansion);
+public enum PreferencesLoadStatus { Missing, Loaded, Unavailable }
+public sealed record PreferencesLoadResult(Preferences Value, PreferencesLoadStatus Status, string? Message = null)
+{
+    public bool CanSave => Status != PreferencesLoadStatus.Unavailable;
+}
 public sealed class Preferences
 {
+    // Guard the destination, not just this object: UI saves use JSON-cloned candidates.
+    private static readonly object persistenceGate = new();
+    private static readonly HashSet<string> unavailablePaths = new(StringComparer.OrdinalIgnoreCase);
+    private const string RecoveryMessage = "Saved preferences could not be read. Temporary defaults are in use. Your saved file is preserved; restore access or repair the file, then restart Sona before saving settings.";
+    public bool LiveTranscription { get; set; }
     public string Language { get; set; } = "auto";
     public string Engine { get; set; } = "Auto";
     public string Model { get; set; } = "auto";
@@ -32,12 +42,33 @@ public sealed class Preferences
     public List<string> Terms { get; set; } = [];
     public List<Replacement> Vocabulary { get; set; } = [new("codex", "Codex"), new("jhinx", "Jhinx"), new("github", "GitHub"), new("next cloud", "Nextcloud"), new("power shell", "PowerShell")];
     public List<Snippet> Snippets { get; set; } = [new("review my changes", "Review the current changes for correctness, accessibility, and regressions. Preserve unrelated work.")];
-    public static Preferences Load(string path)
+    public static Preferences Load(string path) => LoadWithStatus(path).Value;
+    public static PreferencesLoadResult LoadWithStatus(string path)
     {
-        if (!File.Exists(path)) return new();
-        try { var settings = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? new(); settings.Normalize(); return settings; }
-        catch (Exception ex) when (ex is JsonException or IOException) { return new(); }
+        var fullPath = Path.GetFullPath(path);
+        lock (persistenceGate)
+        {
+            try
+            {
+                var settings = ReadExisting(fullPath);
+                settings.Normalize();
+                unavailablePaths.Remove(fullPath);
+                return new(settings, PreferencesLoadStatus.Loaded);
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                unavailablePaths.Remove(fullPath);
+                return new(new(), PreferencesLoadStatus.Missing);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                unavailablePaths.Add(fullPath);
+                return new(new(), PreferencesLoadStatus.Unavailable, RecoveryMessage);
+            }
+        }
     }
+    private static Preferences ReadExisting(string path) =>
+        JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? throw new JsonException("Preferences must be an object.");
     public void Normalize()
     {
         if (Language is not ("auto" or "en" or "fr")) Language = "auto";
@@ -61,8 +92,32 @@ public sealed class Preferences
     }
     public void Save(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(path + ".tmp", path, true);
+        var fullPath = Path.GetFullPath(path);
+        lock (persistenceGate)
+        {
+            if (unavailablePaths.Contains(fullPath)) throw new IOException(RecoveryMessage);
+            // Detect a file that became unreadable after startup before replacing it.
+            // Do not use File.Exists: it also returns false on access failures.
+            try { _ = ReadExisting(fullPath); }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                unavailablePaths.Add(fullPath);
+                throw new IOException(RecoveryMessage, ex);
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            var temporary = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+                File.Move(temporary, fullPath, true);
+            }
+            finally
+            {
+                // Remove only this write's incomplete candidate; never the saved profile.
+                try { File.Delete(temporary); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+        }
     }
 }

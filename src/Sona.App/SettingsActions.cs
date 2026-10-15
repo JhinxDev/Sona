@@ -21,7 +21,7 @@ public partial class MainWindow
         next.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
         next.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
         next.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
-        next.AutoInsert = AutoInsert.IsChecked == true; next.CopyToClipboard = CopyToClipboard.IsChecked == true;
+        next.LiveTranscription = LiveTranscription.IsChecked == true; next.AutoInsert = AutoInsert.IsChecked == true; next.CopyToClipboard = CopyToClipboard.IsChecked == true;
         next.CheckForUpdates = CheckUpdates.IsChecked == true; next.CloseToTray = CloseToTray.IsChecked == true;
         next.Startup = StartWithWindows.IsChecked == true; next.KeepHistory = KeepHistory.IsChecked == true;
         next.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
@@ -36,7 +36,7 @@ public partial class MainWindow
     {
         foreach (var choice in new[] { SpeechLanguage, TranscriptionEngine, DraftStyle, Device, ShortcutMode, CleanupToneChoice, CleanupEngineChoice, CleanupIdleChoice, ThemeChoice })
             choice.SelectionChanged += (_, _) => RefreshSettingsActions();
-        foreach (var choice in new[] { AutoInsert, CopyToClipboard, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
+        foreach (var choice in new[] { LiveTranscription, AutoInsert, CopyToClipboard, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
         { choice.Checked += (_, _) => RefreshSettingsActions(); choice.Unchecked += (_, _) => RefreshSettingsActions(); }
         PanelDisplay.Checked += (_, _) => RefreshSettingsActions(); CapsuleDisplay.Checked += (_, _) => RefreshSettingsActions();
         ProtectionEnabled.Checked += (_, _) => RefreshSettingsActions(); ProtectionEnabled.Unchecked += (_, _) => RefreshSettingsActions();

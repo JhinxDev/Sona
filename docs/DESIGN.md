@@ -1,5 +1,26 @@
 # Sona design
 
+October 15, 0.4.1 daily-use wave: the existing Amethyst and glass palette values
+are unchanged. Home adds a wrapping 12 DIP draft-state line below Latest draft:
+Live raw / provisional, final raw, cleaned, or manual edits protected. Editing
+freezes the editable text against later recognition and cleanup. The final cleanup
+suggestion is a separate expander with an explicit Use cleaned suggestion action.
+It is scoped to one session and cleared when opening another draft.
+
+Optional live text appears below either recording display in a 140 DIP bounded
+scroll area, with 14 DIP text and an 11 DIP provisional-state label. Open draft is
+an explicit action that activates Home for editing; automatic overlay updates
+remain nonactivating. Retained results show a 12-second review notice with the
+explicit insertion shortcut. No partial external typing or animated fake stream.
+Settings adds the opt-in checkbox and local snapshot explanation. About displays
+the running module build ID and actual preferences location/load status. Failed
+preference loads show a recovery warning and preserve the existing file.
+
+Verified: isolated WPF normal/compact captures, native theme save/relaunch, and
+synthetic recording pipeline. Real microphone, Discord insertion and owner visual
+acceptance remain open. See DAILY-USE.md for behavior and proof boundaries.
+
+
 October 14, final shared-glass polish: reading surfaces and controls keep crisp
 foreground text without WPF drop shadows. Checked radio and switch states have
 distinct geometry and color; disabled buttons use a readable neutral surface.
