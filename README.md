@@ -1,6 +1,6 @@
 # Sona
 
-**Local voice dictation for Windows. Speak, review the text, and send it yourself.**
+**Local voice dictation for Windows. Your voice, your words, on your PC.**
 
 Sona turns speech into text in your focused app using Parakeet or Whisper on
 your own computer. Keep a model warm for quick reuse, polish wording locally,
@@ -17,17 +17,35 @@ welcome.
 
 [![Watch the Sona trailer: voice to text on your PC](docs/images/sona-trailer.jpg)](https://www.youtube.com/watch?v=3XNpPcDO-kI)
 
-**[Watch the 4K trailer on Jhinx Dev](https://www.youtube.com/watch?v=3XNpPcDO-kI).**
-Actual Sona captures use demo text; the Codex and Discord sequences illustrate
+**[Watch the original 4K trailer on Jhinx Dev](https://www.youtube.com/watch?v=3XNpPcDO-kI).**
+The trailer shows the earlier 0.4.0 interface. Actual Sona captures use demo text; the Codex and Discord sequences illustrate
 the workflow. The trailer includes AI-assisted narration, music and background art.
 
 ## The app
 
-![Sona with a sample editable draft](docs/images/sona-home.png)
+![Sona 0.4.2 with an editable draft and save, correction review and export actions](docs/images/sona-home-042.png)
 
-The native screenshots below share the same Amethyst theme, window size and
-isolated demonstration profile. They show the real 0.4.0 interface with a normal
-Sona window title; recording is disabled in this profile.
+These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
+isolated demo profiles with synthetic text and no live microphone. The capsule
+uses simulated audio levels. [Capture details](docs/images/README.md).
+
+## New in 0.4.2
+
+- **Finish, then paste once.** Final recognition and cleanup complete before the
+  whole draft reaches your original field. Optional Enter-to-send finishes
+  hands-free recording and submits after verifying the inserted text.
+- **Keep corrections that matter.** Save and export individual drafts; approve
+  short spelling corrections as removable Vocabulary rules.
+- **A quieter recording display.** A compact translucent capsule shows the app,
+  a larger waveform and only the latest phrases, with no draft button or raw-text label.
+- **Less hunting through settings.** Seven settings sections, compact Whisper and
+  Parakeet cards, clear Discord connection controls and optional soft sound cues.
+- **Manage growing history.** Browse by day and clear a chosen date range after
+  reviewing its count. Explicitly saved drafts stay separate.
+
+[Full changelog](CHANGELOG.md) · [Drafts, corrections and Enter-to-send](docs/PERSONALIZATION.md)
+
+![Compact Sona capsule with Discord app identity, waveform and recent phrases](docs/images/sona-capsule-042.png)
 
 ## Everyday dictation
 
@@ -49,13 +67,15 @@ Sona window title; recording is disabled in this profile.
   draft will stay in Sona.
 - **See a live draft.** Enable Show live transcription in Settings and save.
   Local audio snapshots update provisional text every few seconds while you speak.
-  Final recognition and optional cleanup run after stopping. Open draft to edit;
+  Final recognition and optional cleanup run after stopping. Open Home to edit;
   your edits stay protected and the final cleaned suggestion remains separate.
   Partial text is never automatically typed into another app.
 - **Hear subtle feedback.** Original short cues mark opening, recording start, a ready draft and an explicit Enter submission. Turn Sound effects off under Settings → General.
 - **Keep useful drafts.** Save original, generated and corrected text locally,
   reopen it in History, or export one draft for review. Approve a proposed spelling
   correction to teach a removable Vocabulary rule. This does not train the speech model.
+  History groups recent dictations by day, with Today, Last 7 days, Last 30 days
+  and specific-day filters. Clearing recent entries preserves explicitly saved drafts.
 - **Choose local recognition.** NVIDIA Parakeet v3 and six Whisper models
   offer CPU or NVIDIA CUDA options. Explicit downloads use pinned sizes and
   hashes. Compact cards are grouped under Whisper and Parakeet, with a green
@@ -89,11 +109,11 @@ opaque and system high-contrast fallbacks preserve readability. Saved Amethyst G
 settings map to Amethyst. New profiles still start with Charcoal.
 
 <details>
-<summary>Settings and local models</summary>
+<summary>Explore the updated settings and model cards</summary>
 
-![Amethyst glass settings in a native demo](docs/images/sona-amethyst-glass.png)
+![Seven settings sections and optional sound feedback in Sona 0.4.2](docs/images/sona-settings-042.png)
 
-![Parakeet and Whisper model choices in the same theme](docs/images/sona-models.png)
+![Compact Whisper cards with separate Parakeet navigation and a green active-family indicator](docs/images/sona-models-042.png)
 
 </details>
 
@@ -210,8 +230,9 @@ For the maintained regression checks, from the same PowerShell session:
 & $sonaDotnet run --project .\tests\Sona.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
 ```
 
-These checks do not establish real microphone, target-app insertion or call
-acceptance. [Preview validation](docs/PREVIEW-VALIDATION.md) ·
+The owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2
+build on October 15, 2026. That is one target-app smoke test; the automated checks
+do not establish broad microphone, other-app or live-call acceptance. [Preview validation](docs/PREVIEW-VALIDATION.md) ·
 [Contributing](CONTRIBUTING.md) · [Verification](docs/VERIFICATION.md) ·
 [Design](docs/DESIGN.md) · [Implementation](docs/IMPLEMENTATION.md) ·
 [Alternatives](docs/ALTERNATIVES.md)

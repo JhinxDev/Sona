@@ -1,3 +1,17 @@
+# Current 0.4.2 design
+
+The dated sections below preserve design history. Where they differ, the current
+October 15 implementation takes precedence: seven Settings sections, compact
+304 DIP model cards grouped by family, one GitHub sidebar link, optional sound
+feedback, a 272 DIP capsule and 320 DIP panel. The capsule waveform is 176 × 26
+DIP and the panel waveform is 36 DIP tall. Recent transcript text is bounded;
+Open draft and the provisional stage label appear only in the panel.
+
+Completed insertion now uses one guarded paste by default. Submission requires
+explicit opt-in physical Enter intent and complete composer readback. Earlier
+Unicode-only/no-submission notes describe the original implementation.
+[Current behavior](PERSONALIZATION.md) · [Recording display](RECORDING-DISPLAY.md)
+
 # Sona design
 
 October 15, owner recording-display correction: Panel is now 320 DIP wide with

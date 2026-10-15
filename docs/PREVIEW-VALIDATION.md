@@ -167,3 +167,17 @@ convergence receipts belong to the private candidate checkpoint.
 
 See [Discord setup](DISCORD-SETUP.md), [recording display](RECORDING-DISPLAY.md),
 [cleanup evaluation](CLEANUP-MODEL-EVALUATION.md) and [owner checks](../tools/owner-test.md).
+
+## Final 0.4.2 owner check and documentation capture
+
+On October 15, the owner confirmed real hands-free Enter-to-send in Codex on
+installed build `aa8b429e480b`, source `05f838c87641507d7eb7f81e755559de7bd3627f`.
+The final capsule removes Open draft and the provisional stage label, while
+retaining its enlarged waveform and bounded recent text. The affected final
+recording-display fixture passed 35 checks. This supplements the earlier
+qualification above; other composers, Parakeet-specific microphone coverage and
+live Discord calls are not implied by this one successful send.
+
+The README now uses current native WPF client captures from isolated profiles.
+See [image provenance](images/README.md). No live microphone, private transcript,
+foreground change or real message submission was used to produce those images.

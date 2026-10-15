@@ -73,7 +73,10 @@ fixtures exercise Home save/reopen, model-family navigation and the actual Stop
 pipeline with fake capture and fake insertion. These tests never record a live
 microphone, manipulate the production clipboard or send a real message.
 
-Actual Codex/Discord composer consumption, the owner's speech and subjective
-layout acceptance remain owner-started checks against the exact installed build.
+On October 15, 2026, the owner confirmed that physical Enter during hands-free
+dictation sent the completed message in Codex on installed 0.4.2 build
+`aa8b429e480b` (source `05f838c87641507d7eb7f81e755559de7bd3627f`). This
+is a real owner-reported smoke test, not coverage of every composer or speech
+condition. Discord submission and live-call acceptance remain separate checks.
 See [owner checks](../tools/owner-test.md), [recording display](RECORDING-DISPLAY.md),
 and [cleanup model evaluation](CLEANUP-MODEL-EVALUATION.md).
