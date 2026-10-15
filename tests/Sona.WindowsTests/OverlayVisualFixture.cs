@@ -75,6 +75,7 @@ internal static class OverlayVisualFixture
                                 var recent = "Keep this recent phrase. The latest words stay visible.";
                                 overlay.UpdateTranscript(oldText + " " + recent, "Live raw · provisional"); Layout(shell, overlay.Width);
                                 var live = (TextBlock)overlay.FindName("LiveTranscript");
+                                Check(((TextBlock)overlay.FindName("TranscriptStage")).Visibility == (display == "Panel" ? Visibility.Visible : Visibility.Collapsed), display + " shows transcript metadata only in Panel mode");
                                 Check(live.Text.EndsWith("The latest words stay visible.", StringComparison.Ordinal) && !live.Text.Contains("Earlier phrase", StringComparison.Ordinal), display + " displays only recent phrases and preserves the latest words");
                                 Check(live.ActualHeight <= 36 && live.Text.Length <= 240, display + " live tail is bounded to two readable lines");
                                 Check(Descendants(shell).OfType<ScrollViewer>().All(scroll => scroll.Visibility == Visibility.Collapsed), display + " live transcript needs no scroll bar");

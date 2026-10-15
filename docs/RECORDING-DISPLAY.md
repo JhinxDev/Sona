@@ -80,3 +80,6 @@ See [Microsoft's WM_GETICON contract](https://learn.microsoft.com/en-us/windows/
 Owner refinement: Capsule omits the Open draft button, leaving recording controls
 and the recent transcript. Review remains available in the main Sona window;
 Panel retains its review action.
+
+Capsule also omits the transcript-stage label (such as Live raw · provisional),
+showing the recent phrases directly below the waveform. Panel keeps the label.

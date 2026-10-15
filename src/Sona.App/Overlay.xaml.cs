@@ -75,6 +75,8 @@ public partial class Overlay : Window
         PanelDisplay.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         CapsuleDisplay.Visibility = panel ? Visibility.Collapsed : Visibility.Visible;
         ReviewDraft.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
+        TranscriptStage.Visibility = panel && !string.IsNullOrEmpty(TranscriptStage.Text) ? Visibility.Visible : Visibility.Collapsed;
+        LiveTranscript.Margin = new Thickness(0, panel ? 5 : 0, 0, 0);
         Width = panel ? 320 : 272;
         MinHeight = panel ? 144 : 66;
         Shell.Padding = new Thickness(panel ? 10 : 8);
@@ -188,7 +190,7 @@ public partial class Overlay : Window
     public void UpdateTranscript(string text, string stage)
     {
         transcriptText = text; TranscriptStage.Text = stage; TranscriptStage.ToolTip = stage;
-        TranscriptStage.Visibility = string.IsNullOrEmpty(stage) ? Visibility.Collapsed : Visibility.Visible;
+        TranscriptStage.Visibility = display == "Panel" && !string.IsNullOrEmpty(stage) ? Visibility.Visible : Visibility.Collapsed;
         LiveTranscript.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
         RefreshTranscriptTail();
         TranscriptArea.Visibility = string.IsNullOrEmpty(stage) ? Visibility.Collapsed : Visibility.Visible;
