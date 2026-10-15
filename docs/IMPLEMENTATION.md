@@ -35,3 +35,22 @@ failed general/theme-save recovery, and preservation of unrelated unsaved form
 values. It uses a separate profile and disables microphone/startup control.
 
 Remaining strategic boundaries are optional cloud authentication/spend and owner live microphone/real-call/creative acceptance. A build or synthetic replay is not completion of those gates.
+
+
+## Stage an already-qualified package for the next launch
+
+`tools/install.ps1 -PackageDirectory <verified-package> -NextLaunch` copies and
+hash-verifies a separate version directory, then updates the owned Start Menu
+shortcut and current junction. It never quits or launches Sona, reads a live
+draft, or changes the profile. The running executable must match its installation
+receipt; the destination cannot be a running version directory. `-Launch` and
+`-NextLaunch` are mutually exclusive. The ordinary installer still refuses a
+running instance without this explicit mode.
+
+The running copy remains the current session until the user quits normally.
+Opening Sona again while it is running still signals that existing instance.
+Startup registration is not changed; this operation controls Start Menu and the
+current-path launcher, not an independently pinned old executable or Run entry.
+The isolated upgrade rehearsal covers staging, unchanged live synthetic drafts,
+invalid combinations, running-directory rejection and existing upgrade recovery
+(18 checks). No production restart is part of that rehearsal.

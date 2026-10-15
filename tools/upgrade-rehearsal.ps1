@@ -45,6 +45,14 @@ try{
     Proof (!(Field $taskWindow 'RecordButton').Current.IsEnabled) 'Isolated UI disables microphone capture'
     $taskAgent=Join-Path (Split-Path $taskOldPath) 'sona-agent.exe';$taskStatus=((& $taskAgent status)-join "`n"|ConvertFrom-Json);$taskVoice=((& $taskAgent protection status)-join "`n"|ConvertFrom-Json)
     Proof ($taskStatus.ok-and$taskStatus.data.residentProcessId-eq$null-and!$taskVoice.data.enabled-and!$taskVoice.data.connected) 'Isolated pipe has no resident model or Discord protection'
+    $taskRejected=$false;try{& (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-b') -RehearsalRoot $OutputRoot -NextLaunch -Launch|Out-Null}catch{$taskRejected=$true}
+    Proof $taskRejected 'NextLaunch refuses any simultaneous launch request'
+    & (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-b') -RehearsalRoot $OutputRoot -NextLaunch|Out-Null
+    $taskStagedTarget=(Get-Item -LiteralPath (Join-Path $OutputRoot 'Programs\Sona\current')).Target
+    Proof ($taskStagedTarget -eq (Join-Path $OutputRoot 'Programs\Sona\0.3.0-bbbbbbbb') -and !$taskOld.HasExited) 'NextLaunch targets verified new bytes while old process stays running'
+    Proof ((ReadField $taskWindow 'Draft')-ceq$taskDraft-and(ReadField $taskWindow 'Original')-ceq$taskOriginal) 'NextLaunch leaves both live synthetic draft fields unchanged'
+    $taskRejected=$false;try{& (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-a') -RehearsalRoot $OutputRoot -NextLaunch|Out-Null}catch{$taskRejected=$true}
+    Proof $taskRejected 'NextLaunch refuses writes to the currently running version directory'
     $taskCurrent=Join-Path $OutputRoot 'Programs\Sona\current';if((Get-Item -LiteralPath $taskCurrent).LinkType-ne'Junction'){throw 'Unexpected isolated current type'}
     Remove-Item -LiteralPath $taskCurrent -Force;New-Item -ItemType Directory -Path $taskCurrent|Out-Null;Set-Content -LiteralPath (Join-Path $taskCurrent 'failure.marker') -Value 'synthetic deliberate unrelated-current failure'
     $taskFailed=$false;try{& (Join-Path $PSScriptRoot 'upgrade.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-b') -ProcessId $taskOld.Id -RehearsalRoot $OutputRoot|Out-Null}catch{$taskFailed=$true}

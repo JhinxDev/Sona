@@ -1,5 +1,6 @@
-param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch, [string]$RehearsalRoot)
+param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch, [string]$RehearsalRoot, [switch]$NextLaunch)
 $ErrorActionPreference='Stop'
+if($NextLaunch -and $Launch){throw 'NextLaunch never starts or restarts Sona.'}
 $taskPackage=[IO.Path]::GetFullPath($PackageDirectory)
 $taskReceipt=Get-Content -LiteralPath (Join-Path $taskPackage 'package.json') | ConvertFrom-Json
 if ($taskReceipt.Version -notmatch '^0\.[0-9]+\.[0-9]+$' -or $taskReceipt.SourceHead -notmatch '^[a-f0-9]{40}$') { throw 'The package receipt is not a recognized candidate.' }
@@ -11,8 +12,22 @@ if($RehearsalRoot){
 }
 $taskRunning=@(Get-Process -Name Murmur,Sona -ErrorAction SilentlyContinue)
 if($RehearsalRoot){$taskRunning=@($taskRunning|Where-Object{$_.Path-and$_.Path.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)})}
-if($taskRunning.Count){throw 'Quit the existing dictation instance before installing this candidate.'}
+if($taskRunning.Count -and !$NextLaunch){throw 'Quit the existing dictation instance before installing this candidate, or use NextLaunch to preserve it.'}
 $taskInstall = Join-Path $taskProgramRoot ($taskReceipt.Version + '-' + $taskReceipt.SourceHead.Substring(0,8))
+$taskPreservedProcesses=@()
+if($NextLaunch){
+    foreach($taskProcess in $taskRunning){
+        $taskRunningPath=$taskProcess.Path
+        if(!$taskRunningPath -or !$taskRunningPath.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'NextLaunch preserves an unrecognized running instance; installation aborted.'}
+        if((Split-Path $taskRunningPath -Parent).Equals($taskInstall,[StringComparison]::OrdinalIgnoreCase)){throw 'NextLaunch never writes into a running version directory.'}
+        $taskRunningReceipt=Join-Path (Split-Path $taskRunningPath -Parent) 'installation.json'
+        if(!(Test-Path -LiteralPath $taskRunningReceipt)){throw 'Running instance has no ownership receipt.'}
+        $taskRunningOwned=Get-Content -LiteralPath $taskRunningReceipt -Raw|ConvertFrom-Json
+        if($taskRunningOwned.Path -ne $taskRunningPath -or (Get-FileHash -LiteralPath $taskRunningPath).Hash.ToLowerInvariant() -ne $taskRunningOwned.SHA256){throw 'Running instance ownership differs; preserved.'}
+        $taskPreservedProcesses+=@{Id=$taskProcess.Id;Path=$taskRunningPath;Started=$taskProcess.StartTime.ToUniversalTime().ToString('o')}
+    }
+}
+
 foreach ($taskFile in $taskReceipt.Files) {
     $taskSource = [IO.Path]::GetFullPath((Join-Path $taskPackage $taskFile.Path))
     if (!$taskSource.StartsWith($taskPackage + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Package path escapes its root.' }
@@ -34,7 +49,7 @@ $taskShortcut=$taskShell.CreateShortcut($taskMenu); $taskShortcut.TargetPath=Joi
 # Remove only the legacy shortcut verified by its own installed receipt. Keep
 # versioned recovery binaries and the existing preferences directory intact.
 $taskLegacyMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Murmur.lnk'
-if (!$RehearsalRoot -and (Test-Path -LiteralPath $taskLegacyMenu)) {
+if (!$NextLaunch -and !$RehearsalRoot -and (Test-Path -LiteralPath $taskLegacyMenu)) {
     $taskLegacy = $taskShell.CreateShortcut($taskLegacyMenu)
     $taskLegacyRoot = (Join-Path $env:LOCALAPPDATA 'Programs\Murmur') + '\'
     if ($taskLegacy.TargetPath.StartsWith($taskLegacyRoot,[StringComparison]::OrdinalIgnoreCase)) {
@@ -72,4 +87,12 @@ if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
 }
 if ($Launch -and $RehearsalRoot) { throw 'Launch an isolated test with its explicit profile and --test-ui instead.' }
 if ($Launch) { Start-Process -FilePath (Join-Path $taskInstall 'Sona.exe') -ArgumentList '--start-hidden' -WindowStyle Hidden }
+if($NextLaunch){
+    foreach($taskPreserved in $taskPreservedProcesses){
+        $taskStillRunning=Get-Process -Id $taskPreserved.Id -ErrorAction Stop
+        if($taskStillRunning.Path -ne $taskPreserved.Path -or $taskStillRunning.StartTime.ToUniversalTime().ToString('o') -ne $taskPreserved.Started){throw 'Running instance changed during staging; inspect before launch.'}
+    }
+    $taskInstalled.NextLaunchOnly=$true
+    $taskInstalled.PreservedProcesses=$taskPreservedProcesses
+}
 $taskInstalled | ConvertTo-Json -Depth 2
