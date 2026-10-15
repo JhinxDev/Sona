@@ -76,3 +76,7 @@ does not establish a live DWM/device appearance. Physical foreground recording,
 actual target-app insertion and owner visual acceptance remain separate.
 
 See [Microsoft's WM_GETICON contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-geticon).
+
+Owner refinement: Capsule omits the Open draft button, leaving recording controls
+and the recent transcript. Review remains available in the main Sona window;
+Panel retains its review action.

@@ -74,6 +74,7 @@ public partial class Overlay : Window
         var panel = display == "Panel";
         PanelDisplay.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         CapsuleDisplay.Visibility = panel ? Visibility.Collapsed : Visibility.Visible;
+        ReviewDraft.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         Width = panel ? 320 : 272;
         MinHeight = panel ? 144 : 66;
         Shell.Padding = new Thickness(panel ? 10 : 8);

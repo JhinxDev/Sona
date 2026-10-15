@@ -79,7 +79,7 @@ internal static class OverlayVisualFixture
                                 Check(live.ActualHeight <= 36 && live.Text.Length <= 240, display + " live tail is bounded to two readable lines");
                                 Check(Descendants(shell).OfType<ScrollViewer>().All(scroll => scroll.Visibility == Visibility.Collapsed), display + " live transcript needs no scroll bar");
                                 var review = (Button)overlay.FindName("ReviewDraft");
-                                Check(review.ActualHeight >= 26 && review.Visibility == Visibility.Visible, display + " preserves an explicit Open draft action");
+                                Check(display == "Capsule" ? review.Visibility == Visibility.Collapsed : review.ActualHeight >= 26 && review.Visibility == Visibility.Visible, display + (display == "Capsule" ? " omits Open draft to keep the capsule focused" : " preserves an explicit Open draft action"));
                                 Capture(shell, display.ToLowerInvariant() + "-live.png", overlay.Width);
                                 overlay.Update("Preparing your draft", "Transcribing locally"); Layout(shell, overlay.Width);
                                 var busyName = display == "Panel" ? "PanelBusy" : "CapsuleBusy";
