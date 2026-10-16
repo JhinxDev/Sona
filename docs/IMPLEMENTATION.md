@@ -1,6 +1,6 @@
 # Local dictation implementation gates
 
-Current 0.4.3 reliability repairs and acceptance limits: [DAILY-USE-AUDIT.md](DAILY-USE-AUDIT.md). Current draft, insertion and history behavior: [PERSONALIZATION.md](PERSONALIZATION.md). Earlier daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
+Reliability repairs and acceptance limits: [DAILY-USE-AUDIT.md](DAILY-USE-AUDIT.md). Current draft, insertion and history behavior: [PERSONALIZATION.md](PERSONALIZATION.md). Earlier daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
 
 The primary owner integrates the app changes and a scoped independent review. Existing owners retain standalone Hush, media, shared catalogs and Vault Git control.
 
@@ -12,7 +12,7 @@ The primary owner integrates the app changes and a scoped independent review. Ex
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current source candidate identity is Sona 0.4.3; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.4.4; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 Parakeet qualification uses `Sona.WindowsTests --speech-fixture <corpus> <fresh
 JSON> <pinned CUDA ZIP> <pinned CPU ZIP>` and `--speech-memory-fixture <fresh JSON>`.
@@ -37,6 +37,25 @@ values. It uses a separate profile and disables microphone/startup control.
 Remaining strategic boundaries are optional cloud authentication/spend and owner live microphone/real-call/creative acceptance. A build or synthetic replay is not completion of those gates.
 
 
+## Live upgrade delivery rule
+
+The owner's October 16 standing instruction requires qualified new app versions
+and functional updates to reach the installed, currently running app. Routine
+private live upgrades do not need renewed permission. Complete the guarded
+`tools/upgrade.ps1` path: preserve a current-user encrypted recovery checkpoint,
+quit normally when safe, launch through the Explorer-owned desktop bootstrap,
+and read back the live version/build and exact EXE, package hashes, draft,
+original and settings. Keep recovery until that readback succeeds.
+
+Documentation-only commits do not trigger app activation. Separately qualified
+launcher/tooling changes can reuse the accepted app binaries without rebuilding
+them; retain their tooling checks and the current live identity.
+
+Busy recording, owned voice changes and unsaved edits must be preserved until
+activation is safe. Record any pending live step honestly. Source-only changes
+and `-NextLaunch` staging remain incomplete delivery; staging is an interim or
+explicitly requested mode, followed by the guarded live upgrade when safe.
+
 ## Stage an already-qualified package for the next launch
 
 `tools/install.ps1 -PackageDirectory <verified-package> -NextLaunch` copies and
@@ -47,7 +66,8 @@ receipt; the destination cannot be a running version directory. `-Launch` and
 `-NextLaunch` are mutually exclusive. The ordinary installer still refuses a
 running instance without this explicit mode.
 
-The running copy remains the current session until the user quits normally.
+The running copy remains the current session until a normal Quit; `-NextLaunch`
+alone never replaces it.
 Opening Sona again while it is running still signals that existing instance.
 Startup registration is not changed; this operation controls Start Menu and the
 current-path launcher, not an independently pinned old executable or Run entry.
@@ -97,6 +117,41 @@ and preservation of the running owner instance and preferences. The existing
 retry and draft/original restoration. Neither test closes the owner's app or opens
 a microphone. These reproduce a launch-lifetime risk; they do not establish the
 historical cause of any particular Codex shutdown incident.
+
+## Physical recovery paths and verified live 0.4.4
+
+The first qualified upgrade quit the old process, PID `52924`, normally, but
+Explorer never claimed its launch request. `GetFinalPathNameByHandle` showed that
+`%LOCALAPPDATA%/Sona/recovery` was virtualized into the Codex MSIX
+package's `LocalCache/Local/Sona/recovery`. Explorer reported `DirectoryNotFound`
+for the literal requested path. This was a cross-process path-identity failure;
+the evidence did not indicate an ACL or DPAPI policy failure.
+
+Checkpoint and launch-request handoffs must use canonical physical file paths
+resolved from open file handles before passing them to Explorer. A fresh request
+using the physical path and the same canonical desktop bootstrap restored Sona;
+there was no terminal-child fallback. Tooling regression results are separate
+from this verified live recovery.
+
+The maintained `tools/launch-path-checks.ps1` regression first reproduced two
+baseline failures: Explorer could not see the logical virtual path or read its
+bytes. Eight checks then passed using the production
+`tools/resolve-physical-file.ps1` resolver. `tools/start-sona.ps1` resolves the
+existing recovery file before embedding its path and the actual request file
+before desktop handoff. This regression used no app, profile, microphone or
+input. The same eight checks also passed under Windows PowerShell 5.1, including
+the actual handle-based resolver and independent Explorer byte match.
+A narrow independent review found no actionable issue; DPAPI, atomic claim,
+expiry and ambiguous-launch guards remain intact.
+October 16 live readback at 16:26 Toronto verified Sona `0.4.4`, build
+`0257d73b4eed`, PID `42712`,
+at `%LOCALAPPDATA%/Programs/Sona/0.4.4-468a17fa/Sona.exe`. All 36
+installed files matched their receipt hashes; draft and original hashes matched
+the encrypted checkpoint after restoration,
+and the preferences file was unchanged. See [live validation](PREVIEW-VALIDATION.md#october-16-live-delivery-and-recovery-044).
+No microphone, global input or submission was used. This recovery supplies no
+new physical-key evidence. Homepage Search automatic insertion with active
+suggestions remains unresolved.
 
 ## Capture observations and browser suggestions, 0.4.4
 

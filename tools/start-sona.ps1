@@ -8,6 +8,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Security
+. (Join-Path $PSScriptRoot 'resolve-physical-file.ps1')
 function ReadProtected([string]$Path) {
     if((Get-Item -LiteralPath $Path).Length -gt 65536){throw 'Protected launch data exceeds its bound.'}
     $bytes=[Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($Path),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
@@ -78,6 +79,7 @@ if($RecoveryPath){
     if(!$RecoveryPath.StartsWith([IO.Path]::GetFullPath($directory)+'\',[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $RecoveryPath -Leaf)-notmatch'^upgrade-[a-f0-9]{32}\.dpapi$'){throw 'Unrecognized draft recovery path.'}
     # Fail before delegation if the checkpoint cannot be decrypted.
     $probe=ReadProtected $RecoveryPath;$probe=$null
+    $RecoveryPath=Resolve-SonaPhysicalFile $RecoveryPath
 }
 New-Item -ItemType Directory -Path $directory -Force|Out-Null
 $request=Join-Path $directory ('desktop-launch-'+[guid]::NewGuid().ToString('N')+'.dpapi');$reply=$request+'.reply.json'
@@ -85,6 +87,10 @@ $environment=@{};foreach($name in @('SONA_DATA','MURMUR_DATA','SONA_RUNTIME','MU
 $data=@{FilePath=$target;RecoveryPath=$RecoveryPath;RehearsalRoot=$RehearsalRoot;Hidden=[bool]$Hidden;Environment=$environment;ExpiresUtc=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')}
 $bytes=[Text.Encoding]::UTF8.GetBytes(($data|ConvertTo-Json -Depth 4 -Compress))
 try{[IO.File]::WriteAllBytes($request,[Security.Cryptography.ProtectedData]::Protect($bytes,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($bytes,0,$bytes.Length)}
+# The desktop bootstrap does not share an MSIX caller's virtual AppData view.
+# Publish the real existing request path; keep the protected payload unchanged.
+$request=Resolve-SonaPhysicalFile $request
+$reply=$request+'.reply.json'
 $delegated=$false;$confirmed=$false
 try {
     # Windows paths cannot contain quotes. -File consumes explicit path arguments;

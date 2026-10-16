@@ -1,5 +1,37 @@
 # Preview validation
 
+## October 16 live delivery and recovery, 0.4.4
+
+Live readback at 16:26 Toronto verified the installed and running Sona `0.4.4`, build
+`0257d73b4eed`, PID `42712`, with exact executable
+`%LOCALAPPDATA%/Programs/Sona/0.4.4-468a17fa/Sona.exe`. All 36
+installed files matched their receipt hashes. Restored draft and original hashes
+matched the encrypted checkpoint; the preferences file remained unchanged.
+
+The first qualified upgrader had quit old PID `52924` normally, but its desktop
+launch request remained unclaimed. Windows `GetFinalPathNameByHandle` resolved
+the requested `%LOCALAPPDATA%/Sona/recovery` directory into the
+Codex MSIX package's `LocalCache/Local/Sona/recovery`. Explorer saw the literal
+requested path as `DirectoryNotFound`. The observed cause was path virtualization,
+not an ACL or DPAPI policy failure. A fresh physical-path request through the
+same canonical Explorer desktop bootstrap restored the live app with draft and
+original intact. The original failed launch evidence is retained.
+
+A separate maintained `tools/launch-path-checks.ps1` regression recorded two
+baseline failures for Explorer visibility/readback of the logical virtual path,
+then eight passing checks with the production physical-file resolver. It used no
+app, profile, microphone or input. The same eight checks also passed under Windows PowerShell 5.1, including
+the actual handle-based resolver and independent Explorer byte match.
+A narrow independent review found no actionable issue; DPAPI, atomic claim,
+expiry and ambiguous-launch guards remain intact. The launcher/tooling repair changes no app binary; the verified live
+0.4.4 runtime remains current without rebuilding it.
+The owner now requires qualified versions and functional updates to reach the
+live app as part of delivery, with routine guarded upgrades already authorized.
+See [the delivery contract](IMPLEMENTATION.md#live-upgrade-delivery-rule).
+This recovery used no microphone, global input or submission. It adds no
+physical-key acceptance claim: automatic insertion in Homepage Search while
+suggestions are active remains unresolved.
+
 ## October 16 daily-use candidate, 0.4.3
 
 The consolidated Release build passed with zero warnings/errors. The current

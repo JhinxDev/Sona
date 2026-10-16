@@ -23,3 +23,17 @@ Respect the active user's model choices, working changes and explicit scope.
   acceptance. Keep missing personal or physical-device proof explicit.
 - Stage only owned paths and preserve concurrent work. Public source does not
   authorize uploading videos, publishing binary releases or messaging others.
+
+## Qualified updates must reach the running app
+
+Owner standing instruction, October 16, 2026: every qualified new app version or
+functional update must update the live installed and running Sona. Routine
+private live upgrades are already authorized without renewed permission.
+Source-only delivery and `-NextLaunch` staging do not fulfill this requirement.
+Documentation-only commits do not trigger app activation. Separately qualified
+tooling changes may reuse unchanged accepted app binaries.
+Use guarded normal Quit, current-user encrypted recovery and the desktop-owned
+launcher. Preserve busy recording, owned voice changes and unsaved edits until
+activation is safe. Verify the running version/build, exact EXE and installed
+receipt hashes, restored draft and original, and settings readback before calling
+delivery complete. Follow [the live upgrade contract](docs/IMPLEMENTATION.md#live-upgrade-delivery-rule).
