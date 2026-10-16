@@ -18,5 +18,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Capture policy regressions failed' }
 $taskCaptureEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-capture-status-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --capture-status-fixture $taskCaptureEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Capture status regressions failed' }
+$taskHistoryEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-history-controls-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --history-controls-fixture $taskHistoryEvidence
+if ($LASTEXITCODE -ne 0) { throw 'History control regressions failed' }
+$taskHistoryOffEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-history-controls-off-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --history-controls-no-retention-fixture $taskHistoryOffEvidence
+if ($LASTEXITCODE -ne 0) { throw 'History controls with retention off failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

@@ -26,6 +26,7 @@ public sealed class Preferences
     public string Theme { get; set; } = "charcoal";
     public string ShortcutMode { get; set; } = "Hold";
     public bool KeepHistory { get; set; }
+    public bool HistoryPaused { get; set; }
     public string Style { get; set; } = "Clean";
     public bool CleanupEnabled { get; set; }
     public string CleanupTone { get; set; } = "formal";

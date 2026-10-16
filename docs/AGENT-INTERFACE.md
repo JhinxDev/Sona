@@ -137,3 +137,7 @@ uses `SONA_DATA`; normal clients must omit that test-only override.
 The settings interface also accepts `liveTranscription` (boolean, default false).
 Status includes the running module `buildId` and `preferencesLoad` result. These
 contain no transcript or filesystem path. Live text remains local to the UI.
+
+History pause is reported as the boolean `status.historyPaused`. This is read-only
+metadata; reading status does not collect history, inspect field text or change
+the pause preference. Use History's Pause history / Resume history control.

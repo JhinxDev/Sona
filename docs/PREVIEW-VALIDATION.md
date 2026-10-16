@@ -1,5 +1,22 @@
 # Preview validation
 
+## October 16 History controls, 0.4.5
+
+The owner's disabled Clear recent button was observed on the actual idle0.4.4
+app. The regression reproduced the stale busy-state UI before repair.0.4.5 adds
+the idle action refresh, individual recent-row deletion and persistent history
+pause/resume. The independent review's pending-completion privacy leak and
+unrelated-draft edit-loss findings were reproduced, repaired and cleared in a
+bounded follow-up. No remaining scoped finding.
+
+The maintained unshown native History fixture passes23checks with automatic disk
+retention on and23off. Core350/defaultWindows49/capture-policy11/status10 also
+pass, builds have0warnings/errors, and the dependency audit has no known vulnerable
+packages. Existing calendar/filter, retention-off layout and pending-settings
+checks passed. These use synthetic profiles without microphone/global input;
+they do not establish physical speech or Homepage suggestion insertion acceptance.
+[Full History behavior and tests](HISTORY-CONTROLS.md).
+
 ## October 16 live delivery and recovery, 0.4.4
 
 Live readback at 16:26 Toronto verified the installed and running Sona `0.4.4`, build

@@ -38,7 +38,7 @@ public partial class MainWindow
                 if (recent.Any(x => x.Id == item.Id)) HistoryStore.Save(HistoryPath, recent.Where(x => x.Id != item.Id));
             }
             HistoryStore.Save(SavedDraftPath, historyEntries.Where(x => x.Saved && x.Id != item.Id));
-            historyEntries.RemoveAll(x => x.Id == item.Id); if (historySelection == item.Id) historySelection = null; RefreshHistory();
+            historyEntries.RemoveAll(x => x.Id == item.Id); if (historySelection == item.Id) { historySelection = null; suppressCurrentDraftHistory = true; } RefreshHistory();
             HistoryResult.Text = "Saved record removed. The current editable draft was preserved.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { HistoryResult.Text = "The saved draft could not be removed. Existing records were preserved."; }

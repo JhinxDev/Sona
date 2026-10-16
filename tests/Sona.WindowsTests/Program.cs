@@ -11,6 +11,12 @@ if (args.Length == 1 && args[0] == "--capture-policy-checks")
     if (JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength() > 0) Environment.ExitCode = 1;
     return;
 }
+if (args.Length == 2 && args[0] is "--history-controls-fixture" or "--history-controls-no-retention-fixture")
+{
+    var report = HistoryControlsFixture.Run(args[1], args[0] == "--history-controls-no-retention-fixture"); Console.WriteLine(JsonSerializer.Serialize(report));
+    if (JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength() > 0) Environment.ExitCode = 1;
+    return;
+}
 if (args.Length == 2 && args[0] == "--capture-status-fixture")
 {
     var report = CaptureStatusFixture.Run(args[1]); Console.WriteLine(JsonSerializer.Serialize(report));

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Globalization;
+using System.Text.Json;
 using Sona.Core;
 namespace Sona.App;
 
@@ -13,11 +14,13 @@ public partial class MainWindow
     private bool savedDraftStorageFailed;
     private Guid[]? pendingHistoryClear;
     private bool historyRefreshing;
+    private bool suppressCurrentDraftHistory;
+    private Guid? suppressedHistorySession;
     private string SavedDraftPath => Path.Combine(Path.GetDirectoryName(preferencesPath)!, "saved-drafts.json");
     private string HistoryPath => Path.Combine(Path.GetDirectoryName(preferencesPath)!, "history.json");
     private void RetainCurrentDraft()
     {
-        if (preparedInsertionTest || string.IsNullOrWhiteSpace(Draft.Text) || Draft.Text.Length > 6000 || Original.Text.Length > 6000) return;
+        if (preferences.HistoryPaused || suppressCurrentDraftHistory || preparedInsertionTest || string.IsNullOrWhiteSpace(Draft.Text) || Draft.Text.Length > 6000 || Original.Text.Length > 6000) return;
         var index = historyEntries.FindIndex(x => x.Id == historySelection);
         if (index >= 0) { historyEntries[index] = historyEntries[index] with { Original = Original.Text, Draft = Draft.Text }; SaveHistory(); RefreshHistory(); return; }
         if (historyEntries.Any(x => x.Original == Original.Text && x.Draft == Draft.Text)) return;
@@ -37,7 +40,9 @@ public partial class MainWindow
     }
     private void AddHistory(DictationSession current)
     {
+        if (preferences.HistoryPaused || suppressedHistorySession == current.Id) { suppressCurrentDraftHistory = true; suppressedHistorySession = current.Id; return; }
         if (string.IsNullOrWhiteSpace(current.Draft)) return;
+        suppressCurrentDraftHistory = false;
         var item = new HistoryItem(current.Id, DateTimeOffset.Now, current.Original, current.Draft, current.State == SessionState.Inserted, Generated: reviewBaseline);
         historyEntries.RemoveAll(x => x.Id == item.Id); historyEntries.Insert(0, item);
         while (historyEntries.Count(x => !x.Saved) > HistoryStore.Capacity)
@@ -52,13 +57,14 @@ public partial class MainWindow
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             { savedDraftStorageFailed = true; DraftReviewResult.Text = "Saved draft storage failed. Your current draft is still here; the saved file was preserved."; }
         }
-        if (!preferences.KeepHistory || historyStorageFailed) return;
+        if (preferences.HistoryPaused || !preferences.KeepHistory || historyStorageFailed) return;
         try { HistoryStore.Save(HistoryPath, historyEntries.Where(x => !x.Saved)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { historyStorageFailed = true; HistoryResult.Text = "History is still available in this session. Saving failed; existing records were preserved."; }
     }
     private void MarkHistoryInserted()
     {
+        if (preferences.HistoryPaused || suppressCurrentDraftHistory) return;
         var index = historyEntries.FindIndex(x => x.Id == historySelection);
         if (index < 0) return;
         historyEntries[index] = historyEntries[index] with { Inserted = true };
@@ -91,10 +97,57 @@ public partial class MainWindow
             var saved = historyEntries.Count(item => item.Saved);
             HistoryCountPreview.Text = $"{ids.Length} recent {(ids.Length == 1 ? "record" : "records")} in {HistoryFiltering.RangeLabel(filter)}{(string.IsNullOrWhiteSpace(HistorySearch.Text) ? "" : " matching your search")}. {saved} saved {(saved == 1 ? "draft stays" : "drafts stay")} separate.";
             ClearHistoryButton.Content = ids.Length == 0 ? "Clear recent..." : $"Clear {ids.Length} recent...";
-            ClearHistoryButton.IsEnabled = !SettingsBusy && ids.Length > 0;
+            RefreshHistoryActions();
             if (pendingHistoryClear != null && pendingHistoryClear.Any(id => !ids.Contains(id))) ResetHistoryClear();
         }
         finally { historyRefreshing = false; }
+    }
+    private void RefreshHistoryActions()
+    {
+        if (ClearHistoryButton == null || PauseHistoryButton == null || HistoryRange == null || HistoryDay == null || HistorySearch == null) return;
+        var count = HistoryFiltering.ClearableIds(historyEntries, CurrentHistoryFilter(), HistorySearch.Text, DateTimeOffset.Now, TimeZoneInfo.Local).Length;
+        ClearHistoryButton.IsEnabled = !SettingsBusy && count > 0;
+        ConfirmHistoryClear.IsEnabled = !SettingsBusy && pendingHistoryClear != null;
+        PauseHistoryButton.IsEnabled = preferencesLoad.CanSave && !preferencesApplying && !shutdownPending;
+        PauseHistoryButton.Content = preferences.HistoryPaused ? "Resume history" : "Pause history";
+        System.Windows.Automation.AutomationProperties.SetName(PauseHistoryButton, (string)PauseHistoryButton.Content);
+        HistoryLabel.Text = preferences.HistoryPaused
+            ? "History is paused. New dictations are not added. Your current draft still works."
+            : preferences.KeepHistory ? "Your past dictations, stored locally on this device."
+            : "New dictations stay in this session. Previously stored history and explicitly saved drafts remain on this device.";
+    }
+    private void PauseHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (!preferencesLoad.CanSave || preferencesApplying || shutdownPending) { HistoryResult.Text = "History pause is unavailable until preferences can be saved."; return; }
+        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        next.HistoryPaused = !preferences.HistoryPaused;
+        try
+        {
+            next.Save(preferencesPath);
+            preferences.HistoryPaused = next.HistoryPaused;
+            // Resuming never retroactively collects the draft dictated while paused.
+            suppressedHistorySession = session?.Id;
+            suppressCurrentDraftHistory = true;
+            ResetHistoryClear(); RefreshHistory();
+            HistoryResult.Text = preferences.HistoryPaused
+                ? "History paused. New dictations will not be added; existing drafts stay available."
+                : "History resumed for future dictations. Drafts made while paused were not added.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        { HistoryResult.Text = "History pause could not be saved. The previous choice was retained."; }
+        RefreshSettingsActions();
+    }
+    private void DeleteHistoryDraft_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: HistoryItem item }) return;
+        if (item.Saved) { DeleteSavedDraft_Click(sender, e); return; }
+        if (SettingsBusy) { HistoryResult.Text = "Finish dictation before deleting a history draft."; return; }
+        if (!historyEntries.Any(entry => !entry.Saved && entry.Id == item.Id)) return;
+        pendingHistoryClear = [item.Id];
+        HistoryClearPreview.Text = "Delete this recent draft from History? Your current editable draft will stay.";
+        ConfirmHistoryClear.Content = "Delete draft";
+        HistoryClearConfirmation.Visibility = Visibility.Visible;
+        RefreshHistoryActions();
     }
     private void HistorySearch_Changed(object sender, TextChangedEventArgs e) { ResetHistoryClear(); RefreshHistory(); }
     private void HistoryRange_Changed(object sender, SelectionChangedEventArgs e)
@@ -125,6 +178,8 @@ public partial class MainWindow
         cancellation?.Cancel(); preparedInsertionTest = insertionTestHolding = false; target = null;
         session = new(); session.Begin(); session.Stop(); session.Complete(item.Original, item.Draft);
         if (item.Inserted) session.MarkInserted();
+        suppressCurrentDraftHistory = preferences.HistoryPaused;
+        suppressedHistorySession = preferences.HistoryPaused ? session.Id : null;
         ResetLiveReview(); historySelection = item.Id; Render(session); reviewBaseline = item.Generated ?? item.Draft; Pages.SelectedIndex = 0;
         Status.Text = "History draft opened"; StatusDetail.Text = "Review or copy this text. It was not inserted automatically.";
     }
@@ -139,6 +194,7 @@ public partial class MainWindow
         HistoryClearPreview.Text = $"Clear {ids.Length} recent {(ids.Length == 1 ? "record" : "records")} from {description}? Saved drafts and the current editable draft will stay.";
         ConfirmHistoryClear.Content = $"Clear {ids.Length} recent";
         HistoryClearConfirmation.Visibility = Visibility.Visible;
+        RefreshHistoryActions();
     }
     private void ConfirmHistoryClear_Click(object sender, RoutedEventArgs e)
     {
@@ -161,7 +217,7 @@ public partial class MainWindow
             else if (preferences.KeepHistory)
                 HistoryStore.Save(HistoryPath, historyEntries.Where(item => !item.Saved && !ids.Contains(item.Id)));
             historyEntries.RemoveAll(item => !item.Saved && ids.Contains(item.Id));
-            if (historySelection.HasValue && ids.Contains(historySelection.Value)) historySelection = null;
+            if (historySelection.HasValue && ids.Contains(historySelection.Value)) { historySelection = null; suppressCurrentDraftHistory = true; }
             historyStorageFailed = false; ResetHistoryClear(); RefreshHistory();
             HistoryResult.Text = $"Cleared {ids.Count} recent {(ids.Count == 1 ? "record" : "records")}. Saved drafts and your current editable draft were preserved.";
         }

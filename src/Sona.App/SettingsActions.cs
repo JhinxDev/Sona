@@ -64,6 +64,7 @@ public partial class MainWindow
         PreferencesSaveBar.Visibility = HasUnsavedGeneralSettings(next) ? Visibility.Visible : Visibility.Collapsed;
 
         SavePreferencesButton.IsEnabled = !SettingsBusy;
+        RefreshHistoryActions();
         // The dependent option retains its form value while protection is off.
         // Neither this display state nor master-toggle edits save protection.
         SilenceIncoming.IsEnabled = ProtectionEnabled.IsChecked == true && !SettingsBusy;

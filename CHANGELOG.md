@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.5 - History deletion and pause
+
+- Re-enable Clear recent automatically when dictation returns to idle. The
+  confirmation still removes only the previewed range/search records and keeps
+  saved drafts plus the current editor.
+- Add Delete draft to individual recent rows, alongside saved-draft deletion.
+  Cleared current drafts do not silently reappear at the next dictation.
+- Add persistent Pause history / Resume history on History. Pausing stops new
+  session and saved automatic entries while dictation and explicit Save draft
+  remain available. Resume never collects a paused recording that is still
+  transcribing, or a draft made while paused.
+- Keep unrelated unsaved settings and edits to another opened history draft.
+
+[History controls and qualification](docs/HISTORY-CONTROLS.md).
+
 ## 0.4.4 - destination capture guidance
 
 - Explain when Windows reports a selected suggestion or list item rather than

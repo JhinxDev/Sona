@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.4.** Build from source below. There is no published binary
+**Early preview: 0.4.5.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -265,3 +265,12 @@ Sona's original source is [MIT licensed](LICENSE). Engines, models, fonts and
 redistributables retain their own terms, including Parakeet's CC-BY-4.0 weights.
 The bundled Parakeet scheduler repair includes its source patch, rebuild
 instructions and license notices. [Third-party notices](THIRD-PARTY-NOTICES.md).
+
+## History controls
+
+Use **Pause history** on History to stop adding new entries while continuing
+dictation; **Resume history** starts future entries again. The choice is remembered
+across restarts. Existing entries remain until you clear or delete them. **Clear
+recent** previews the selected range/search and requires its confirmation; saved
+drafts and your working editor stay. **Delete draft** removes an individual row.
+[Details](docs/HISTORY-CONTROLS.md).
