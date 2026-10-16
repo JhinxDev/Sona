@@ -1,8 +1,8 @@
 # Local dictation implementation gates
 
-Current 0.4.2 draft, insertion and history behavior: [PERSONALIZATION.md](PERSONALIZATION.md). Earlier daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
+Current 0.4.3 reliability repairs and acceptance limits: [DAILY-USE-AUDIT.md](DAILY-USE-AUDIT.md). Current draft, insertion and history behavior: [PERSONALIZATION.md](PERSONALIZATION.md). Earlier daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
 
-The primary owner executes the tightly coupled app work. The notification diagnosis is an independent read-only worker. Existing owners retain Hush, Tool Shed, shared catalogs and Vault Git control.
+The primary owner integrates the app changes and a scoped independent review. Existing owners retain standalone Hush, media, shared catalogs and Vault Git control.
 
 1. Build `Sona.Core` for text transformation, original preservation and a single session state machine. Run the executable regression harness in `tests/Sona.Tests`.
 2. Build `Sona.App` for native recording, nonactivating overlay, shortcut registration, reference-based sidebar/settings/history UI, safe focus-bound insertion and bounded worker lifecycle. Keep all runtime/download/build output outside the synced Vault.
@@ -10,9 +10,9 @@ The primary owner executes the tightly coupled app work. The notification diagno
 4. Use the task-owned native UI for saved settings/readback, narrow layout, cancellation and clean quit. Add test lifecycle bounds so verification never leaves a worker or hidden test window.
 5. Prepare a safe owner-triggered insertion/voice exercise in an empty Codex draft. Verify opt-in clipboard backup or preservation when disabled, focus drift, no duplicate text, no submission without explicit opt-in Enter intent, and call-protection restoration. No background microphone test is permitted.
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
-7. Create reviewed private Git history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
+7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current candidate identity is Sona 0.4.2; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.4.3; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 Parakeet qualification uses `Sona.WindowsTests --speech-fixture <corpus> <fresh
 JSON> <pinned CUDA ZIP> <pinned CPU ZIP>` and `--speech-memory-fixture <fresh JSON>`.

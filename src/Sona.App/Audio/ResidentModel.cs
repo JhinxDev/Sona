@@ -15,6 +15,8 @@ internal sealed class ResidentModel
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly HttpClient http = new(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = 1024 * 1024 };
     private readonly TimeProvider clock;
+    private readonly Func<string, CancellationToken, Task<bool>> verifyModel;
+    private readonly TimeSpan startupTimeout;
     private BoundedProcess? worker;
     private Uri? endpoint;
     private Task drainOutput = Task.CompletedTask, drainError = Task.CompletedTask;
@@ -30,7 +32,12 @@ internal sealed class ResidentModel
     public bool CleanupPending => Volatile.Read(ref cleanupPending);
     public string? LoadedModel => Volatile.Read(ref loaded);
     public int? ProcessId => Volatile.Read(ref processId) is var id && id > 0 ? id : null;
-    public ResidentModel(TimeProvider? clock = null) => this.clock = clock ?? TimeProvider.System;
+    public ResidentModel(TimeProvider? clock = null, Func<string, CancellationToken, Task<bool>>? verifyModel = null, TimeSpan? startupTimeout = null)
+    {
+        this.clock = clock ?? TimeProvider.System;
+        this.verifyModel = verifyModel ?? ((model, token) => Transcriber.Models.VerifyAsync(model, token));
+        this.startupTimeout = startupTimeout ?? TimeSpan.FromSeconds(60);
+    }
     public async Task WarmAsync(Preferences p, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation).ConfigureAwait(false);
@@ -107,6 +114,7 @@ internal sealed class ResidentModel
     }
     private async Task EnsureAsync(Preferences p, CancellationToken cancellation)
     {
+        cancellation.ThrowIfCancellationRequested();
         var model = Transcriber.SelectedModel(p);
         var isParakeet = ModelCatalog.Get(model).IsParakeet;
         var cuda = isParakeet ? Transcriber.ParakeetUsesCuda(p) : p.Engine != "FastCpu" && Transcriber.CudaEngineAvailable;
@@ -115,34 +123,38 @@ internal sealed class ResidentModel
         var nextKey = model + (cuda ? ":cuda" : ":cpu");
         if (worker != null && key == nextKey && !worker.Process.HasExited) { lastUse = clock.GetTimestamp(); return; }
         await ReleaseAsync().ConfigureAwait(false);
-        if (!Transcriber.Models.Present(model) || !await Transcriber.Models.VerifyAsync(model, cancellation).ConfigureAwait(false)) throw new IOException("Install and verify the selected local model first.");
-        var executable = isParakeet ? ParakeetAssets.Executable(cuda) : Path.Combine(Transcriber.RuntimeRoot, cuda ? "whisper-cuda" : "whisper", "Release", "whisper-server.exe");
-        if (!File.Exists(executable)) throw new IOException("The resident local engine is missing. Repair the local runtime.");
-        if (isParakeet && !await ParakeetAssets.VerifyAsync(cuda, cancellation).ConfigureAwait(false)) throw new IOException("The Parakeet runtime failed integrity verification. Existing files were preserved.");
-        var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
-        var capability = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        parakeet = isParakeet; apiKey = isParakeet ? capability : null;
-        endpoint = new Uri(isParakeet ? $"http://127.0.0.1:{port}/" : $"http://127.0.0.1:{port}/{capability}/");
-        var info = new ProcessStartInfo(executable);
-        if (isParakeet)
-        {
-            foreach (var name in info.Environment.Keys.Where(n => n.StartsWith("NEMO_SPEECH_", StringComparison.OrdinalIgnoreCase)).ToArray()) info.Environment.Remove(name);
-            info.Environment["NEMO_SPEECH_HTTP_API_KEY"] = apiKey;
-            foreach (var arg in new[] { "serve", "--asr-model", Transcriber.Models.PathFor(model), "--device", cuda ? "cuda:0" : "cpu", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--no-ui", "--threads", "1", "--max-upload-mb", "8", "--read-timeout", "90", "--write-timeout", "90", "--asr.batching.enabled=false", "--asr.batching.max_batch_size", "1", "--asr.batching.state_arena_slots", "1" }) info.ArgumentList.Add(arg);
-        }
-        else
-        {
-            foreach (var arg in new[] { "-m", Transcriber.Models.PathFor(model), "-t", "6", "-bs", cuda ? "5" : "1", "-bo", cuda ? "5" : "1", "-l", "auto", "-nf", "-sns", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--request-path", "/" + capability, "--public", Path.Combine(Transcriber.RuntimeRoot, "no-public-files") }) info.ArgumentList.Add(arg);
-            if (!cuda) info.ArgumentList.Add("-ng");
-        }
+        // Verification is part of startup, including automatic warming after launch.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(startupTimeout);
         try
         {
+            var verified = await verifyModel(model, deadline.Token).ConfigureAwait(false);
+            deadline.Token.ThrowIfCancellationRequested();
+            if (!verified) throw new IOException("Install and verify the selected local model first.");
+            var executable = isParakeet ? ParakeetAssets.Executable(cuda) : Path.Combine(Transcriber.RuntimeRoot, cuda ? "whisper-cuda" : "whisper", "Release", "whisper-server.exe");
+            if (!File.Exists(executable)) throw new IOException("The resident local engine is missing. Repair the local runtime.");
+            if (isParakeet && !await ParakeetAssets.VerifyAsync(cuda, deadline.Token).ConfigureAwait(false)) throw new IOException("The Parakeet runtime failed integrity verification. Existing files were preserved.");
+            deadline.Token.ThrowIfCancellationRequested();
+            var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
+            var capability = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            parakeet = isParakeet; apiKey = isParakeet ? capability : null;
+            endpoint = new Uri(isParakeet ? $"http://127.0.0.1:{port}/" : $"http://127.0.0.1:{port}/{capability}/");
+            var info = new ProcessStartInfo(executable);
+            if (isParakeet)
+            {
+                foreach (var name in info.Environment.Keys.Where(n => n.StartsWith("NEMO_SPEECH_", StringComparison.OrdinalIgnoreCase)).ToArray()) info.Environment.Remove(name);
+                info.Environment["NEMO_SPEECH_HTTP_API_KEY"] = apiKey;
+                foreach (var arg in new[] { "serve", "--asr-model", Transcriber.Models.PathFor(model), "--device", cuda ? "cuda:0" : "cpu", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--no-ui", "--threads", "1", "--max-upload-mb", "8", "--read-timeout", "90", "--write-timeout", "90", "--asr.batching.enabled=false", "--asr.batching.max_batch_size", "1", "--asr.batching.state_arena_slots", "1" }) info.ArgumentList.Add(arg);
+            }
+            else
+            {
+                foreach (var arg in new[] { "-m", Transcriber.Models.PathFor(model), "-t", "6", "-bs", cuda ? "5" : "1", "-bo", cuda ? "5" : "1", "-l", "auto", "-nf", "-sns", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--request-path", "/" + capability, "--public", Path.Combine(Transcriber.RuntimeRoot, "no-public-files") }) info.ArgumentList.Add(arg);
+                if (!cuda) info.ArgumentList.Add("-ng");
+            }
             Volatile.Write(ref usedCuda, 0);
             worker = new BoundedProcess(info, cuda || isParakeet ? 3072 : 1536);
             Volatile.Write(ref processId, worker.Process.Id);
             drainOutput = DrainAsync(worker.Process.StandardOutput, false);
             drainError = DrainAsync(worker.Process.StandardError, true);
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(TimeSpan.FromSeconds(60));
             while (true)
             {
                 deadline.Token.ThrowIfCancellationRequested();
@@ -185,9 +197,19 @@ internal sealed class ResidentModel
                 Volatile.Write(ref usedCuda, cuda ? 1 : 0);
             }
             else if (cuda && Volatile.Read(ref usedCuda) == 0) throw new IOException("The resident engine did not confirm CUDA. Select CPU or repair its runtime.");
-            cancellation.ThrowIfCancellationRequested(); key = nextKey; Volatile.Write(ref loaded, model); lastUse = clock.GetTimestamp();
+            deadline.Token.ThrowIfCancellationRequested(); key = nextKey; Volatile.Write(ref loaded, model); lastUse = clock.GetTimestamp();
         }
-        catch (Exception ex) { await ReleaseAsync().ConfigureAwait(false); if (ex is System.ComponentModel.Win32Exception or UnauthorizedAccessException or InvalidOperationException or JsonException or HttpRequestException) throw new IOException("The local model could not start safely. Check its files and runtime.", ex); throw; }
+        catch (Exception ex)
+        {
+            await ReleaseAsync().ConfigureAwait(false);
+            if (ex is OperationCanceledException && !cancellation.IsCancellationRequested)
+                throw new IOException("The local model reached its verification and startup time limit. Try again or check the selected model and runtime files.", ex);
+            if (ex is UnauthorizedAccessException or System.Security.SecurityException)
+                throw new IOException("The local model or runtime could not be read. Restore access and try again. Existing files were preserved.", ex);
+            if (ex is System.ComponentModel.Win32Exception or InvalidOperationException or JsonException or HttpRequestException)
+                throw new IOException("The local model could not start safely. Check its files and runtime.", ex);
+            throw;
+        }
     }
     private HttpRequestMessage Request(HttpMethod method, string path)
     {

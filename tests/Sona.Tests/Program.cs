@@ -2,6 +2,7 @@ using Sona.Core;
 int count = 0;
 void Check(bool pass, string name) { if (!pass) throw new Exception(name); Console.WriteLine("PASS " + name); count++; }
 AppPathsChecks.Run(Check);
+HistoryPreservationChecks.Run(Check);
 var preferences = new Preferences();
 Check(TextPipeline.Apply("Um, review codex with github.", preferences) == "review Codex with GitHub.", "Fillers and explicit vocabulary");
 Check(TextPipeline.Apply("Keep `um github` and https://example.com/um plus foo_bar.", preferences) == "Keep `um github` and https://example.com/um plus foo_bar.", "Protected code paths and URLs");

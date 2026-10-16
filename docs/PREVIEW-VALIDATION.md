@@ -1,5 +1,60 @@
 # Preview validation
 
+## October 16 daily-use candidate, 0.4.3
+
+The consolidated Release build passed with zero warnings/errors. The current
+dependency audit reported no known vulnerable packages. Verification includes:
+
+- 350 Core checks, including malformed and semantically invalid persisted-history
+  preservation, valid updates and temporary-file cleanup.
+- 49 default Windows lifecycle/transport checks; 24 focused insertion checks,
+  14 completed-paste checks and 17 active-app state checks.
+- 35 model preflight failure/deadline/cancellation checks with no worker started.
+- Five native Quit checks, including real UIA containment between two windows
+  in one process and actual Close after faulted model/cleanup preparation.
+- 88 native pending-settings checks, including edits during actual protection
+  configuration, exact persisted-byte preservation, protection rollback and a
+  later clean patch. The independent review's async-conflict finding was
+  reproduced before repair and passed afterward.
+- 27 fake-capture/recognition native pipeline checks, 22 draft-personalization
+  checks plus nine reopen checks, 22 retention-off checks, and 18 layout checks.
+- 22 actual local CLI/MCP checks against an isolated app/profile.
+
+The first consolidated live-draft fixture timed out waiting for cleanup to start.
+Its original receipt is retained. The fixture now also observes an unexpectedly
+completed stop task and reports the actual terminal state instead of an opaque
+wait. A bounded diagnostic rerun passed all 27 checks. The initial cause was not
+established; this is not evidence of a repaired production regression.
+
+These native fixtures use synthetic text, fake audio/recognition or fake external
+boundaries and isolated profiles. They do not open a microphone, inject global
+input, change the production profile or qualify a real Discord call. The hosted
+provider policy has independent safety coverage; Homepage Search still needs an
+owner-started check on the exact candidate. [Audit](DAILY-USE-AUDIT.md).
+
+Maintained affected commands after `tools/build.ps1`:
+
+```powershell
+$tests = '.\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe'
+& $tests --insertion-fixture
+& $tests --completed-paste-fixture
+& $tests --active-app-state-fixture
+& $tests --speech-preflight-checks
+& $tests --quit-preparation-fixture <fresh-directory>
+& $tests --agent-settings-conflict-fixture <fresh-directory>
+& $tests --live-draft-fixture <fresh-directory>
+& $tests --personalization-fixture <fresh-directory>
+& $tests --personalization-reopen <same-personalization-directory>
+& $tests --history-retention-off-fixture <fresh-directory>
+& $tests --layout-polish-fixture <fresh-directory>
+.\tools\agent-smoke.ps1 -OutputDirectory <fresh-directory>
+```
+
+Earlier qualified speech benchmarks, media and launcher/upgrade evidence below
+remain tied to their original source candidates. The engines, dependencies,
+inference flags and desktop launcher did not change in this pass. No new live
+latency, WER, hardware, call or visual-acceptance claim is made.
+
 ## October 15 daily-use candidate, 0.4.1
 
 The affected pass has 311 core checks, 8 focused insertion checks, 27 isolated

@@ -1,4 +1,8 @@
-# Current 0.4.2 design
+# Current 0.4.3 design
+
+October 16 reliability changes add specific retained-draft capture guidance and
+preserve pending native settings when an agent patch conflicts. Existing themes,
+layout and recording geometry remain as described below.
 
 The dated sections below preserve design history. Where they differ, the current
 October 15 implementation takes precedence: seven Settings sections, compact

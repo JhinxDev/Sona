@@ -3,7 +3,10 @@ using System.Runtime.InteropServices;
 using System.Windows.Automation;
 namespace Sona.App.Windows;
 
-public sealed record DraftTarget(nint Window, int ProcessId, int[] RuntimeId, long FocusEpoch);
+public sealed record DraftTarget(nint Window, int ProcessId, int[] RuntimeId, long FocusEpoch, int WindowProcessId = 0)
+{
+    public int OwnerProcessId => WindowProcessId > 0 ? WindowProcessId : ProcessId;
+}
 public sealed partial class Insertion : IDisposable
 {
     private long focusEpoch;
@@ -26,22 +29,7 @@ public sealed partial class Insertion : IDisposable
             Interlocked.Increment(ref focusEpoch);
     }
     [DllImport("user32.dll")] private static extern nint GetAncestor(nint hwnd, uint flags);
-    public DraftTarget? Capture()
-    {
-        if (readTarget != null) return readTarget();
-        try
-        {
-            if (hook == 0 || foregroundHook == 0) return null;
-            var element = AutomationElement.FocusedElement;
-            if (element == null || element.Current.ProcessId == Environment.ProcessId || element.Current.IsPassword || !element.Current.IsEnabled) return null;
-            if (element.Current.ControlType != ControlType.Edit && element.Current.ControlType != ControlType.Document) return null;
-            var window = GetForegroundWindow();
-            if (window == 0 || GetWindowThreadProcessId(window, out var process) == 0 || process != element.Current.ProcessId) return null;
-            if (element.TryGetCurrentPattern(ValuePattern.Pattern, out var value) && ((ValuePattern)value).Current.IsReadOnly) return null;
-            return new(window, element.Current.ProcessId, element.GetRuntimeId(), Interlocked.Read(ref focusEpoch));
-        }
-        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException) { return null; }
-    }
+    public DraftTarget? Capture() => CaptureWithStatus().Target;
     public static string AppName(DraftTarget? target)
     {
         if (target == null) return "No focused text field";
@@ -56,8 +44,8 @@ public sealed partial class Insertion : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
     }
-    public bool IsForegroundCurrent(DraftTarget? target) => target != null && target.Window == GetForegroundWindow() && target.FocusEpoch == FocusEpoch;
-    public static bool Same(DraftTarget? target, DraftTarget? current) => target != null && current != null && target.Window == current.Window && target.ProcessId == current.ProcessId && target.RuntimeId.SequenceEqual(current.RuntimeId) && target.FocusEpoch == current.FocusEpoch;
+    public bool IsForegroundCurrent(DraftTarget? target) => target != null && target.Window == GetForegroundWindow() && GetWindowThreadProcessId(target.Window, out var owner) != 0 && owner == target.OwnerProcessId && target.FocusEpoch == FocusEpoch;
+    public static bool Same(DraftTarget? target, DraftTarget? current) => target != null && current != null && target.Window == current.Window && target.ProcessId == current.ProcessId && target.OwnerProcessId == current.OwnerProcessId && target.RuntimeId.SequenceEqual(current.RuntimeId) && target.FocusEpoch == current.FocusEpoch;
     public async Task<(bool Inserted, string Detail)> InsertAsync(DraftTarget? target, string text, CancellationToken cancellation = default)
     {
         if (target == null) return (false, "Focus an editable field, then use the recording shortcut. Your transcript is ready to copy.");

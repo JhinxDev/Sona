@@ -22,6 +22,7 @@ internal static class InsertionChecks
         Check(!(await insertion.InsertAsync(target, "test")).Inserted, "Different field in same window refuses input");
         Check(!(await insertion.InsertAsync(null, "test")).Inserted, "Hover without focused field never sends");
         Check(!(await insertion.InsertAsync(target, "test\nsubmit")).Inserted && sends == 1, "No line break submission or clipboard transport");
+        passed += TargetCaptureChecks.Run();
         return passed;
     }
 }

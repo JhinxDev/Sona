@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.3 — daily-use reliability
+
+- Prove focused fields belong to the exact foreground window even when UIA is
+  hosted by another process; keep separate provider and window identities.
+  Accept writable-value comboboxes with the same focus and safety guards.
+- Explain capture failures without logging field contents. Retained drafts stay
+  available for an intentional retry.
+- Include model/runtime integrity verification in the startup deadline and
+  normalize access errors without changing owner cancellation.
+- Continue Quit cleanup after completed preparation faults; pending operations
+  retain bounded waits and retry guidance.
+- Preserve history files damaged since startup, including invalid saved records.
+- Reject agent settings patches while native settings have unsaved edits;
+  expose `unsavedSettings` in status.
+
+The owner-reported Homepage Search failure still needs exact-candidate acceptance.
+The capture changes are independently tested compatibility repairs, not a proven
+diagnosis. [Audit](docs/DAILY-USE-AUDIT.md).
+
 ## 0.4.2 — October 15, 2026
 
 Source preview; no public binary release yet.

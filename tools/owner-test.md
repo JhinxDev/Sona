@@ -1,5 +1,22 @@
 # Owner-started Sona test
 
+## Short 0.4.3 Homepage check
+
+Record the version/build from About first. Keep the existing retained draft.
+
+1. Focus an empty Search field on Homepage and use Ctrl+Alt+Shift+V to retry
+   the ready draft. This shortcut inserts once and does not request Enter.
+   Review the result without submitting. If Sona withholds insertion, report
+   its specific status and keep the draft.
+2. For a synthetic check without microphone capture, prepare Settings → Test
+   shortcut, then return to empty Homepage Search and hold Ctrl+Win for at
+   least 250 ms before releasing. Expect one fixed test sentence, no Enter.
+3. In a separate attempt, change field or app after the test starts. The draft
+   must remain in Sona rather than reaching the new field.
+
+The agent does not press these keys. Actual voice and call checks below remain
+separate, deliberate owner gestures.
+
 ## Short 0.4.2 acceptance run
 
 Use the coordinated private candidate. Settings → About shows the exact build

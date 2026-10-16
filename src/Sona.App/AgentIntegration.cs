@@ -15,10 +15,11 @@ public partial class MainWindow
         if (shutdownPending) return new(false, Error: "Sona is shutting down.");
         switch (request.Method)
         {
-            case "status": return new(true, new { version = AppVersion.Number, buildId = AppVersion.BuildId, preferencesLoad = preferencesLoad.Status.ToString(), liveTranscription = preferences.LiveTranscription, state = recorder != null ? "recording" : processing || preparing || preferencesApplying || cleanupInstalling ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), loadedModel = transcriber.LoadedModel, residentProcessId = transcriber.ResidentProcessId, residentCleanupPending = transcriber.ResidentCleanupPending, downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, cleanupBackend = cleanupModel.LoadedBackend, cleanupProcessId = cleanupModel.ProcessId, cleanupInstalling, cleanupPercent, cleanupOutcome, microphoneControl = false });
+            case "status": return new(true, new { version = AppVersion.Number, buildId = AppVersion.BuildId, preferencesLoad = preferencesLoad.Status.ToString(), unsavedSettings = HasUnsavedSettings, liveTranscription = preferences.LiveTranscription, state = recorder != null ? "recording" : processing || preparing || preferencesApplying || cleanupInstalling ? "busy" : "idle", model = Transcriber.SelectedModel(preferences), loadedModel = transcriber.LoadedModel, residentProcessId = transcriber.ResidentProcessId, residentCleanupPending = transcriber.ResidentCleanupPending, downloadingModel, downloadPercent, downloadOutcome, apiVersion = 1, cleanupBackend = cleanupModel.LoadedBackend, cleanupProcessId = cleanupModel.ProcessId, cleanupInstalling, cleanupPercent, cleanupOutcome, microphoneControl = false });
             case "settings.get": return new(true, AgentSettings.View(preferences));
             case "settings.patch":
                 if (SettingsBusy) return new(false, Error: "Finish the current dictation before changing settings.");
+                if (HasUnsavedSettings) return new(false, Error: "Sona has unsaved settings. Save or revert the Settings and Discord protection edits before applying an agent patch.");
                 var next = AgentSettings.Apply(preferences, request.Parameters);
                 if (next.Device != -1 && !Recorder.Devices().Any(d => d.Id == next.Device)) return new(false, Error: "Requested microphone is not available.");
                 if (!transcriber.AvailableFor(next)) return new(false, Error: "Install a compatible model and engine first.");
@@ -27,7 +28,15 @@ public partial class MainWindow
                 try
                 {
                     if (protection != null) await protection.ConfigureAsync(next, cancellation);
-                    cancellation.ThrowIfCancellationRequested(); next.Save(preferencesPath);
+                    cancellation.ThrowIfCancellationRequested();
+                    // Protection configuration can await I/O while the form remains editable.
+                    // Recheck before persistence or any form refresh can discard those edits.
+                    if (HasUnsavedSettings)
+                    {
+                        await ConfigureProtectionAsync();
+                        return new(false, Error: "Sona has unsaved settings. Save or revert the Settings and Discord protection edits before applying an agent patch.");
+                    }
+                    next.Save(preferencesPath);
                 }
                 catch { await ConfigureProtectionAsync(); throw; }
                 finally { preferencesApplying = false; }

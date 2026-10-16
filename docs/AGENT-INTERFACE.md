@@ -1,5 +1,13 @@
 # Sona agent interface
 
+0.4.3 adds `unsavedSettings` to status. `settings.patch` rejects while the native
+general or Discord-protection form already has unsaved edits, before validation
+or side effects. Edits made while protection configuration is awaiting also
+reject the patch before saving or refreshing the form, restoring the committed
+protection configuration. Save or revert those edits in Sona, then retry.
+Status returns only the boolean, not the pending values. Clean patches retain
+the existing validated commit behavior.
+
 0.4.2 adds `pasteCompletedDraft` (default true) and `enterToSend` (default false)
 boolean settings, plus `soundEffects` (default true). Enter-to-send still requires the owner's physical Enter gesture
 during an admitted hands-free recording and verified insertion into the same field.

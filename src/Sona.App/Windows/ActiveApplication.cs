@@ -91,8 +91,8 @@ internal sealed class RecordingDestinationContext
     {
         ActiveAppName = app.Name;
         ActiveAppIcon = app.Icon ?? ApplicationIconCache.DefaultIcon;
-        if (IsRecordingContext && Destination != null && !DestinationChanged && app.Window == Destination.Window && app.ProcessId == Destination.ProcessId && app.FocusEpoch == Destination.FocusEpoch && ReferenceEquals(DestinationIcon, ApplicationIconCache.DefaultIcon)) DestinationIcon = ActiveAppIcon;
-        if (IsRecordingContext && Destination != null && (app.Window != Destination.Window || app.ProcessId != Destination.ProcessId || app.FocusEpoch != Destination.FocusEpoch)) DestinationChanged = true;
+        if (IsRecordingContext && Destination != null && !DestinationChanged && app.Window == Destination.Window && app.ProcessId == Destination.OwnerProcessId && app.FocusEpoch == Destination.FocusEpoch && ReferenceEquals(DestinationIcon, ApplicationIconCache.DefaultIcon)) DestinationIcon = ActiveAppIcon;
+        if (IsRecordingContext && Destination != null && (app.Window != Destination.Window || app.ProcessId != Destination.OwnerProcessId || app.FocusEpoch != Destination.FocusEpoch)) DestinationChanged = true;
     }
     public void Begin(DraftTarget? destination, string name, ImageSource? icon = null)
     {

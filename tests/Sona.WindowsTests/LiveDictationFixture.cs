@@ -58,7 +58,12 @@ internal static class LiveDictationFixture
                     var cleanupReady = new TaskCompletionSource<string>(); var cleanupStarted = false;
                     window.CleanupForTests = (_, _) => { cleanupStarted = true; return cleanupReady.Task; };
                     var stopLatency = System.Diagnostics.Stopwatch.StartNew();
-                    var stopping = window.StopForTestsAsync(); await Wait(() => cleanupStarted);
+                    var stopping = window.StopForTestsAsync(); await Wait(() => cleanupStarted || stopping.IsCompleted);
+                    if (!cleanupStarted)
+                    {
+                        await stopping;
+                        throw new InvalidOperationException("Final cleanup was skipped: " + window.SessionForTests + "; " + ((TextBlock)window.FindName("StatusDetail")).Text);
+                    }
                     Check(stopLatency.Elapsed < TimeSpan.FromSeconds(1), "Stopping does not wait for the next two-second preview polling interval");
                     draft.Text = "My correction survives cleanup too.";
                     cleanupReady.SetResult("Let's review the draft together and keep the correction."); await stopping;

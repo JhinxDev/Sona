@@ -11,6 +11,15 @@ public partial class MainWindow
 {
     private readonly DispatcherTimer settingsActionTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private bool restoringIdleChoice;
+    private bool HasUnsavedGeneralSettings(Preferences? candidate = null) => JsonSerializer.Serialize(candidate ?? ReadGeneralPreferences()) != JsonSerializer.Serialize(preferences);
+    private bool HasUnsavedProtectionSettings =>
+        (ProtectionEnabled.IsChecked == true) != preferences.ProtectionEnabled ||
+        (SilenceIncoming.IsChecked == true) != preferences.SilenceIncoming ||
+        !WatchedApps.Text.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase).SequenceEqual(preferences.WatchedApps, StringComparer.Ordinal) ||
+        !int.TryParse(ProtectionDelay.Text, out var delay) || delay != preferences.ProtectionReleaseDelayMs ||
+        ProtectionShortcutInput.Text.Trim() != preferences.ProtectionShortcut;
+    private bool HasUnsavedSettings => HasUnsavedGeneralSettings() || HasUnsavedProtectionSettings;
 
     // General preferences are deliberately separate from protected credentials
     // and call-protection configuration, which retain their explicit save actions.
@@ -35,6 +44,7 @@ public partial class MainWindow
 
     private void InitializeSettingsActions()
     {
+        RefreshProtectionFields();
         foreach (var choice in new[] { SpeechLanguage, TranscriptionEngine, DraftStyle, Device, ShortcutMode, CleanupToneChoice, CleanupEngineChoice, CleanupIdleChoice, ThemeChoice })
             choice.SelectionChanged += (_, _) => RefreshSettingsActions();
         foreach (var choice in new[] { SoundEffects, PasteCompletedDraft, EnterToSend, LiveTranscription, AutoInsert, CopyToClipboard, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
@@ -51,7 +61,8 @@ public partial class MainWindow
     {
         if (SavePreferencesButton == null || CleanupIdleChoice.SelectedItem == null || SpeechLanguage.SelectedItem == null) return;
         var next = ReadGeneralPreferences();
-        PreferencesSaveBar.Visibility = JsonSerializer.Serialize(next) == JsonSerializer.Serialize(preferences) ? Visibility.Collapsed : Visibility.Visible;
+        PreferencesSaveBar.Visibility = HasUnsavedGeneralSettings(next) ? Visibility.Visible : Visibility.Collapsed;
+
         SavePreferencesButton.IsEnabled = !SettingsBusy;
         // The dependent option retains its form value while protection is off.
         // Neither this display state nor master-toggle edits save protection.

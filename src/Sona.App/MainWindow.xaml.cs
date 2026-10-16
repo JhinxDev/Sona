@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? cancellation;
     private DictationSession? session;
     private DraftTarget? target;
+    private TargetCaptureResult? recordingCapture;
     private int shortcutToggleMode;
     private int enterToSendEnabled;
     private bool submitOnComplete;
@@ -147,10 +148,11 @@ public partial class MainWindow : Window
         {
             if (preparedInsertionTest && session?.State == SessionState.Ready)
             {
-                target = insertion.Capture();
+                var capture = insertion.CaptureWithStatus();
+                target = capture.Target;
                 if (hotkeys?.CanBeginHold != true) return false;
-                if (target == null) { ShowShortcutNotice("Test shortcut", "Focus an editable draft"); return false; }
-                activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.ProcessId ? activeApplication.Current.Icon : null); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
+                if (target == null) { ShowShortcutNotice("Test shortcut: field unavailable", capture.Detail); return false; }
+                activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
                 barPreview.Stop(); overlay.Update("Test shortcut", "No microphone"); overlay.ShowFor(target.Window);
                 insertionTestHolding = true; return true;
             }
@@ -182,8 +184,9 @@ public partial class MainWindow : Window
         if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new(); submitOnComplete = false;
-        target = insertion.Capture();
-        activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.ProcessId ? activeApplication.Current.Icon : null);
+        recordingCapture = insertion.CaptureWithStatus();
+        target = recordingCapture.Target;
+        activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
         barPreview.Stop();
         RetainCurrentDraft(); historySelection = null;
         preparedInsertionTest = insertionTestHolding = false;
@@ -214,7 +217,7 @@ public partial class MainWindow : Window
             capture.Start(preferences.Device);
             if (admission != null && !admission()) { Cancel(); return false; }
             hotkeys?.Recording(true); timer.Start();
-            Status.Text = "Listening"; StatusDetail.Text = target == null ? "Draft stays in Sona. Click the destination composer before the next recording; hovering alone does not select it." : "Destination: " + Insertion.AppName(target) + ". Keep that composer focused. Esc cancels."; RecordButton.Content = "Stop";
+            Status.Text = "Listening"; StatusDetail.Text = target == null ? recordingCapture.Detail : "Destination: " + Insertion.AppName(target) + ". Keep that composer focused. Esc cancels."; RecordButton.Content = "Stop";
             overlay.UpdateTarget(destinationContext.Label);
             overlay.UpdateAppIcon(destinationContext.Icon);
             overlay.Update("Listening", "Esc to cancel"); overlay.ShowFor(target?.Window ?? 0);
@@ -268,7 +271,7 @@ public partial class MainWindow : Window
                 if (submitOnComplete && insertion.LastSubmissionAccepted) completedFeedback = FeedbackCue.Sent;
                 Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
             }
-            else { Status.Text = "Draft ready"; StatusDetail.Text = (liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? "No focused text field was captured. Open the destination composer before recording, or copy this draft." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
+            else { Status.Text = "Draft ready"; StatusDetail.Text = (liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
@@ -282,7 +285,10 @@ public partial class MainWindow : Window
     private async Task InsertReadyAsync(DraftTarget? suppliedTarget = null)
     {
         if (shutdownPending || processing || recorder != null || session?.State != SessionState.Ready) { StatusDetail.Text = "Choose a new ready draft first. Already inserted drafts cannot be inserted twice."; return; }
-        var current = session; var destination = suppliedTarget ?? insertion.Capture();
+        var current = session;
+        var capture = suppliedTarget == null ? insertion.CaptureWithStatus() : new TargetCaptureResult(suppliedTarget, TargetCaptureStatus.Ready);
+        var destination = capture.Target;
+        if (destination == null) { Status.Text = "Draft ready"; StatusDetail.Text = capture.Detail; return; }
         activeApplication?.Refresh();
         if (suppliedTarget != null && destinationContext.DestinationChanged) { Status.Text = "Draft ready"; StatusDetail.Text = "Focus changed. Your draft stayed in Sona."; overlay.Hide(); destinationContext.End(); return; }
         cancellation?.Dispose(); cancellation = new();
@@ -420,32 +426,40 @@ public partial class MainWindow : Window
     private void PreviewBar_Click(object sender, RoutedEventArgs e) { if (recorder != null || processing || insertionTestHolding) return; barPreview.Stop(); barPreview.Interval = TimeSpan.FromSeconds(5); overlay.UpdateTranscript("", ""); overlay.UpdateTarget("Preview"); overlay.Update("Voice bar preview", "No microphone"); overlay.ShowFor(new WindowInteropHelper(this).Handle); barPreview.Start(); }
     private void Quit_Click(object sender, RoutedEventArgs e) => RequestQuit();
     public void RequestQuit() => Dispatcher.BeginInvoke(() => _ = QuitAsync());
+    // A failed preparation task is already finished. Observe its error, then
+    // still run the owning resource cleanup below. A genuinely pending task
+    // retains the bounded wait and keeps Quit retryable instead of hiding it.
+    private static async Task DrainForQuitAsync(Task pending)
+    {
+        try { await pending.WaitAsync(TimeSpan.FromSeconds(7)); }
+        catch (Exception) when (pending.IsFaulted || pending.IsCanceled) { _ = pending.Exception; }
+    }
     private async Task QuitAsync()
     {
         if (shutdownPending) return;
         shutdownPending = true; IsEnabled = false; Cancel();
         modelLifetime.Cancel(); modelIdleTimer.Stop();
-        try { await liveOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(liveOperation); }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for live preview cleanup", "Try Quit again shortly."); return; }
-        try { await operation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(operation); }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for local cleanup", "Windows is still releasing worker files. Try Quit again shortly."); return; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or InvalidOperationException or System.Text.Json.JsonException) { /* Always retry recorded cleanup failures below, even when the operation faulted. */ }
         try { await transcriber.RetryCleanupAsync(); }
         catch (ScratchCleanupException ex) { ShowCleanupFailure("Temporary recording needs cleanup", ex.Message + " Try Quit again after the file is released."); return; }
         if (transcriber.CleanupPending) { ShowCleanupFailure("Temporary recording needs cleanup", "Recording files remain on this computer. Try Quit again to retry cleanup."); return; }
-        try { await modelPreparation.WaitAsync(TimeSpan.FromSeconds(7)); await transcriber.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(modelPreparation); await transcriber.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is IOException or TimeoutException) { ShowCleanupFailure("Model memory needs cleanup", "Try Quit again once the local model is released."); return; }
-        try { await cleanupPreparation.WaitAsync(TimeSpan.FromSeconds(7)); await cleanupModel.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(cleanupPreparation); await cleanupModel.UnloadAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (Exception ex) when (ex is IOException or TimeoutException) { ShowCleanupFailure("Cleanup memory needs attention", "Try Quit again once the cleanup model is released."); return; }
         cleanupInstallCancellation?.Cancel();
-        try { await cleanupInstallOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(cleanupInstallOperation); }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for cleanup setup", "Try Quit again shortly."); return; }
         try { await CleanupAssets.RetryCleanupAsync(); }
         catch (IOException) { ShowCleanupFailure("Cleanup setup needs attention", "A setup file is still locked. Try Quit again shortly."); return; }
         if (CleanupAssets.CleanupPending) { ShowCleanupFailure("Cleanup setup needs attention", "Try Quit again to release remaining setup files."); return; }
         modelDownloadCancellation?.Cancel();
-        try { await modelDownloadOperation.WaitAsync(TimeSpan.FromSeconds(7)); }
+        try { await DrainForQuitAsync(modelDownloadOperation); }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or System.Net.Http.HttpRequestException) { }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for model download cleanup", "Try Quit again shortly."); return; }
         try { await modelStore.RetryCleanupAsync(); await ParakeetAssets.RetryCleanupAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
@@ -454,8 +468,8 @@ public partial class MainWindow : Window
         if (agentServer != null) { await agentServer.DisposeAsync(); agentServer = null; }
         if (protection != null)
         {
-            try { await protectionReleaseOperation; using var restoreDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(7)); await protection.RestoreForQuitAsync(restoreDeadline.Token); }
-            catch (Exception ex) when (ex is IOException or OperationCanceledException) { ShowCleanupFailure("Discord restoration needs attention", "Sona could not confirm restoration. Reconnect Discord or pause protection, then try Quit again."); return; }
+            try { await DrainForQuitAsync(protectionReleaseOperation); using var restoreDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(7)); await protection.RestoreForQuitAsync(restoreDeadline.Token); }
+            catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException) { ShowCleanupFailure("Discord restoration needs attention", "Sona could not confirm restoration. Reconnect Discord or pause protection, then try Quit again."); return; }
             protectionTimer.Stop(); protectionHotkey?.Dispose(); await protection.DisposeAsync(); protection = null;
         }
         quitting = true; Close(); Application.Current.Shutdown();
