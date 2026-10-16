@@ -96,7 +96,7 @@ public partial class MainWindow
             var ids = HistoryFiltering.ClearableIds(historyEntries, filter, HistorySearch.Text, now, TimeZoneInfo.Local);
             var saved = historyEntries.Count(item => item.Saved);
             HistoryCountPreview.Text = $"{ids.Length} recent {(ids.Length == 1 ? "record" : "records")} in {HistoryFiltering.RangeLabel(filter)}{(string.IsNullOrWhiteSpace(HistorySearch.Text) ? "" : " matching your search")}. {saved} saved {(saved == 1 ? "draft stays" : "drafts stay")} separate.";
-            ClearHistoryButton.Content = ids.Length == 0 ? "Clear recent..." : $"Clear {ids.Length} recent...";
+            ClearHistoryButton.Content = "Clear recent history";
             RefreshHistoryActions();
             if (pendingHistoryClear != null && pendingHistoryClear.Any(id => !ids.Contains(id))) ResetHistoryClear();
         }

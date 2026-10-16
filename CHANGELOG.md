@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6 - full History action label
+
+- Show Clear recent history in full, without an ellipsis or a changing count in
+  the button. The exact count remains immediately below the controls and in the
+  confirmation. Existing deletion and pause behavior is unchanged.
+
 ## 0.4.5 - History deletion and pause
 
 - Re-enable Clear recent automatically when dictation returns to idle. The

@@ -97,7 +97,7 @@
     <StackPanel Grid.Row="1" Margin="0,16,0,12">
      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <Grid><TextBox x:Name="HistorySearch" TextChanged="HistorySearch_Changed" AutomationProperties.Name="Search transcriptions" Padding="12,10"/><TextBlock Text="Search transcriptions..." Margin="13,10" Foreground="{DynamicResource Muted}" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=HistorySearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
-      <Button x:Name="ClearHistoryButton" Grid.Column="1" Content="Clear recent..." Click="ClearHistory_Click" Margin="10,0,0,0" AutomationProperties.Name="Preview clearing filtered recent history"/>
+      <Button x:Name="ClearHistoryButton" Grid.Column="1" Content="Clear recent history" Click="ClearHistory_Click" Margin="10,0,0,0" AutomationProperties.Name="Preview clearing filtered recent history"/>
      </Grid>
      <WrapPanel Margin="0,10,0,0" VerticalAlignment="Center">
       <Button x:Name="PauseHistoryButton" Content="Pause history" Click="PauseHistory_Click" Margin="0,0,16,0" ToolTip="Pause new History entries without stopping dictation. Existing drafts stay available. Your choice is remembered."/>
