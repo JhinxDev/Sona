@@ -5,6 +5,7 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 4 && args[0] == "--desktop-launch-parent") { DesktopLaunchParent.Run(args[1], args[2], args[3]); return; }
 if (args.Length == 2 && args[0] == "--layout-polish-fixture") { Console.WriteLine(JsonSerializer.Serialize(LayoutPolishFixture.Run(args[1]))); return; }
 if (args.Length == 2 && args[0] == "--closed-discord-start-fixture") { Console.WriteLine(JsonSerializer.Serialize(DiscordClosedStartFixture.Run(args[1]))); return; }
 if (args.Length == 1 && args[0] == "--discord-closed-checks") { Console.WriteLine($"{await DiscordClosedChecks.RunAsync()} closed Discord checks passed."); return; }

@@ -86,7 +86,7 @@ if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
     }
 }
 if ($Launch -and $RehearsalRoot) { throw 'Launch an isolated test with its explicit profile and --test-ui instead.' }
-if ($Launch) { Start-Process -FilePath (Join-Path $taskInstall 'Sona.exe') -ArgumentList '--start-hidden' -WindowStyle Hidden }
+if ($Launch) { & (Join-Path $PSScriptRoot 'start-sona.ps1') -FilePath (Join-Path $taskInstall 'Sona.exe') -Hidden | Out-Null }
 if($NextLaunch){
     foreach($taskPreserved in $taskPreservedProcesses){
         $taskStillRunning=Get-Process -Id $taskPreserved.Id -ErrorAction Stop

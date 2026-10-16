@@ -59,7 +59,11 @@ $taskAbout=ById 'SettingsAboutNav'
 if($taskAbout){$taskAbout.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()}
 $taskQuit=$taskRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)))
 if($taskQuit.Count-ne1){throw 'Quit control not unique; app preserved'}
-function LaunchPrivate([string]$Path,[string]$Payload){$taskLaunch=[Diagnostics.ProcessStartInfo]::new($Path);$taskLaunch.UseShellExecute=$false;$taskLaunch.Environment['SONA_DRAFT_TRANSFER']=$Payload;if($RehearsalRoot){$taskLaunch.ArgumentList.Add('--test-ui');$taskLaunch.ArgumentList.Add('--test-transfer');$taskLaunch.Environment['SONA_DATA']=Join-Path $RehearsalRoot 'profile';$taskLaunch.Environment['MURMUR_DATA']=Join-Path $RehearsalRoot 'profile'};try{return [Diagnostics.Process]::Start($taskLaunch)}finally{$taskLaunch.Environment.Remove('SONA_DRAFT_TRANSFER')|Out-Null}}
+function LaunchPrivate([string]$Path,[string]$Checkpoint){
+    $launch=@{FilePath=$Path;RecoveryPath=$Checkpoint};if($RehearsalRoot){$launch.RehearsalRoot=$RehearsalRoot}
+    $launched=& (Join-Path $PSScriptRoot 'start-sona.ps1') @launch
+    return Get-Process -Id $launched.PID -ErrorAction Stop
+}
 $taskNew=$null
 try{
     $taskQuit[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
@@ -67,7 +71,7 @@ try{
     $taskInstallArgs=@{PackageDirectory=$taskPackage};if($RehearsalRoot){$taskInstallArgs.RehearsalRoot=$RehearsalRoot}
     & (Join-Path $PSScriptRoot 'install.ps1') @taskInstallArgs|Out-Null
     $taskNewPath=Join-Path $taskProgramRoot ($taskPackageReceipt.Version+'-'+$taskPackageReceipt.SourceHead.Substring(0,8)+'\Sona.exe')
-    $taskNew=LaunchPrivate $taskNewPath (ReadRecovery $taskRecovery)
+    $taskNew=LaunchPrivate $taskNewPath $taskRecovery
     for($taskTry=0;$taskTry-lt100;$taskTry++){$taskNew.Refresh();if($taskNew.MainWindowHandle-ne0){break};if($taskNew.HasExited){throw 'Candidate exited'};Start-Sleep -Milliseconds 100}
     $taskNewRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskNew.MainWindowHandle)
     $taskNewField=$taskNewRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'Draft'))
@@ -75,8 +79,9 @@ try{
     Remove-Item -LiteralPath $taskRecovery
     [pscustomobject]@{Version=$taskPackageReceipt.Version;PID=$taskNew.Id;DraftPreserved=$true;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json
 }catch{
+    $taskLaunchUncertain=[bool]$_.Exception.Data['DesktopLaunchUncertain']
     $taskRemaining=@(Get-Process -Name Sona -ErrorAction SilentlyContinue)
     if($RehearsalRoot){$taskRemaining=@($taskRemaining|Where-Object{$_.Path-and$_.Path.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)})}
-    if(!$taskRemaining.Count){LaunchPrivate $taskOldPath (ReadRecovery $taskRecovery)|Out-Null}
+    if(!$taskRemaining.Count -and !$taskLaunchUncertain){LaunchPrivate $taskOldPath $taskRecovery|Out-Null}
     throw 'Update did not qualify. Encrypted draft recovery is retained; any running app was preserved.'
 }finally{$taskDraft=$null;$taskOriginal=$null;$taskPayload=$null}

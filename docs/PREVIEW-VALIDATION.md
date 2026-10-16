@@ -234,3 +234,20 @@ Local original media and the verified editable release archive were retained.
 This completes the media replacement, not a public binary release. The trailer
 uses the documented prerecorded recognition and measured-event replay; it does
 not establish physical shortcut, live microphone or receiving-field acceptance.
+
+## Desktop launch lifetime — October 16, 2026
+
+A native isolated test confirms Sona launched directly by a contained terminal
+belongs to that terminal's cleanup job and exits with it. The repaired desktop
+bootstrap launches outside that job and survives its closure with the synthetic
+draft intact. Thirteen checks cover the two launch routes, private transfer,
+request expiry/replay, exact test cleanup and production preservation. Eighteen
+upgrade-rehearsal checks cover the successful and fallback restoration paths.
+
+The first rehearsal exposed timestamp conversion between Windows PowerShell and
+PowerShell 7; identity checking now compares UTC ticks. A separate harness issue
+inherited PowerShell 7's module path into Windows PowerShell; the test launcher
+now lets Windows PowerShell resolve its own modules. Failed receipts were retained.
+No production process was restarted and no model, microphone or external input
+was used. Existing speech-worker job containment is unchanged. See
+[desktop launch implementation](IMPLEMENTATION.md#desktop-owned-installation-and-upgrade-launches).

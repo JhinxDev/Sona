@@ -38,6 +38,10 @@ Source preview; no public binary release yet.
 
 ### Daily-use repair
 
+- Installer and guarded upgrade launches now belong to the Windows desktop,
+  so closing their launching terminal does not close Sona. Encrypted draft
+  recovery and private transfer remain intact; speech-worker jobs are unchanged.
+
 - Fixed Ctrl + Windows appearing to do nothing when Discord was closed and call
   protection was enabled: the protection preparation step had rejected recording
   before the capsule appeared. Closed desktop Discord now permits dictation;

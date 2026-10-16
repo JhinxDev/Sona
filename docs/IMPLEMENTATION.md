@@ -54,3 +54,46 @@ current-path launcher, not an independently pinned old executable or Run entry.
 The isolated upgrade rehearsal covers staging, unchanged live synthetic drafts,
 invalid combinations, running-directory rejection and existing upgrade recovery
 (18 checks). No production restart is part of that rehearsal.
+
+## Desktop-owned installation and upgrade launches
+
+`install.ps1 -Launch` and both the candidate and recovery launches in
+`upgrade.ps1` now use `start-sona.ps1`. It delegates a hidden bootstrap to the
+actual Explorer desktop through `start-desktop-app.ps1`. Starting a fresh
+`Shell.Application` object alone or using `Start-Process` does not establish
+independence from an agent terminal's Windows cleanup job.
+
+The bootstrap receives only a short-lived, current-user DPAPI request path on
+its command line. It validates the installed target, atomically claims the
+request, reads the existing encrypted draft checkpoint and passes its contents
+through `SONA_DRAFT_TRANSFER` in the child's private environment. Supported
+profile/runtime overrides are transferred explicitly. No draft enters command
+arguments, logs or a plaintext handoff file. The updater still verifies the live
+draft before removing its own recovery checkpoint. Failed or uncertain launches
+retain recovery; an ambiguous acknowledgement never triggers a second launch.
+Expired and consumed requests cannot launch another instance. An interactive
+Explorer desktop is required; there is no terminal-child fallback.
+
+This changes installation tooling, not Sona's speech-worker containment. The
+app still owns its worker jobs and releases them on exit. Existing app packages
+can use the repaired scripts; no new app build or user restart is required to
+install this tooling repair. `-NextLaunch` remains non-launching.
+
+The Windows implementation follows the actual-desktop dispatch pattern described
+by [Microsoft](https://devblogs.microsoft.com/oldnewthing/20131118-00/?p=2643).
+A bounded native regression launches isolated Sona instances, closes the launcher's
+kill-on-close job and verifies the direct control dies while the desktop-launched
+instance survives, restores its synthetic draft and then quits normally:
+
+```powershell
+.\tools\desktop-launch-rehearsal.ps1 -PackageDirectory <verified-package> `
+  -OutputRoot <fresh-path-ending-in-sona-upgrade-rehearsal-and-32-hex-digits> `
+  -TestExecutable .\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe
+```
+
+The 13 checks include private transfer, request cleanup/expiry/replay rejection,
+and preservation of the running owner instance and preferences. The existing
+18-check `upgrade-rehearsal.ps1` separately exercises installer failure, fallback,
+retry and draft/original restoration. Neither test closes the owner's app or opens
+a microphone. These reproduce a launch-lifetime risk; they do not establish the
+historical cause of any particular Codex shutdown incident.
