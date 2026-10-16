@@ -13,5 +13,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Agent interface build failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Safety regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Sona.WindowsTests" -c Release --disable-build-servers -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Windows lifecycle regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --capture-policy-checks
+if ($LASTEXITCODE -ne 0) { throw 'Capture policy regressions failed' }
+$taskCaptureEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-capture-status-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --capture-status-fixture $taskCaptureEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Capture status regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

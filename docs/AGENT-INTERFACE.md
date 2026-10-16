@@ -1,5 +1,16 @@
 # Sona agent interface
 
+0.4.4 adds nullable `destinationCapture` to `status`. It is a snapshot of the last
+intentional recording, Test shortcut or ready-draft capture, not a fresh focus
+inspection. `attempt`, `observedAt`, `status`, control type, process identities,
+exact foreground HWND, start/end focus epochs, `stable`, nullable containment,
+calling apartment and a transient runtime-identity hash support diagnosis. No
+field text, labels, window titles, raw runtime IDs or draft are exposed. The
+snapshot is memory-only, overwritten by the next capture and cleared on exit.
+Null means no attempt has been captured this run. Unknown metadata stays null or
+unverified; a stable rejection is not permission to insert. No new command starts
+a capture, recording or submission.
+
 0.4.3 adds `unsavedSettings` to status. `settings.patch` rejects while the native
 general or Discord-protection form already has unsaved edits, before validation
 or side effects. Edits made while protection configuration is awaiting also

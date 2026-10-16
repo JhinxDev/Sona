@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows.Automation;
 
 namespace Sona.App.Windows;
@@ -7,7 +9,7 @@ public enum TargetCaptureStatus
 {
     Ready, TrackingUnavailable, NoForegroundWindow, NoFocusedControl, SonaFocused,
     PasswordField, DisabledField, UnsupportedControl, ReadOnlyField,
-    OutsideForegroundWindow, FocusChanged, ProviderUnavailable
+    OutsideForegroundWindow, FocusChanged, ProviderUnavailable, SuggestionFocused
 }
 
 public sealed record TargetCaptureResult(DraftTarget? Target, TargetCaptureStatus Status)
@@ -15,6 +17,13 @@ public sealed record TargetCaptureResult(DraftTarget? Target, TargetCaptureStatu
     public int? ControlTypeId { get; init; }
     public int? ProviderProcessId { get; init; }
     public int? WindowProcessId { get; init; }
+    public long ForegroundWindow { get; init; }
+    public long FocusEpochBefore { get; init; }
+    public long FocusEpochAfter { get; init; }
+    public bool Stable { get; init; }
+    public bool? FieldInForegroundWindow { get; init; }
+    public string? RuntimeIdentityHash { get; init; }
+    internal static string? HashRuntimeId(int[] runtimeId) => runtimeId.Length == 0 ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join(",", runtimeId))));
     public string Detail => Status switch
     {
         TargetCaptureStatus.Ready => "The focused text field was captured.",
@@ -24,7 +33,8 @@ public sealed record TargetCaptureResult(DraftTarget? Target, TargetCaptureStatu
         TargetCaptureStatus.SonaFocused => "Sona had focus when recording began. Focus the destination and use Ctrl + Windows, or copy this draft.",
         TargetCaptureStatus.PasswordField => "Password fields are protected. Your draft stays in Sona.",
         TargetCaptureStatus.DisabledField => "The focused field is disabled. Your draft stays in Sona.",
-        TargetCaptureStatus.UnsupportedControl => "Windows exposed a control that Sona cannot safely type into. Try Test shortcut with the caret in the field, or copy this draft.",
+        TargetCaptureStatus.UnsupportedControl => "Windows did not identify an editable text field. Your draft stays in Sona. Use Copy draft, then paste into the destination yourself.",
+        TargetCaptureStatus.SuggestionFocused => "Windows is reporting a suggestion or list item instead of the text field. Your draft stays in Sona. Use Copy draft, then paste into the field yourself.",
         TargetCaptureStatus.ReadOnlyField => "Windows exposed the focused control as read-only. Your draft stays in Sona; try Test shortcut in the editable field.",
         TargetCaptureStatus.OutsideForegroundWindow => "Windows reported a focused field outside the active window. Your draft stays in Sona.",
         TargetCaptureStatus.FocusChanged => "Focus changed while Sona checked the destination. Your draft stays in Sona.",
@@ -60,12 +70,14 @@ public sealed partial class Insertion
                 if (attribute is bool state) readOnly = state;
             }
             var field = new TargetFieldMetadata(current.ProcessId, current.ControlType.Id, current.IsEnabled, current.IsPassword, readOnly, element.GetRuntimeId());
-            var preliminary = EvaluateCapture(field, window, (int)owner, true, epoch, epoch);
-            if (preliminary.Target == null) return preliminary;
             var contained = ElementBelongsToWindow(element, window);
-            if (window != GetForegroundWindow() || GetWindowThreadProcessId(window, out var finalOwner) == 0 || owner != finalOwner)
-                return new(null, TargetCaptureStatus.FocusChanged);
-            return EvaluateCapture(field, window, (int)owner, contained, epoch, FocusEpoch);
+            // Re-read actual focused identity as well as the event epoch. A UIA
+            // call may pump messages or race a provider even for rejected types.
+            var finalElement = AutomationElement.FocusedElement;
+            var sameElement = finalElement != null && finalElement.Current.ProcessId == field.ProcessId && finalElement.GetRuntimeId().SequenceEqual(field.RuntimeId);
+            var sameWindow = window == GetForegroundWindow() && GetWindowThreadProcessId(window, out var finalOwner) != 0 && owner == finalOwner;
+            var result = EvaluateCapture(field, window, (int)owner, contained, epoch, FocusEpoch);
+            return sameElement && sameWindow ? result : result with { Target = null, Status = TargetCaptureStatus.FocusChanged, Stable = false };
         }
         catch (Exception error) when (error is ElementNotAvailableException or InvalidOperationException or COMException or UnauthorizedAccessException)
         { return new(null, TargetCaptureStatus.ProviderUnavailable); }
@@ -73,17 +85,28 @@ public sealed partial class Insertion
 
     internal static TargetCaptureResult EvaluateCapture(TargetFieldMetadata field, nint window, int owner, bool contained, long firstEpoch, long finalEpoch)
     {
-        TargetCaptureResult Result(TargetCaptureStatus status, DraftTarget? target = null) => new(target, status) { ControlTypeId = field.ControlTypeId, ProviderProcessId = field.ProcessId, WindowProcessId = owner };
+        var stable = field.RuntimeId.Length > 0 && firstEpoch == finalEpoch;
+        TargetCaptureResult Result(TargetCaptureStatus status, DraftTarget? target = null) => new(target, status)
+        {
+            ControlTypeId = field.ControlTypeId, ProviderProcessId = field.ProcessId, WindowProcessId = owner,
+            ForegroundWindow = window.ToInt64(), FocusEpochBefore = firstEpoch, FocusEpochAfter = finalEpoch,
+            Stable = stable, FieldInForegroundWindow = contained, RuntimeIdentityHash = TargetCaptureResult.HashRuntimeId(field.RuntimeId)
+        };
+        // Rejection reasons also need exact scope and stable identity. An early
+        // unsupported-type result must not be mistaken for target-app evidence.
+        if (!contained) return Result(TargetCaptureStatus.OutsideForegroundWindow);
+        if (!stable) return Result(TargetCaptureStatus.FocusChanged);
         if (field.ProcessId == Environment.ProcessId) return Result(TargetCaptureStatus.SonaFocused);
         if (field.Password) return Result(TargetCaptureStatus.PasswordField);
         if (!field.Enabled) return Result(TargetCaptureStatus.DisabledField);
+        // ARIA active descendants can expose a selected option while DOM input
+        // focus remains elsewhere. A controls relationship alone is not proof
+        // of keyboard ownership, so never promote a suggestion to its controller.
+        if (field.ControlTypeId == ControlType.ListItem.Id) return Result(TargetCaptureStatus.SuggestionFocused);
         if (field.ControlTypeId != ControlType.Edit.Id && field.ControlTypeId != ControlType.Document.Id && !(field.ControlTypeId == ControlType.ComboBox.Id && field.ReadOnly == false))
             return Result(TargetCaptureStatus.UnsupportedControl);
         if (field.ReadOnly == true) return Result(TargetCaptureStatus.ReadOnlyField);
-        // Native HWND/UIA containment is required even when process IDs match.
         // Hosted providers retain their own identity and the HWND owner's PID.
-        if (!contained) return Result(TargetCaptureStatus.OutsideForegroundWindow);
-        if (field.RuntimeId.Length == 0 || firstEpoch != finalEpoch) return Result(TargetCaptureStatus.FocusChanged);
         return Result(TargetCaptureStatus.Ready, new DraftTarget(window, field.ProcessId, field.RuntimeId, finalEpoch, owner));
     }
 

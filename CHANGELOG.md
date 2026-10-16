@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.4 - destination capture guidance
+
+- Explain when Windows reports a selected suggestion or list item rather than
+  the editable field. Offer Copy draft and manual paste without repeating the
+  misleading request to reposition an already visible caret.
+- Verify exact-window containment, current focused identity and focus epoch
+  before classifying rejected controls as well as accepted fields.
+- Report the last intentional capture as bounded, in-memory metadata through
+  `status.destinationCapture`. Status reads do not inspect focus or export text.
+
+An observed browser integration uses ARIA active descendants, so accessibility
+focus can land on a suggestion while DOM input focus remains on Search. A
+controller relationship alone cannot establish keyboard ownership. This version
+keeps that case blocked; it does not repair automatic insertion through active
+suggestions. Empty-field alternate paste was observed separately, without Enter.
+[Audit and limits](docs/DAILY-USE-AUDIT.md).
+
 ## 0.4.3 — daily-use reliability
 
 - Prove focused fields belong to the exact foreground window even when UIA is

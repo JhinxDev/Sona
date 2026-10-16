@@ -1,12 +1,14 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Threading;
+using Sona.App;
 using Sona.App.Windows;
 
 internal static class TargetCaptureDiagnostic
 {
-    public static object Run(string output)
+    public static object Run(string output, nint expectedWindow = 0)
     {
         output = Path.GetFullPath(output);
         if (File.Exists(output)) throw new IOException("Use a fresh diagnostic receipt path.");
@@ -18,40 +20,40 @@ internal static class TargetCaptureDiagnostic
             {
                 using var insertion = new Insertion();
                 var elapsed = Stopwatch.StartNew();
-                string? last = null;
-                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
                 timer.Tick += (_, _) =>
                 {
                     try
                     {
-                        var result = insertion.CaptureWithStatus();
-                        var key = JsonSerializer.Serialize(new { result.Status, result.ControlTypeId, result.ProviderProcessId, result.WindowProcessId, insertion.FocusEpoch });
-                        if (key != last)
+                        var foreground = GetForegroundWindow();
+                        if (expectedWindow == 0 || foreground == expectedWindow)
                         {
-                            observations.Add(new { AtMilliseconds = (int)elapsed.ElapsedMilliseconds, Status = result.Status.ToString(), result.ControlTypeId, result.ProviderProcessId, result.WindowProcessId, FocusEpoch = insertion.FocusEpoch, Captured = result.Target != null });
-                            last = key;
+                            var result = insertion.CaptureWithStatus();
+                            // Retain one coherent capture, never join independently
+                            // sampled focused controls or hidden tab descendants.
+                            if (GetForegroundWindow() == foreground && (result.ForegroundWindow == 0 || result.ForegroundWindow == foreground.ToInt64()))
+                                observations.Add(new { AtMilliseconds = (int)elapsed.ElapsedMilliseconds, Capture = CaptureObservation.From("diagnostic", result) });
                         }
                     }
                     catch (Exception error) { failure = error; timer.Stop(); Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Send); }
-                    if (elapsed.Elapsed >= TimeSpan.FromSeconds(30)) { timer.Stop(); Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Send); }
+                    if (elapsed.Elapsed >= TimeSpan.FromSeconds(20)) { timer.Stop(); Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Send); }
                 };
                 timer.Start(); Dispatcher.Run();
             }
             catch (Exception error) { failure = error; }
         }) { IsBackground = true, Name = "Sona passive destination diagnostic" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
-        if (!thread.Join(TimeSpan.FromSeconds(40))) throw new TimeoutException("The passive diagnostic did not finish; no text input was requested.");
+        if (!thread.Join(TimeSpan.FromSeconds(35))) throw new TimeoutException("Passive inspection exceeded its bound; no input was requested.");
         if (failure != null) throw new InvalidOperationException("Passive destination inspection failed.", failure);
-        var result = new
+        var report = new
         {
-            SchemaVersion = 1,
+            SchemaVersion = 3, ExpectedWindow = expectedWindow.ToInt64(),
             AppAssemblySha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Insertion).Assembly.Location))),
-            Observations = observations,
-            FieldContentsRead = false, WindowTitlesRead = false,
+            Observations = observations, FieldContentsRead = false, WindowTitlesRead = false,
             MicrophoneOpened = false, GlobalInputSent = false, ClipboardTouched = false
         };
-        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-        File.WriteAllText(output, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
-        return result;
+        File.WriteAllText(output, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+        return report;
     }
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
 }

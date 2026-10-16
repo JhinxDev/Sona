@@ -306,3 +306,27 @@ now lets Windows PowerShell resolve its own modules. Failed receipts were retain
 No production process was restarted and no model, microphone or external input
 was used. Existing speech-worker job containment is unchanged. See
 [desktop launch implementation](IMPLEMENTATION.md#desktop-owned-installation-and-upgrade-launches).
+
+## Destination capture follow-up, 0.4.4
+
+The new capture policy first reproduced nine failed assertions; the actual
+unshown MainWindow/status fixture reproduced two. After repair, 11 policy and
+10 status checks pass. Status reads neither inspect focus nor start services.
+The affected insertion (24), completed-paste (14), active-app state (17), and
+default Windows (49) suites also pass. Build completed without warnings/errors.
+An independent source/fixture review found no actionable issue in the bounded
+patch. Existing 0.4.3 Core 350, speech-preflight, settings, history and shutdown
+evidence remains applicable; these unchanged paths were not needlessly replayed.
+
+Under a separate, explicitly authorized desktop window, actual installed 0.4.3
+alternate paste inserted the full synthetic sentence into empty Homepage Search,
+without Enter or microphone. The query lowercased it, so exact-case readback was
+unconfirmed. Selected suggestions report ListItem accessibility focus despite
+the input caret. Synthetic Ctrl+Windows modifiers left that identity unchanged;
+the recording listener ignores injected events. This is a compatibility finding,
+not a successful physical-shortcut test or live-speech proof.
+
+Version 0.4.4 improves guidance and captures actual-attempt metadata. It does not
+authorize suggestion controllers as text destinations. Automatic insertion with
+active suggestions remains unresolved. See [audit](DAILY-USE-AUDIT.md) and the
+[read-only status contract](AGENT-INTERFACE.md).

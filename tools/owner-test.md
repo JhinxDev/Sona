@@ -1,5 +1,24 @@
 # Owner-started Sona test
 
+## Short 0.4.4 Homepage check
+
+Read the version/build in Settings → About first. This candidate explains the
+suggestion-focus limitation; automatic insertion through active suggestions is
+still unsupported. Preserve your current draft.
+
+1. If Windows reports a suggestion or list item, use **Copy draft**, return to
+   the Search input and paste manually. Keep it unsent.
+2. To compare the empty-input path without microphone capture, use Settings →
+   Audio & typing → **Test shortcut**. Return to empty Homepage Search, hold
+   physical Ctrl+Windows for at least 250 ms and release. Do not press Enter.
+3. The read-only `sona-agent status` now includes `destinationCapture` from the
+   actual attempt. An agent can inspect it after the attempt without asking you
+   to keep focus in Search for a timed capture. No draft contents need sharing.
+
+The observed complete alternate paste into an empty field is distinct from this
+still-pending physical shortcut check. Do not treat synthetic modifier injection
+as a recording test; Sona ignores injected recording gestures.
+
 ## Short 0.4.3 Homepage check
 
 Record the version/build from About first. Keep the existing retained draft.
@@ -8,7 +27,7 @@ Record the version/build from About first. Keep the existing retained draft.
    the ready draft. This shortcut inserts once and does not request Enter.
    Review the result without submitting. If Sona withholds insertion, report
    its specific status and keep the draft.
-2. For a synthetic check without microphone capture, prepare Settings → Test
+2. For a synthetic check without microphone capture, prepare Settings → Audio & typing → Test
    shortcut, then return to empty Homepage Search and hold Ctrl+Win for at
    least 250 ms before releasing. Expect one fixed test sentence, no Enter.
 3. In a separate attempt, change field or app after the test starts. The draft
@@ -53,7 +72,6 @@ needs to be shared. Existing theme persistence, cancellation and microphone
 acceptance checks below remain available for targeted follow-up.
 
 ## Extended checks
-
 
 The agent does not start a live microphone or inject global key/input tests. Open **Sona 0.4.2** intentionally and record the exact version/build you use. Close competing dictation tools while testing the shared Ctrl+Win shortcut. These owner-started checks remain open for the new Parakeet integration.
 

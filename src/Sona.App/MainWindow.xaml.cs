@@ -148,7 +148,7 @@ public partial class MainWindow : Window
         {
             if (preparedInsertionTest && session?.State == SessionState.Ready)
             {
-                var capture = insertion.CaptureWithStatus();
+                var capture = CaptureDestination("test-shortcut");
                 target = capture.Target;
                 if (hotkeys?.CanBeginHold != true) return false;
                 if (target == null) { ShowShortcutNotice("Test shortcut: field unavailable", capture.Detail); return false; }
@@ -184,7 +184,7 @@ public partial class MainWindow : Window
         if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new(); submitOnComplete = false;
-        recordingCapture = insertion.CaptureWithStatus();
+        recordingCapture = CaptureDestination("recording");
         target = recordingCapture.Target;
         activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
         barPreview.Stop();
@@ -286,7 +286,7 @@ public partial class MainWindow : Window
     {
         if (shutdownPending || processing || recorder != null || session?.State != SessionState.Ready) { StatusDetail.Text = "Choose a new ready draft first. Already inserted drafts cannot be inserted twice."; return; }
         var current = session;
-        var capture = suppliedTarget == null ? insertion.CaptureWithStatus() : new TargetCaptureResult(suppliedTarget, TargetCaptureStatus.Ready);
+        var capture = suppliedTarget == null ? CaptureDestination("ready-draft") : new TargetCaptureResult(suppliedTarget, TargetCaptureStatus.Ready);
         var destination = capture.Target;
         if (destination == null) { Status.Text = "Draft ready"; StatusDetail.Text = capture.Detail; return; }
         activeApplication?.Refresh();

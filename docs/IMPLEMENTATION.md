@@ -97,3 +97,22 @@ and preservation of the running owner instance and preferences. The existing
 retry and draft/original restoration. Neither test closes the owner's app or opens
 a microphone. These reproduce a launch-lifetime risk; they do not establish the
 historical cause of any particular Codex shutdown incident.
+
+## Capture observations and browser suggestions, 0.4.4
+
+Capture inspects a single focused element, proves exact HWND ancestry and then
+rechecks foreground HWND/owner, focused provider/runtime identity and focus epoch.
+Rejected controls undergo the same scope checks before receiving a specific
+reason. A ListItem returns `SuggestionFocused` with copy/paste guidance; it never
+becomes a destination. In particular, ARIA `aria-activedescendant` can move the
+accessible focus while DOM keyboard focus stays on a combobox. A `ControllerFor`
+relationship does not independently prove the editable input still owns typing.
+
+The three intentional admission paths retain a `CaptureObservation` in memory.
+Agent status returns that existing snapshot without invoking UIA. It exports
+bounded classification and identity metadata, not text, labels, titles, raw
+runtime IDs or transcripts. Routine insertion safety rechecks do not replace the
+original attempt. No history or file is written. The passive test diagnostic can
+record these observations only when explicitly run, with a 20-second bound and
+optional exact HWND filter. The current API still cannot start a recording,
+capture a new destination, export transcripts or submit a message.

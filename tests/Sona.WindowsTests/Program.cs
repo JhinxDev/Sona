@@ -5,6 +5,18 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 1 && args[0] == "--capture-policy-checks")
+{
+    var report = CapturePolicyChecks.Run(); Console.WriteLine(JsonSerializer.Serialize(report));
+    if (JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength() > 0) Environment.ExitCode = 1;
+    return;
+}
+if (args.Length == 2 && args[0] == "--capture-status-fixture")
+{
+    var report = CaptureStatusFixture.Run(args[1]); Console.WriteLine(JsonSerializer.Serialize(report));
+    if (JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength() > 0) Environment.ExitCode = 1;
+    return;
+}
 if (args.Length == 2 && args[0] == "--agent-settings-conflict-fixture")
 {
     var report = AgentSettingsConflictFixture.Run(args[1]);
@@ -12,7 +24,7 @@ if (args.Length == 2 && args[0] == "--agent-settings-conflict-fixture")
     if (report.Failures.Length > 0) Environment.ExitCode = 1;
     return;
 }
-if (args.Length == 2 && args[0] == "--capture-diagnostic") { Console.WriteLine(JsonSerializer.Serialize(TargetCaptureDiagnostic.Run(args[1]))); return; }
+if (args.Length is 2 or 3 && args[0] == "--capture-diagnostic") { var window = args.Length == 3 ? (nint)long.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture) : 0; Console.WriteLine(JsonSerializer.Serialize(TargetCaptureDiagnostic.Run(args[1], window))); return; }
 if (args.Length == 2 && args[0] == "--quit-preparation-fixture") { Console.WriteLine(JsonSerializer.Serialize(QuitPreparationFixture.Run(args[1]))); return; }
 if (args.Length == 1 && args[0] == "--speech-preflight-checks")
 {

@@ -1,9 +1,22 @@
-# Daily-use reliability audit, 0.4.3
+# Daily-use reliability audit, 0.4.3 and 0.4.4
 
 This pass follows an owner-reported empty Homepage Search after dictation with
-Ctrl + Windows. The recognized draft stayed available. A later screenshot shows
-a caret in Search. The exact shortcut-time capture failure has not been reproduced;
-the compatibility and diagnostic changes below do not establish its cause.
+Ctrl + Windows. The recognized draft stayed available despite a visible caret.
+Later bounded desktop tests identified an observable trigger: the browser search
+integration uses `role=combobox`, `aria-controls` and `aria-activedescendant`.
+Windows reports the selected ListItem while the DOM input retains its typing
+caret. The empty field instead reports a writable ComboBox. The installed 0.4.3
+capture accepts that empty field, and alternate paste inserted the entire fixed
+test sentence without Enter. The destination lowercased the query; exact-case
+readback was therefore unconfirmed. Synthetic Ctrl+Windows modifiers did not
+change the reported ListItem; injected recording gestures are deliberately ignored.
+
+This establishes the accessibility mismatch, not a successful physical shortcut
+repair. Version 0.4.4 classifies ListItems as `SuggestionFocused` and offers manual
+paste. It keeps them rejected. `ControllerFor` links alone cannot distinguish
+virtual focus from actual keyboard focus on an option. A general automatic repair
+needs independent current editable-focus proof plus a negative real-option-focus
+test; this candidate does not provide that proof or change the browser integration.
 
 ## Repairs
 
@@ -36,16 +49,22 @@ exact window's UIA ancestry rather than shared process identity.
 
 ## Diagnostic and owner check
 
-`Sona.WindowsTests --capture-diagnostic <fresh-json>` passively samples the actual
-capture code for 30 seconds. It records status, control type, process identities,
-focus epoch and test-assembly hash; no text, window titles, microphone or input.
-Use it only for a bounded, intentional reproduction. An observation of another
-active app does not qualify Homepage.
+Version 0.4.4 records the actual recording, Test shortcut or ready-draft capture
+in memory. `sona-agent status` returns nullable `destinationCapture` without
+another inspection. It contains status, type, exact HWND/process identities,
+start/end focus epochs, stability, containment and a transient identity hash.
+It contains no text, labels, window titles or raw runtime IDs and is not persisted.
 
-The decisive remaining check is an owner-started attempt in empty Homepage
-Search on the exact candidate. [The short procedure](../tools/owner-test.md)
-uses a retained draft or the existing microphone-free Test shortcut first, with
-no Enter submission. Preserve the original draft if insertion is withheld.
+The maintained `--capture-diagnostic <fresh-json> [decimal-HWND]` tool passively
+samples that same capture for 20 seconds. Its schema 3 observations preserve one
+coherent capture instead of combining independently sampled focused elements or
+hidden tab descendants. A different active app or zero samples cannot qualify the
+intended target. Use actual-attempt status when diagnosing the physical shortcut.
+
+The remaining owner-started check is in [the short procedure](../tools/owner-test.md).
+Automatic insertion with an active suggestion remains an explicit compatibility
+gap. Copy draft and manual paste is the fallback; an empty-field alternate-paste
+observation does not establish physical Ctrl+Windows or live-microphone acceptance.
 
 Builds, simulated boundaries, file replays and personal target-app acceptance
 remain separate. [Verification receipts and commands](PREVIEW-VALIDATION.md).

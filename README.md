@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.3.** Build from source below. There is no published binary
+**Early preview: 0.4.4.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -30,6 +30,14 @@ AI-assisted narration, music and background art. [Capture details](docs/images/R
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
 replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
+
+## New in 0.4.4
+
+Clearer guidance when browser search suggestions hide the editable field from
+Windows accessibility, plus a read-only report of the last intentional capture
+in `sona-agent status`. Automatic insertion while a suggestion has accessibility
+focus remains unsupported; use Copy draft and paste manually in that case.
+[Observed limitation and verification](docs/DAILY-USE-AUDIT.md).
 
 ## New in 0.4.3
 
