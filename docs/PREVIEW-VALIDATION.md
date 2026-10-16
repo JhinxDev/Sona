@@ -216,3 +216,21 @@ still scroll, and longer feedback can legitimately restore the scrollbar. The
 microphone label's former 21.47-DIP center offset is now below 0.5 DIP.
 
 Recognition timing is unchanged; fast completions are not artificially delayed.
+
+## Public trailer replacement — October 16, 2026
+
+The updated [0.4.2 trailer](https://www.youtube.com/watch?v=Xyz4TkNP58w) is public
+on Jhinx Dev, with the approved 4K cover, completed 4K processing and saved English
+captions. Native publication readback and anonymous metadata confirmed the exact
+video and channel. The README, repository homepage and social preview now point
+to the replacement. The public cover bytes match the SHA-256 recorded in
+[image provenance](images/README.md).
+
+The previous trailer was deleted after the replacement was public and the
+repository links were verified. Native channel content and anonymous metadata
+confirmed the old video was unavailable while the replacement remained public.
+Local original media and the verified editable release archive were retained.
+
+This completes the media replacement, not a public binary release. The trailer
+uses the documented prerecorded recognition and measured-event replay; it does
+not establish physical shortcut, live microphone or receiving-field acceptance.
