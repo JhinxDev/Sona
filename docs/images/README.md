@@ -15,7 +15,8 @@ promise about a new installation. Offscreen rendering does not qualify native
 DWM transparency on every Windows system.
 
 The unversioned earlier images and `sona-trailer.jpg` are retained historical
-assets. The linked published trailer depicts 0.4.0; it is not a 0.4.2 demonstration.
+assets. They depict the earlier 0.4.0 interface; the README now links the updated
+0.4.2 trailer and its matching R11b cover.
 
 ## SHA-256
 
@@ -63,3 +64,16 @@ their original source identities.
 - Models PNG SHA-256: `3d66f4692a5471aac2ad8d63136fa3e3d4b96bc3301c5200fac235fc384a9ee0`.
 - Audio PNG SHA-256: `47191e8bb9f486154f961b98f938dd3da3d4cb7c829396d6b208a7a2ee1da074`.
 - App DLL SHA-256: `d7d9f0aa37c7323c90af83f346c7c64ea67769ef3797c4d9a585d61a8984ca24`.
+
+
+## Updated 0.4.2 trailer cover
+
+`sona-trailer-r11b.jpg` is the matching 3840 x 2160 cover for the updated
+[4K trailer](https://www.youtube.com/watch?v=Xyz4TkNP58w). It combines the original
+project glass environment with actual 0.4.2 Home and recording UI from source
+`7f43257df581e35ce309bec7d0ed657148f774f9`, build `5cd0afbf41b5`.
+The Home draft is demonstration text; the capsule uses measured prerecorded
+speech/transcript events, as documented above. The film's receiving field is an
+illustration. Later layout and closed-Discord repairs do not relabel these captures.
+
+Cover SHA-256: `2eeec03623d24b0184ce07d2f84def01e3ec7bf9531b93dcf927c5dcdac08931`.

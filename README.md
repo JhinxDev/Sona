@@ -15,11 +15,13 @@ attempt at a native Windows alternative that you can inspect, adapt and improve.
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
-[![Watch the Sona trailer: voice to text on your PC](docs/images/sona-trailer.jpg)](https://www.youtube.com/watch?v=3XNpPcDO-kI)
+[![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
 
-**[Watch the original 4K trailer on Jhinx Dev](https://www.youtube.com/watch?v=3XNpPcDO-kI).**
-The trailer shows the earlier 0.4.0 interface. Actual Sona captures use demo text; the Codex and Discord sequences illustrate
-the workflow. The trailer includes AI-assisted narration, music and background art.
+**[Watch the updated 4K trailer on Jhinx Dev](https://www.youtube.com/watch?v=Xyz4TkNP58w).**
+The trailer shows Sona 0.4.2 with actual app captures and a prerecorded local
+recognition demonstration. The recording display replays measured speech and
+transcript events; the receiving field illustrates insertion. It includes
+AI-assisted narration, music and background art. [Capture details](docs/images/README.md).
 
 ## The app
 
