@@ -47,7 +47,7 @@ public partial class MainWindow
                 SetIdleChoice(preferences.ModelIdleMinutes);
                 preferences.ProtectionEnabled = next.ProtectionEnabled; preferences.SilenceIncoming = next.SilenceIncoming; preferences.ProtectionReleaseDelayMs = next.ProtectionReleaseDelayMs; preferences.WatchedApps = next.WatchedApps;
                 preferences.ProtectionShortcut = next.ProtectionShortcut; ProtectionShortcutInput.Text = preferences.ProtectionShortcut; UpdateProtectionHotkey();
-                ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming; WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
+                ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming; ProtectionToggleResult.Text = ProtectionPolicySummary; WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
                 SpeechLanguage.SelectedIndex = preferences.Language == "en" ? 1 : preferences.Language == "fr" ? 2 : 0;
                 TranscriptionEngine.SelectedIndex = preferences.Engine == "FastCpu" ? 1 : 0;
                 ShortcutMode.SelectedIndex = preferences.ShortcutMode == "Toggle" ? 1 : 0;

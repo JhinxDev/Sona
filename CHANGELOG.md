@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.7
+
+- Discord mute and incoming-audio switches apply/save immediately and show their saved policy beside the controls. Advanced edits retain their separate Save action.
+- Changing incoming silencing applies to active recordings; rollback preserves explicit pause and manual overrides without transient voice acquisition.
+- Failed acquisition/restoration remains retryable, including manual overrides during awaited retries. Imported settings remain pending for review.
+- Added isolated native switch/failure/persistence regressions to the maintained build checks. Real Discord call acceptance remains separate.
+
 ## 0.4.6 - full History action label
 
 - Show Clear recent history in full, without an ellipsis or a changing count in

@@ -174,6 +174,7 @@ File.WriteAllText(store.PathFor("tiny"), "unrelated existing bytes");
 var preservedModel = false; try { await store.InstallAsync("tiny", null, default); } catch (IOException) { preservedModel = true; }
 Check(preservedModel && File.ReadAllText(store.PathFor("tiny")) == "unrelated existing bytes" && Directory.GetFiles(modelTestRoot).Length == 1, "Model installation preserves mismatched existing files before any network request");
 File.Delete(store.PathFor("tiny")); Directory.Delete(modelTestRoot);
+foreach (var protectionCheck in await ProtectionSettingsChecks.RunAsync()) Check(true, protectionCheck);
 var voice = new FakeVoice(); var protectionController = new MicProtection(voice);
 await protectionController.ConfigureAsync(true, 0, default);
 await protectionController.SetSourcesAsync(new[] { "sona" }, default);
@@ -277,12 +278,15 @@ sealed class FakeVoice : IVoiceProtectionTransport
     public VoiceState State { get; set; } = new(true, false, false);
     public List<string> Changes { get; } = [];
     public bool RejectRelease { get; set; }
+    public bool RejectProtect { get; set; }
+    public bool RejectDeafen { get; set; }
     public Action? DuringUndeafen { get; set; }
+    public Func<CancellationToken, Task<VoiceState>>? ReadOverride { get; set; }
     private readonly Queue<VoiceObservation> observations = new();
     public long ObservationVersion { get; private set; }
     public void Observe(bool mute, bool deaf) { State = State with { Muted = mute, Deafened = deaf }; observations.Enqueue(new(++ObservationVersion, mute, deaf, false)); }
     public IReadOnlyList<VoiceObservation> DrainObservations() { var result = observations.ToArray(); observations.Clear(); return result; }
-    public Task<VoiceState> ReadAsync(CancellationToken cancellation) => Task.FromResult(State);
-    public Task<bool> SetMuteAsync(bool value, CancellationToken cancellation) { if (!value && RejectRelease) return Task.FromResult(false); State = State with { Muted = value }; Changes.Add("mute:" + value); return Task.FromResult(true); }
-    public Task<bool> SetDeafenAsync(bool value, CancellationToken cancellation) { if (!value && RejectRelease) return Task.FromResult(false); State = State with { Deafened = value }; Changes.Add("deafen:" + value); if (!value) DuringUndeafen?.Invoke(); return Task.FromResult(true); }
+    public Task<VoiceState> ReadAsync(CancellationToken cancellation) => ReadOverride?.Invoke(cancellation) ?? Task.FromResult(State);
+    public Task<bool> SetMuteAsync(bool value, CancellationToken cancellation) { if (value && RejectProtect) return Task.FromResult(false); if (!value && RejectRelease) return Task.FromResult(false); State = State with { Muted = value }; Changes.Add("mute:" + value); return Task.FromResult(true); }
+    public Task<bool> SetDeafenAsync(bool value, CancellationToken cancellation) { if (value && RejectDeafen) return Task.FromResult(false); if (!value && RejectRelease) return Task.FromResult(false); State = State with { Deafened = value }; Changes.Add("deafen:" + value); if (!value) DuringUndeafen?.Invoke(); return Task.FromResult(true); }
 }

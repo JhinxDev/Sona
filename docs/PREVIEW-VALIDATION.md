@@ -379,3 +379,21 @@ Version 0.4.4 improves guidance and captures actual-attempt metadata. It does no
 authorize suggestion controllers as text destinations. Automatic insertion with
 active suggestions remains unresolved. See [audit](DAILY-USE-AUDIT.md) and the
 [read-only status contract](AGENT-INTERFACE.md).
+
+## October 18 Discord settings candidate, 0.4.7
+
+The Off-versus-saved-policy mismatch was reproduced in the native isolated
+fixture before repair. A Core regression separately reproduced incoming silencing
+not applying to an unchanged active source. Source review caught import applying
+before review, paused rollback acquiring transiently, and manual unmute during an
+awaited retry. Their regressions failed before correction and then passed.
+
+Core362, new native19, default Windows49, fake Disconnect10, closed Discord11,
+Settings23 and agent pending-settings88 passed. Normal/minimum-size synthetic
+captures were inspected. The maintained build now includes the new native mode.
+All Discord calls in these tests target unique fake pipes and fixture credentials.
+No real microphone, Discord account/session action or global input was used.
+
+The owner is in a public call and prohibited actions affecting that session.
+The qualified candidate must remain unactivated until that constraint is cleared.
+A local build/package is not proof of a live0.4.7 upgrade or owner-call acceptance.

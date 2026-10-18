@@ -53,18 +53,33 @@ internal sealed class ProtectionService : IAsyncDisposable
     public async Task ConfigureAsync(Preferences settings, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try
-        {
-            watched = settings.WatchedApps.ToArray();
-            if (!settings.ProtectionEnabled && enabled) await controller.PauseAsync(true, cancellation);
-            await controller.ConfigureAsync(settings.SilenceIncoming, settings.ProtectionReleaseDelayMs, cancellation);
-            if (settings.DiscordDisconnected && !connectionSuppressed) await DisconnectUnderGateAsync(cancellation);
-            enabled = settings.ProtectionEnabled;
-            if (connectionSuppressed) Status = "Disconnected";
-            else if (!enabled) Status = "Off";
-            else if (controller.Paused) { await controller.PauseAsync(false, cancellation); Status = "Ready"; }
-        }
+        try { await ConfigureUnderGateAsync(settings, null, cancellation); }
         finally { gate.Release(); }
+    }
+    public async Task RestoreConfigurationAsync(Preferences settings, bool paused, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try { await ConfigureUnderGateAsync(settings, paused, cancellation); }
+        finally { gate.Release(); }
+    }
+    private async Task ConfigureUnderGateAsync(Preferences settings, bool? restorePause, CancellationToken cancellation)
+    {
+        var wasEnabled = enabled;
+        watched = settings.WatchedApps.ToArray();
+        // A rollback to paused must never briefly acquire the active source.
+        if (restorePause == true || !settings.ProtectionEnabled && enabled) await controller.PauseAsync(true, cancellation);
+        await controller.ConfigureAsync(settings.SilenceIncoming, settings.ProtectionReleaseDelayMs, cancellation);
+        if (settings.DiscordDisconnected && !connectionSuppressed) await DisconnectUnderGateAsync(cancellation);
+        enabled = settings.ProtectionEnabled;
+        if (connectionSuppressed) Status = "Disconnected";
+        else if (!enabled) Status = "Off";
+        else
+        {
+            if (transport.Connected) await controller.SetSourcesAsync(Sources(), cancellation);
+            if ((!wasEnabled || restorePause == false) && restorePause != true && controller.Paused)
+                await controller.PauseAsync(false, cancellation);
+            Status = controller.Status;
+        }
     }
     public async Task ConnectAsync(bool interactive, CancellationToken cancellation)
     {
@@ -121,6 +136,8 @@ internal sealed class ProtectionService : IAsyncDisposable
         await gate.WaitAsync(cancellation);
         try
         {
+            // Track the actual recording even when protection is off or paused.
+            ownRecording = true;
             if (enabled && connectionSuppressed)
             {
                 if (controller.OwnsChanges) throw new IOException("Discord restoration needs retry before recording.");
@@ -150,7 +167,13 @@ internal sealed class ProtectionService : IAsyncDisposable
     public async Task PauseAsync(bool pause, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
-        try { if (connectionSuppressed && !pause) { Status = "Disconnected"; return; } if (!enabled && !pause) { Status = "Off"; return; } await controller.PauseAsync(pause, cancellation); Status = controller.Status; }
+        try
+        {
+            if (connectionSuppressed && !pause) { Status = "Disconnected"; return; }
+            if (!enabled && !pause) { Status = "Off"; return; }
+            if (!pause && controller.Paused) await controller.SetSourcesAsync(Sources(), cancellation);
+            await controller.PauseAsync(pause, cancellation); Status = controller.Status;
+        }
         finally { gate.Release(); }
     }
     private HashSet<string> Sources()

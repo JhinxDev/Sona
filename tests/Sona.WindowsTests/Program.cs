@@ -5,6 +5,11 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 2 && args[0] == "--protection-controls-fixture")
+{
+    BoundedProcess.ContainApplication();
+    Console.WriteLine(JsonSerializer.Serialize(ProtectionControlsFixture.Run(args[1]))); return;
+}
 if (args.Length == 1 && args[0] == "--capture-policy-checks")
 {
     var report = CapturePolicyChecks.Run(); Console.WriteLine(JsonSerializer.Serialize(report));

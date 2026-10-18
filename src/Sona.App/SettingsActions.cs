@@ -50,7 +50,8 @@ public partial class MainWindow
         foreach (var choice in new[] { SoundEffects, PasteCompletedDraft, EnterToSend, LiveTranscription, AutoInsert, CopyToClipboard, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
         { choice.Checked += (_, _) => RefreshSettingsActions(); choice.Unchecked += (_, _) => RefreshSettingsActions(); }
         PanelDisplay.Checked += (_, _) => RefreshSettingsActions(); CapsuleDisplay.Checked += (_, _) => RefreshSettingsActions();
-        ProtectionEnabled.Checked += (_, _) => RefreshSettingsActions(); ProtectionEnabled.Unchecked += (_, _) => RefreshSettingsActions();
+        ProtectionEnabled.Checked += ProtectionToggleChanged; ProtectionEnabled.Unchecked += ProtectionToggleChanged;
+        SilenceIncoming.Checked += ProtectionToggleChanged; SilenceIncoming.Unchecked += ProtectionToggleChanged;
         ModelIdleChoice.SelectionChanged += ModelIdleChanged;
         settingsActionTimer.Tick += (_, _) => RefreshSettingsActions();
         Loaded += (_, _) => settingsActionTimer.Start(); Closed += (_, _) => settingsActionTimer.Stop();
@@ -65,9 +66,10 @@ public partial class MainWindow
 
         SavePreferencesButton.IsEnabled = !SettingsBusy;
         RefreshHistoryActions();
-        // The dependent option retains its form value while protection is off.
-        // Neither this display state nor master-toggle edits save protection.
-        SilenceIncoming.IsEnabled = ProtectionEnabled.IsChecked == true && !SettingsBusy;
+        // Programmatic initialization is guarded; deliberate switch changes save directly.
+        ProtectionEnabled.IsEnabled = !SettingsBusy && !discordConnectionBusy;
+        SilenceIncoming.IsEnabled = ProtectionEnabled.IsChecked == true && !SettingsBusy && !discordConnectionBusy;
+        SaveProtectionButton.IsEnabled = !SettingsBusy && !discordConnectionBusy;
         SilenceIncoming.ToolTip = ProtectionEnabled.IsChecked == true ? "Also silence incoming audio when Discord protection is active." : "Enable Discord protection to use this option. Your choice is retained.";
         StartupReason.Visibility = StartWithWindows.IsEnabled ? Visibility.Collapsed : Visibility.Visible;
         StartupReason.Text = arguments.Contains("--test-ui") ? "Disabled in isolated preview." : "Unavailable for this build.";

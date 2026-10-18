@@ -24,5 +24,8 @@ if ($LASTEXITCODE -ne 0) { throw 'History control regressions failed' }
 $taskHistoryOffEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-history-controls-off-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --history-controls-no-retention-fixture $taskHistoryOffEvidence
 if ($LASTEXITCODE -ne 0) { throw 'History controls with retention off failed' }
+$taskProtectionEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-protection-controls-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --protection-controls-fixture $taskProtectionEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Isolated protection switch regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

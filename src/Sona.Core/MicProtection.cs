@@ -27,6 +27,8 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
     private long muteOwnedAfter;
     private long deafenOwnedAfter;
     private bool restorationPending;
+    private bool acquisitionPending;
+    private long manualOverrideVersion;
     public bool OwnsChanges => ownMute || ownDeafen;
     public bool Paused => paused;
     public int SourceCount => sources.Count;
@@ -35,6 +37,7 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
     {
         if (releaseDelayMs is < 0 or > 5000) throw new ArgumentException("Release delay is out of range.");
         await gate.WaitAsync(cancellation);
+        var previousDeafen = deafen; var previousDelay = delayMs;
         try
         {
             ApplyObservations();
@@ -44,7 +47,10 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
                 if (!await transport.SetDeafenAsync(false, cancellation)) throw new IOException("Discord did not acknowledge deafen restoration.");
                 ownDeafen = false;
             }
+            if (deafen && !previousDeafen && sources.Count > 0 && !paused && !closed)
+                await AcquireAsync(cancellation);
         }
+        catch { deafen = previousDeafen; delayMs = previousDelay; throw; }
         finally { gate.Release(); }
     }
     public async Task SetSourcesAsync(IEnumerable<string> active, CancellationToken cancellation)
@@ -56,8 +62,15 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
         {
             if (closed) throw new InvalidOperationException("Protection is closed.");
             var wasRecording = sources.Count > 0;
-            if (sources.SetEquals(snapshot)) { if (sources.Count == 0 && restorationPending) await ReleaseAsync(cancellation); return; }
+            if (sources.SetEquals(snapshot))
+            {
+                ApplyObservations();
+                if (sources.Count == 0 && restorationPending) await ReleaseAsync(cancellation);
+                else if (sources.Count > 0 && acquisitionPending && !paused) await AcquireAsync(cancellation);
+                return;
+            }
             sources.Clear(); sources.UnionWith(snapshot); CancelRelease();
+            if (sources.Count == 0) acquisitionPending = false;
             if (paused) return;
             if (sources.Count > 0) { if (!wasRecording) await AcquireAsync(cancellation); }
             else if (OwnsChanges && delayMs > 0)
@@ -75,7 +88,7 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
         try
         {
             CancelRelease(); paused = value;
-            if (value) { await ReleaseAsync(cancellation); Status = "Paused"; }
+            if (value) { acquisitionPending = false; await ReleaseAsync(cancellation); Status = "Paused"; }
             else if (sources.Count > 0) await AcquireAsync(cancellation);
             else Status = "Ready";
         }
@@ -104,8 +117,10 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
         var channelChanged = false;
         foreach (var observation in transport.DrainObservations())
         {
-            if (observation.Muted == false && observation.Sequence > muteOwnedAfter) ownMute = false;
-            if (observation.Deafened == false && observation.Sequence > deafenOwnedAfter) ownDeafen = false;
+            if (observation.Muted == false && observation.Sequence > muteOwnedAfter)
+            { if (ownMute) { manualOverrideVersion++; acquisitionPending = false; Status = "Manual Discord change kept"; } ownMute = false; }
+            if (observation.Deafened == false && observation.Sequence > deafenOwnedAfter)
+            { if (ownDeafen) { manualOverrideVersion++; acquisitionPending = false; Status = "Manual Discord change kept"; } ownDeafen = false; }
             channelChanged |= observation.ChannelChanged;
         }
         return channelChanged;
@@ -123,53 +138,67 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
         {
             // Discord documents restoring the controlling client's settings on
             // disconnect. Never claim a new user's mute after reconnect.
-            CancelRelease(); ownMute = ownDeafen = false; Status = "Disconnected; check Discord voice state";
+            CancelRelease(); acquisitionPending = false; ownMute = ownDeafen = false; Status = "Disconnected; check Discord voice state";
         }
         finally { gate.Release(); }
     }
     private async Task AcquireAsync(CancellationToken cancellation)
     {
-        ApplyObservations();
-        var state = await transport.ReadAsync(cancellation);
-        ApplyObservations();
-        if (!state.InCall) { Status = "No Discord call"; return; }
-        if (!state.Muted)
+        try
         {
-            ownMute = false;
-            muteOwnedAfter = transport.ObservationVersion;
-            if (!await transport.SetMuteAsync(true, cancellation)) throw new IOException("Discord did not acknowledge microphone protection.");
-            ownMute = true;
+            ApplyObservations();
+            var overrideVersion = manualOverrideVersion;
+            var state = await transport.ReadAsync(cancellation);
+            ApplyObservations();
+            if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
+            if (!state.InCall) { acquisitionPending = false; Status = "No Discord call"; return; }
+            if (!state.Muted)
+            {
+                ownMute = false;
+                muteOwnedAfter = transport.ObservationVersion;
+                if (!await transport.SetMuteAsync(true, cancellation)) throw new IOException("Discord did not acknowledge microphone protection.");
+                ownMute = true;
+                ApplyObservations();
+                if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
+            }
+            if (deafen && !state.Deafened)
+            {
+                ownDeafen = false;
+                deafenOwnedAfter = transport.ObservationVersion;
+                if (!await transport.SetDeafenAsync(true, cancellation)) throw new IOException("Discord did not acknowledge incoming audio silencing.");
+                ownDeafen = true;
+                ApplyObservations();
+                if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
+            }
+            acquisitionPending = false; Status = "Protecting recording";
         }
-        if (deafen && !state.Deafened)
-        {
-            ownDeafen = false;
-            deafenOwnedAfter = transport.ObservationVersion;
-            if (!await transport.SetDeafenAsync(true, cancellation)) throw new IOException("Discord did not acknowledge incoming audio silencing.");
-            ownDeafen = true;
-        }
-        Status = "Protecting recording";
+        catch { acquisitionPending = true; Status = "Discord protection needs retry"; throw; }
     }
     private async Task ReleaseAsync(CancellationToken cancellation)
     {
-        ApplyObservations();
-        if (!OwnsChanges) { restorationPending = false; Status = paused ? "Paused" : "Ready"; return; }
-        var state = await transport.ReadAsync(cancellation);
-        ApplyObservations();
-        if (!state.Deafened) ownDeafen = false;
-        if (!state.Muted) ownMute = false;
-        if (ownDeafen)
+        try
         {
-            if (!await transport.SetDeafenAsync(false, cancellation)) throw new IOException("Discord did not acknowledge deafen restoration.");
-            ownDeafen = false;
             ApplyObservations();
+            if (!OwnsChanges) { restorationPending = false; Status = paused ? "Paused" : "Ready"; return; }
+            var state = await transport.ReadAsync(cancellation);
+            ApplyObservations();
+            if (!state.Deafened) ownDeafen = false;
+            if (!state.Muted) ownMute = false;
+            if (ownDeafen)
+            {
+                if (!await transport.SetDeafenAsync(false, cancellation)) throw new IOException("Discord did not acknowledge deafen restoration.");
+                ownDeafen = false;
+                ApplyObservations();
+            }
+            if (ownMute)
+            {
+                if (!await transport.SetMuteAsync(false, cancellation)) throw new IOException("Discord did not acknowledge mute restoration.");
+                ownMute = false;
+            }
+            Status = paused ? "Paused" : "Ready";
+            restorationPending = false;
         }
-        if (ownMute)
-        {
-            if (!await transport.SetMuteAsync(false, cancellation)) throw new IOException("Discord did not acknowledge mute restoration.");
-            ownMute = false;
-        }
-        Status = paused ? "Paused" : "Ready";
-        restorationPending = false;
+        catch { restorationPending = OwnsChanges; Status = "Discord restoration needs retry"; throw; }
     }
     private async Task ReleaseAfterAsync(CancellationTokenSource timer)
     {

@@ -14,6 +14,38 @@ Pending owned restoration prevents a new protected recording until resolved.
 If saving the choice fails after a successful disconnect, the UI explains that
 restart may reconnect and offers a retry. The runtime stays disconnected.
 
+## Immediate switches, 0.4.7
+
+**Mute Discord while dictating** and **Also silence incoming Discord audio**
+apply and save directly. A nearby message reports applying, the saved policy,
+or a failed change. With incoming silencing Off, Sona keeps microphone protection
+and releases only deafen changes it owns. Preexisting manual mute/deafen is
+preserved. Watched apps, release delay and shortcut still use **Save protection**;
+switch actions preserve pending advanced and general edits.
+
+Incoming-audio changes apply during an existing watched/Sona recording. Ordinary
+setting changes preserve an explicit pause. A disabled master still tracks Sona's
+recording lifecycle so enabling protection uses current sources and an ended
+source cannot cause a phantom mute. Failed acquisition/restoration remains
+retryable; a manual override during an awaited retry stops subsequent commands.
+Failed preference persistence restores the prior switch and runtime policy,
+including paused state without intermediate acquisition. Failed rollback retains
+ownership and explicit retry guidance. Hush import remains review-then-save.
+
+The maintained build runs an isolated native switch fixture through actual WPF
+controls, a private synthetic profile and a uniquely named fake Discord pipe:
+
+```powershell
+.\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe --protection-controls-fixture <fresh-evidence-directory>
+```
+
+Verification: Core362 checks, native switches19, default Windows49, fake
+Disconnect10, closed-Discord11, Settings23 and agent pending-settings88 passed.
+Normal/minimum-size synthetic UI captures were inspected. Source review caught
+three additional import/rollback/awaited-override cases; each was reproduced and
+fixed with an affected regression. These checks neither connect the owner's
+Discord nor open a microphone. Actual owner-call acceptance remains separate.
+
 ## Retained setup missing after a desktop handoff
 
 A packaged Codex terminal and Explorer can see different physical AppData

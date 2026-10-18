@@ -252,3 +252,13 @@ and the current editor continue to work. Clear recent uses its displayed
 range/search confirmation and preserves saved drafts and the working editor.
 The idle action refresh now re-enables Clear after dictation finishes.
 [Behavior and regression evidence](HISTORY-CONTROLS.md).
+
+## Discord switch feedback, 0.4.7
+
+The two Discord switches apply and save immediately and show their saved policy
+beside them. The connected banner includes microphone-only or incoming-audio
+policy. A failure rolls back the switch and explains retry rather than leaving an
+apparently applied choice. Advanced fields retain Save protection; imported
+choices remain pending review. Busy operations disable both switches. The new
+native fixture preserves general/advanced pending edits while checking runtime,
+persistence, restoration failures, manual choices, pause and initialization.

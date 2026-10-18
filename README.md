@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.6.** Build from source below. There is no published binary
+**Early preview: 0.4.7.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -30,6 +30,14 @@ AI-assisted narration, music and background art. [Capture details](docs/images/R
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
 replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
+
+## New in 0.4.7
+
+The two Discord protection switches apply and save immediately, with nearby
+confirmation or failure guidance. Mute-only mode leaves incoming audio on;
+incoming silencing can change during an existing recording. Paused state,
+manual Discord changes and failed-operation retries remain protected.
+[Settings behavior and isolated verification](docs/DISCORD-SETUP.md).
 
 ## New in 0.4.4
 

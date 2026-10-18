@@ -10,6 +10,7 @@ public partial class MainWindow
 {
     private ProtectedCredentials? credentialVault;
     private bool discordConnectionBusy;
+    private bool refreshingProtectionToggles;
     private ProtectionService? protection;
     private ProtectionHotkey? protectionHotkey;
     private Task protectionReleaseOperation = Task.CompletedTask;
@@ -52,16 +53,62 @@ public partial class MainWindow
         if (!ProtectionShortcut.TryParse(ProtectionShortcutInput.Text, out _, out _)) { ProtectionResult.Text = "Use Ctrl, Alt or Win with a letter, digit, Space or F1-F24, optionally Shift."; return; }
         var candidate = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
         candidate.ProtectionEnabled = ProtectionEnabled.IsChecked == true; candidate.SilenceIncoming = SilenceIncoming.IsChecked == true; candidate.ProtectionReleaseDelayMs = delay; candidate.WatchedApps = apps.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        candidate.ProtectionShortcut = ProtectionShortcutInput.Text.Trim(); preferencesApplying = true;
+        candidate.ProtectionShortcut = ProtectionShortcutInput.Text.Trim();
+        await SaveProtectionPreferencesAsync(candidate);
+    }
+    private async void ProtectionToggleChanged(object sender, RoutedEventArgs e)
+    {
+        if (refreshingProtectionToggles || protection == null || preferencesApplying || discordConnectionBusy) return;
+        var master = ReferenceEquals(sender, ProtectionEnabled);
+        var requested = master ? ProtectionEnabled.IsChecked == true : SilenceIncoming.IsChecked == true;
+        if (requested == (master ? preferences.ProtectionEnabled : preferences.SilenceIncoming)) return;
+        if (SettingsBusy)
+        {
+            RefreshProtectionToggles(); ProtectionToggleResult.Text = "Finish the current operation before changing protection."; return;
+        }
+        // Switches commit only their own choice, leaving advanced/general edits pending.
+        var candidate = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        if (master) candidate.ProtectionEnabled = requested; else candidate.SilenceIncoming = requested;
+        await SaveProtectionPreferencesAsync(candidate);
+    }
+    private async Task SaveProtectionPreferencesAsync(Preferences candidate)
+    {
+        if (protection == null) return;
+        var wasPaused = protection.Paused;
+        preferencesApplying = true; ProtectionToggleResult.Text = "Applying and saving"; RefreshSettingsActions();
         try
         {
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(7)); await protection.ConfigureAsync(candidate, deadline.Token); candidate.Save(preferencesPath);
-            preferences.ProtectionEnabled = candidate.ProtectionEnabled; preferences.SilenceIncoming = candidate.SilenceIncoming; preferences.ProtectionReleaseDelayMs = candidate.ProtectionReleaseDelayMs; preferences.WatchedApps = candidate.WatchedApps;
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+            await protection.ConfigureAsync(candidate, deadline.Token); candidate.Save(preferencesPath);
+            preferences.ProtectionEnabled = candidate.ProtectionEnabled; preferences.SilenceIncoming = candidate.SilenceIncoming;
+            preferences.ProtectionReleaseDelayMs = candidate.ProtectionReleaseDelayMs; preferences.WatchedApps = candidate.WatchedApps;
             preferences.ProtectionShortcut = candidate.ProtectionShortcut; UpdateProtectionHotkey();
+            ProtectionToggleResult.Text = ProtectionPolicySummary;
             ProtectionResult.Text = "Protection settings saved.";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException) { await ConfigureProtectionAsync(); ProtectionResult.Text = "Protection settings could not be saved. Previous preferences were retained."; }
-        finally { preferencesApplying = false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or JsonException or InvalidOperationException)
+        {
+            var restored = true;
+            try
+            {
+                using var rollback = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+                await protection.RestoreConfigurationAsync(preferences, wasPaused, rollback.Token);
+            }
+            catch (Exception rollbackError) when (rollbackError is IOException or UnauthorizedAccessException or OperationCanceledException or JsonException or InvalidOperationException) { restored = false; }
+            RefreshProtectionToggles();
+            ProtectionToggleResult.Text = restored ? "Change not saved. Previous choice restored; try again." : "Change not saved. Discord restoration needs retry.";
+            ProtectionResult.Text = ProtectionToggleResult.Text;
+        }
+        finally { preferencesApplying = false; RefreshSettingsActions(); RefreshDiscordConnection(); }
+    }
+    private string ProtectionPolicySummary => !preferences.ProtectionEnabled ? "Saved. Discord protection is off."
+        : preferences.SilenceIncoming ? "Saved. Microphone and incoming audio are silenced while dictating."
+        : "Saved. Microphone only; incoming audio stays on.";
+    private void RefreshProtectionToggles()
+    {
+        refreshingProtectionToggles = true;
+        try { ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming; }
+        finally { refreshingProtectionToggles = false; }
     }
     private void ImportHush_Click(object sender, RoutedEventArgs e)
     {
@@ -73,16 +120,27 @@ public partial class MainWindow
             if (File.Exists(legacy) && new FileInfo(legacy).Length <= 65536)
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(legacy));
-                if (doc.RootElement.TryGetProperty("watched_apps", out var apps) && apps.ValueKind == JsonValueKind.Array) WatchedApps.Text = string.Join("\n", apps.EnumerateArray().Take(50).Where(a => a.ValueKind == JsonValueKind.String).Select(a => a.GetString()));
-                if (doc.RootElement.TryGetProperty("focus_deafen", out var deafen) && deafen.ValueKind is JsonValueKind.True or JsonValueKind.False) SilenceIncoming.IsChecked = deafen.GetBoolean();
-                if (doc.RootElement.TryGetProperty("mute_release_delay_ms", out var delay) && delay.TryGetInt32(out var ms)) ProtectionDelay.Text = Math.Clamp(ms, 0, 5000).ToString();
-                if (doc.RootElement.TryGetProperty("hotkey_pause", out var shortcut) && shortcut.ValueKind == JsonValueKind.String) ProtectionShortcutInput.Text = shortcut.GetString();
-                if (doc.RootElement.TryGetProperty("autostart_enabled", out var startup) && startup.ValueKind is JsonValueKind.True or JsonValueKind.False) StartWithWindows.IsChecked = startup.GetBoolean();
-                if (doc.RootElement.TryGetProperty("close_to_tray", out var trayPreference) && trayPreference.ValueKind is JsonValueKind.True or JsonValueKind.False) CloseToTray.IsChecked = trayPreference.GetBoolean();
+                ApplyHushSettings(doc.RootElement);
             }
             ProtectionResult.Text = "Hush credentials protected with Windows encryption. Review settings, then save. Pause and quit Hush before connecting Discord.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException) { ProtectionResult.Text = "Import could not complete. Existing Sona and Hush setup was preserved."; }
+    }
+    private void ApplyHushSettings(JsonElement settings)
+    {
+        var previousGuard = refreshingProtectionToggles; refreshingProtectionToggles = true;
+        try
+        {
+            if (settings.TryGetProperty("watched_apps", out var apps) && apps.ValueKind == JsonValueKind.Array) WatchedApps.Text = string.Join("\n", apps.EnumerateArray().Take(50).Where(a => a.ValueKind == JsonValueKind.String).Select(a => a.GetString()));
+            if (settings.TryGetProperty("focus_deafen", out var deafen) && deafen.ValueKind is JsonValueKind.True or JsonValueKind.False) SilenceIncoming.IsChecked = deafen.GetBoolean();
+            if (settings.TryGetProperty("mute_release_delay_ms", out var delay) && delay.TryGetInt32(out var ms)) ProtectionDelay.Text = Math.Clamp(ms, 0, 5000).ToString();
+            if (settings.TryGetProperty("hotkey_pause", out var shortcut) && shortcut.ValueKind == JsonValueKind.String) ProtectionShortcutInput.Text = shortcut.GetString();
+            if (settings.TryGetProperty("autostart_enabled", out var startup) && startup.ValueKind is JsonValueKind.True or JsonValueKind.False) StartWithWindows.IsChecked = startup.GetBoolean();
+            if (settings.TryGetProperty("close_to_tray", out var trayPreference) && trayPreference.ValueKind is JsonValueKind.True or JsonValueKind.False) CloseToTray.IsChecked = trayPreference.GetBoolean();
+        }
+        finally { refreshingProtectionToggles = previousGuard; }
+        ProtectionToggleResult.Text = "Imported choices are not saved. Review them, then select Save protection.";
+        RefreshSettingsActions();
     }
     private async void ConnectDiscord_Click(object sender, RoutedEventArgs e)
     {
@@ -123,7 +181,7 @@ public partial class MainWindow
     }
     private void RefreshProtectionFields()
     {
-        ProtectionEnabled.IsChecked = preferences.ProtectionEnabled; SilenceIncoming.IsChecked = preferences.SilenceIncoming;
+        RefreshProtectionToggles(); ProtectionToggleResult.Text = ProtectionPolicySummary;
         WatchedApps.Text = string.Join("\n", preferences.WatchedApps); ProtectionDelay.Text = preferences.ProtectionReleaseDelayMs.ToString();
         ProtectionShortcutInput.Text = preferences.ProtectionShortcut;
     }
@@ -137,7 +195,7 @@ public partial class MainWindow
         if (ConnectDiscordButton == null || DiscordConnectionBadge == null) return;
         var connected = protection?.Connected == true;
         HushStatus.Text = connected ? "Connected" : "Not connected";
-        DiscordConnectionDetail.Text = discordConnectionBusy ? "Updating the Discord connection..." : connected ? protection!.Status : protection?.ConnectionSuppressed == true ? "Disconnected; call protection is inactive. Your saved setup is kept." : "Connect Discord to use call protection. Your saved setup is kept.";
+        DiscordConnectionDetail.Text = discordConnectionBusy ? "Updating the Discord connection..." : connected ? protection!.Status + (preferences.ProtectionEnabled ? preferences.SilenceIncoming ? ". Microphone and incoming audio." : ". Microphone only." : "") : protection?.ConnectionSuppressed == true ? "Disconnected; call protection is inactive. Your saved setup is kept." : "Connect Discord to use call protection. Your saved setup is kept.";
         ConnectDiscordButton.Content = discordConnectionBusy && !connected ? "Connecting..." : "Connect Discord";
         ConnectDiscordButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
         ConnectDiscordButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && protection != null;
