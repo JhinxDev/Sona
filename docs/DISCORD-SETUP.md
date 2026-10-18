@@ -14,6 +14,44 @@ Pending owned restoration prevents a new protected recording until resolved.
 If saving the choice fails after a successful disconnect, the UI explains that
 restart may reconnect and offers a retry. The runtime stays disconnected.
 
+## Retained setup missing after a desktop handoff
+
+A packaged Codex terminal and Explorer can see different physical AppData
+folders at the same logical path. On October 18, the installed 0.4.6 app had
+preferences in its desktop profile but no encrypted Discord setup there. The
+retained setup in the caller's redirected profile still authenticated and read
+voice state. Restoring those exact encrypted bytes to the active desktop profile
+made the actual Connect action and a Disconnect/Connect cycle succeed.
+
+`tools/start-sona.ps1 -FilePath <owned-installed-Sona.exe> -CheckProfileOnly`
+performs a read-only check through the protected Explorer bootstrap without
+launching Sona. If the caller has a saved Discord setup but the desktop profile
+cannot see one, it fails with a bounded setup-missing reason. `tools/upgrade.ps1`
+runs this check before capturing drafts or quitting the current app. This checks
+file presence, not authorization validity or real-call behavior.
+
+For a verified split, run `tools/restore-discord-setup.ps1` from the destination
+app's desktop context with explicit `-SourceProfileDirectory` and
+`-DestinationProfileDirectory`. The destination must already contain physical
+`preferences.json`. The tool validates current-user DPAPI, copies the existing
+encrypted file atomically, verifies its encrypted hash, preserves the source,
+and refuses a different existing destination. It rejects redirected destinations
+and never returns credential plaintext. Select the retained Sona setup; Hush
+migration remains the separate explicit action described below.
+
+The recovery and preflight fixtures use synthetic profiles:
+
+```powershell
+.\tools\discord-setup-restore-checks.ps1 -OutputDirectory <fresh-evidence-directory>
+.\tools\desktop-profile-checks.ps1 -OutputRoot <fresh-sona-upgrade-rehearsal-and-32-hex-directory>
+```
+
+Eight recovery checks passed under PowerShell 7 and Windows PowerShell 5.1.
+Eight profile checks passed, including missing setup, read-only desktop visibility
+and preservation of the running owner instance. App binaries remain 0.4.6;
+this is a tooling and active-profile repair. No microphone, message submission
+or call was started, and call protection remained off during live verification.
+
 ## Application credentials and consent
 
 Sona's current adapter uses Discord's local desktop RPC connection with OAuth2

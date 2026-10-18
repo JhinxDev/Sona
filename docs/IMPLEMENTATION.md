@@ -47,6 +47,13 @@ quit normally when safe, launch through the Explorer-owned desktop bootstrap,
 and read back the live version/build and exact EXE, package hashes, draft,
 original and settings. Keep recovery until that readback succeeds.
 
+Before normal Quit, the upgrader now performs the launcher's read-only desktop
+profile preflight. If the caller can see retained Discord setup but Explorer
+cannot, it stops while the current app is still running. Resolve the verified
+profile split with the no-overwrite encrypted recovery procedure in
+[Discord setup](DISCORD-SETUP.md#retained-setup-missing-after-a-desktop-handoff).
+Terminal-side file existence alone does not prove desktop profile visibility.
+
 Documentation-only commits do not trigger app activation. Separately qualified
 launcher/tooling changes can reuse the accepted app binaries without rebuilding
 them; retain their tooling checks and the current live identity.

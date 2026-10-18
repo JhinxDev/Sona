@@ -4,6 +4,7 @@ param(
     [Parameter(ParameterSetName='Launch')][string]$RecoveryPath,
     [Parameter(ParameterSetName='Launch')][string]$RehearsalRoot,
     [Parameter(ParameterSetName='Launch')][switch]$Hidden,
+    [Parameter(ParameterSetName='Launch')][switch]$CheckProfileOnly,
     [Parameter(Mandatory,ParameterSetName='Bootstrap')][string]$BootstrapRequest
 )
 $ErrorActionPreference='Stop'
@@ -13,6 +14,15 @@ function ReadProtected([string]$Path) {
     if((Get-Item -LiteralPath $Path).Length -gt 65536){throw 'Protected launch data exceeds its bound.'}
     $bytes=[Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($Path),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
     try{return [Text.Encoding]::UTF8.GetString($bytes)}finally{[Array]::Clear($bytes,0,$bytes.Length)}
+}
+function ProfileRoot($Environment,[string]$TestRoot) {
+    if($TestRoot){return Join-Path $TestRoot 'profile'}
+    if($Environment.SONA_DATA){return [string]$Environment.SONA_DATA}
+    if($Environment.MURMUR_DATA){return [string]$Environment.MURMUR_DATA}
+    $local=[Environment]::GetFolderPath('LocalApplicationData')
+    $current=Join-Path $local 'Sona';$legacy=Join-Path $local 'Murmur'
+    if([IO.File]::Exists((Join-Path $current 'preferences.json')) -or ![IO.Directory]::Exists($legacy)){return $current}
+    return $legacy
 }
 function ValidateTarget([string]$Path,[string]$TestRoot) {
     $root=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\Sona'))
@@ -31,7 +41,7 @@ if($PSCmdlet.ParameterSetName-eq'Bootstrap') {
     $request=[IO.Path]::GetFullPath($BootstrapRequest)
     if((Split-Path $request -Leaf)-notmatch'^desktop-launch-[a-f0-9]{32}\.dpapi$'){throw 'Unrecognized desktop launch request.'}
     $claimed=$request+'.claimed';$reply=$request+'.reply.json';$replyTemporary=$reply+'.tmp'
-    $ownsRequest=$false;$payload=$null;$info=$null;$child=$null
+    $ownsRequest=$false;$payload=$null;$info=$null;$child=$null;$failureCode='DesktopLaunchFailed'
     try {
         # Atomic claim prevents replay by a second bootstrap. The command line holds
         # only this encrypted request path, never draft text or a private environment.
@@ -48,21 +58,29 @@ if($PSCmdlet.ParameterSetName-eq'Bootstrap') {
             $info.Arguments='--test-ui --test-transfer'
             $info.EnvironmentVariables['SONA_DATA']=Join-Path $data.RehearsalRoot 'profile';$info.EnvironmentVariables['MURMUR_DATA']=$info.EnvironmentVariables['SONA_DATA']
         }
+        # Resolve inside Explorer's profile view, before reading any draft or launching.
+        $desktopProfile=ProfileRoot $data.Environment $data.RehearsalRoot
+        $desktopSetup=[IO.File]::Exists((Join-Path $desktopProfile 'discord-credentials.dpapi'))
+        if($data.ExpectedDiscordSetup -and !$desktopSetup){$failureCode='DiscordSetupMissing';throw 'Retained Discord setup is not visible from the desktop profile.'}
         if($data.Hidden){$info.Arguments=($info.Arguments+' --start-hidden').Trim()}
-        if($data.RecoveryPath){
+        if($data.RecoveryPath -and !$data.CheckProfileOnly){
             $payload=ReadProtected $data.RecoveryPath
             if($payload.Length-gt30000){throw 'Draft transfer exceeds its bound.'}
             $info.EnvironmentVariables['SONA_DRAFT_TRANSFER']=$payload
         }
         if([DateTimeOffset]::UtcNow -gt ([DateTimeOffset]$data.ExpiresUtc)){throw 'Desktop launch request expired.'}
-        $child=[Diagnostics.Process]::Start($info)
-        $result=@{Ok=$true;PID=$child.Id;Path=$target;Started=$child.StartTime.ToUniversalTime().ToString('o');Route='Explorer desktop bootstrap'}
+        if($data.CheckProfileOnly){
+            $result=@{Ok=$true;CheckProfileOnly=$true;DiscordSetupPresent=$desktopSetup;Route='Explorer desktop profile preflight'}
+        }else{
+            $child=[Diagnostics.Process]::Start($info)
+            $result=@{Ok=$true;PID=$child.Id;Path=$target;Started=$child.StartTime.ToUniversalTime().ToString('o');Route='Explorer desktop bootstrap'}
+        }
         [IO.File]::WriteAllText($replyTemporary,($result|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false));[IO.File]::Move($replyTemporary,$reply)
     } catch {
         # A claimed request gets a bounded, nonsecret failure receipt. Never echo
         # protected payloads, exception details or inherited environment values.
         if($ownsRequest -and !(Test-Path -LiteralPath $reply)){
-            $result=@{Ok=$false;LaunchMayHaveStarted=($null-ne$child)}
+            $result=@{Ok=$false;LaunchMayHaveStarted=($null-ne$child);FailureCode=$failureCode}
             [IO.File]::WriteAllText($replyTemporary,($result|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false));[IO.File]::Move($replyTemporary,$reply)
         }
     } finally {
@@ -84,7 +102,8 @@ if($RecoveryPath){
 New-Item -ItemType Directory -Path $directory -Force|Out-Null
 $request=Join-Path $directory ('desktop-launch-'+[guid]::NewGuid().ToString('N')+'.dpapi');$reply=$request+'.reply.json'
 $environment=@{};foreach($name in @('SONA_DATA','MURMUR_DATA','SONA_RUNTIME','MURMUR_RUNTIME')){$environment[$name]=[Environment]::GetEnvironmentVariable($name)}
-$data=@{FilePath=$target;RecoveryPath=$RecoveryPath;RehearsalRoot=$RehearsalRoot;Hidden=[bool]$Hidden;Environment=$environment;ExpiresUtc=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')}
+$callerProfile=ProfileRoot $environment $RehearsalRoot
+$data=@{FilePath=$target;RecoveryPath=$RecoveryPath;RehearsalRoot=$RehearsalRoot;Hidden=[bool]$Hidden;CheckProfileOnly=[bool]$CheckProfileOnly;ExpectedDiscordSetup=[IO.File]::Exists((Join-Path $callerProfile 'discord-credentials.dpapi'));Environment=$environment;ExpiresUtc=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')}
 $bytes=[Text.Encoding]::UTF8.GetBytes(($data|ConvertTo-Json -Depth 4 -Compress))
 try{[IO.File]::WriteAllBytes($request,[Security.Cryptography.ProtectedData]::Protect($bytes,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($bytes,0,$bytes.Length)}
 # The desktop bootstrap does not share an MSIX caller's virtual AppData view.
@@ -105,7 +124,15 @@ try {
     while(!(Test-Path -LiteralPath $reply) -and [DateTime]::UtcNow-lt$until){Start-Sleep -Milliseconds 50}
     if(!(Test-Path -LiteralPath $reply)){throw 'Desktop launch acknowledgement timed out; encrypted recovery retained.'}
     $result=Get-Content -LiteralPath $reply -Raw|ConvertFrom-Json
-    if(!$result.Ok){$delegated=[bool]$result.LaunchMayHaveStarted;throw 'Desktop bootstrap did not confirm a launch; recovery retained.'}
+    if(!$result.Ok){
+        $delegated=[bool]$result.LaunchMayHaveStarted
+        if($result.FailureCode-eq'DiscordSetupMissing'){throw 'Desktop profile cannot see the retained Discord setup. Restore the existing encrypted setup before upgrading; current app and recovery are preserved.'}
+        throw 'Desktop bootstrap did not confirm a launch; recovery retained.'
+    }
+    if($CheckProfileOnly){
+        if(!$result.CheckProfileOnly -or $result.PID){throw 'Desktop profile preflight returned an unexpected launch receipt.'}
+        $confirmed=$true;$result;return
+    }
     $process=Get-Process -Id $result.PID -ErrorAction Stop
     if($process.Path-ne$target -or $process.StartTime.ToUniversalTime().Ticks-ne([DateTime]$result.Started).ToUniversalTime().Ticks){throw 'Desktop-launched process identity differs; recovery retained.'}
     $confirmed=$true

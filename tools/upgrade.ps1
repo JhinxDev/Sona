@@ -38,6 +38,11 @@ if($taskOwned.SourceHead-eq$taskPackageReceipt.SourceHead){Write-Output 'This ve
 $taskAgent=Join-Path (Split-Path $taskOldPath) 'sona-agent.exe'
 function Idle{ $taskState=((& $taskAgent status)-join "`n"|ConvertFrom-Json);$taskVoice=((& $taskAgent protection status)-join "`n"|ConvertFrom-Json);return $taskState.ok-and$taskState.data.state-eq'idle'-and$taskVoice.ok-and!$taskVoice.data.ownsChanges }
 if(!(Idle)){throw 'Current app is busy or owns voice changes; preserved'}
+# Verify the target desktop view before normal Quit. A packaged caller can see a
+# retained Discord setup that Explorer cannot see at the same logical path.
+$taskProfileCheck=@{FilePath=$taskOldPath;CheckProfileOnly=$true}
+if($RehearsalRoot){$taskProfileCheck.RehearsalRoot=$RehearsalRoot}
+& (Join-Path $PSScriptRoot 'start-sona.ps1') @taskProfileCheck|Out-Null
 $taskRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskOld.MainWindowHandle)
 if(!$taskRoot-or$taskRoot.Current.ProcessId-ne$taskOld.Id){throw 'Open Sona from its tray; hidden app was preserved'}
 function ById([string]$Id){return $taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))}
