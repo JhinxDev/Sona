@@ -397,3 +397,15 @@ No real microphone, Discord account/session action or global input was used.
 The owner is in a public call and prohibited actions affecting that session.
 The qualified candidate must remain unactivated until that constraint is cleared.
 A local build/package is not proof of a live0.4.7 upgrade or owner-call acceptance.
+
+
+## Session History across guarded updates (October 18)
+
+The isolated four-entry restart and failure fixtures cover recent classification,
+exact preferences/working draft/original, finite plaintext and DPAPI cleanup,
+changed-history refusal, and uncertain-Quit recovery retention. The original
+18-check upgrade rehearsal remains applicable. Run the session fixture against
+the qualified package with the documented failure modes before changing this
+transfer. A fixture marker proves the intended fault occurred after staging;
+an earlier failure is not evidence that this fault path passed. Test windows stay
+offscreen and never activate; no production microphone or Discord test is implied.

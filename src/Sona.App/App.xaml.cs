@@ -22,7 +22,7 @@ public partial class App : Application
         ownsMutex = created;
         if (!created)
         {
-            if (!e.Args.Contains("--start-hidden")) { try { using var signal = EventWaitHandle.OpenExisting(openName); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { } }
+            if (!e.Args.Contains("--start-hidden") && !e.Args.Contains("--start-minimized")) { try { using var signal = EventWaitHandle.OpenExisting(openName); signal.Set(); } catch (WaitHandleCannotBeOpenedException) { } }
             Shutdown(); return;
         }
         global::Sona.App.Windows.BoundedProcess.ContainApplication();
@@ -33,6 +33,7 @@ public partial class App : Application
         open = new EventWaitHandle(false, EventResetMode.AutoReset, openName);
         openWait = ThreadPool.RegisterWaitForSingleObject(open, (_, _) => Dispatcher.BeginInvoke(() => { main.Show(); main.WindowState = WindowState.Normal; main.Activate(); }), null, Timeout.Infinite, false);
         if (e.Args.Contains("--start-hidden") && main.PreferencesAvailable) { main.ShowActivated = false; main.Show(); main.Hide(); }
+        else if (e.Args.Contains("--start-minimized")) { main.ShowActivated = false; main.WindowState = WindowState.Minimized; main.Show(); }
         else main.Show();
         if (e.Args.Contains("--test-ui"))
         {

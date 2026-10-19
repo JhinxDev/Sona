@@ -7,6 +7,9 @@
 - Failed acquisition/restoration remains retryable, including manual overrides during awaited retries. Imported settings remain pending for review.
 - Added isolated native switch/failure/persistence regressions to the maintained build checks. Real Discord call acceptance remains separate.
 
+- Guard upgrades against losing session-only History. The explicit finite transfer preserves recent entries with History storage Off and retains recovery after an uncertain Quit.
+- Keep isolated UI tests offscreen without activation; start updated apps minimized and retain the older hidden rollback route.
+
 ## 0.4.6 - full History action label
 
 - Show Clear recent history in full, without an ellipsis or a changing count in

@@ -4,10 +4,12 @@ param(
     [Parameter(ParameterSetName='Launch')][string]$RecoveryPath,
     [Parameter(ParameterSetName='Launch')][string]$RehearsalRoot,
     [Parameter(ParameterSetName='Launch')][switch]$Hidden,
+    [Parameter(ParameterSetName='Launch')][switch]$Minimized,
     [Parameter(ParameterSetName='Launch')][switch]$CheckProfileOnly,
     [Parameter(Mandatory,ParameterSetName='Bootstrap')][string]$BootstrapRequest
 )
 $ErrorActionPreference='Stop'
+if($Hidden -and $Minimized){throw 'Choose hidden or minimized startup, not both.'}
 Add-Type -AssemblyName System.Security
 . (Join-Path $PSScriptRoot 'resolve-physical-file.ps1')
 function ReadProtected([string]$Path) {
@@ -63,6 +65,7 @@ if($PSCmdlet.ParameterSetName-eq'Bootstrap') {
         $desktopSetup=[IO.File]::Exists((Join-Path $desktopProfile 'discord-credentials.dpapi'))
         if($data.ExpectedDiscordSetup -and !$desktopSetup){$failureCode='DiscordSetupMissing';throw 'Retained Discord setup is not visible from the desktop profile.'}
         if($data.Hidden){$info.Arguments=($info.Arguments+' --start-hidden').Trim()}
+        if($data.Minimized){$info.Arguments=($info.Arguments+' --start-minimized').Trim()}
         if($data.RecoveryPath -and !$data.CheckProfileOnly){
             $payload=ReadProtected $data.RecoveryPath
             if($payload.Length-gt30000){throw 'Draft transfer exceeds its bound.'}
@@ -103,7 +106,7 @@ New-Item -ItemType Directory -Path $directory -Force|Out-Null
 $request=Join-Path $directory ('desktop-launch-'+[guid]::NewGuid().ToString('N')+'.dpapi');$reply=$request+'.reply.json'
 $environment=@{};foreach($name in @('SONA_DATA','MURMUR_DATA','SONA_RUNTIME','MURMUR_RUNTIME')){$environment[$name]=[Environment]::GetEnvironmentVariable($name)}
 $callerProfile=ProfileRoot $environment $RehearsalRoot
-$data=@{FilePath=$target;RecoveryPath=$RecoveryPath;RehearsalRoot=$RehearsalRoot;Hidden=[bool]$Hidden;CheckProfileOnly=[bool]$CheckProfileOnly;ExpectedDiscordSetup=[IO.File]::Exists((Join-Path $callerProfile 'discord-credentials.dpapi'));Environment=$environment;ExpiresUtc=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')}
+$data=@{FilePath=$target;RecoveryPath=$RecoveryPath;RehearsalRoot=$RehearsalRoot;Hidden=[bool]$Hidden;Minimized=[bool]$Minimized;CheckProfileOnly=[bool]$CheckProfileOnly;ExpectedDiscordSetup=[IO.File]::Exists((Join-Path $callerProfile 'discord-credentials.dpapi'));Environment=$environment;ExpiresUtc=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')}
 $bytes=[Text.Encoding]::UTF8.GetBytes(($data|ConvertTo-Json -Depth 4 -Compress))
 try{[IO.File]::WriteAllBytes($request,[Security.Cryptography.ProtectedData]::Protect($bytes,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser))}finally{[Array]::Clear($bytes,0,$bytes.Length)}
 # The desktop bootstrap does not share an MSIX caller's virtual AppData view.

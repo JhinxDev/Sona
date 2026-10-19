@@ -1,5 +1,6 @@
-param([Parameter(Mandatory)][string]$PackageDirectory,[int]$ProcessId,[switch]$RecoverySelfTest,[string]$RehearsalRoot)
+param([Parameter(Mandatory)][string]$PackageDirectory,[int]$ProcessId,[switch]$RecoverySelfTest,[string]$RehearsalRoot,[switch]$PreserveSessionHistory,[scriptblock]$BeforeSessionQuitForTests,[scriptblock]$QuitInvokeForTests)
 $ErrorActionPreference='Stop'
+if(($BeforeSessionQuitForTests -or $QuitInvokeForTests) -and !$RehearsalRoot){throw 'A transfer test hook requires an isolated rehearsal.'}
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
 function SaveRecovery([string]$Payload,[string]$Directory){
@@ -43,6 +44,30 @@ if(!(Idle)){throw 'Current app is busy or owns voice changes; preserved'}
 $taskProfileCheck=@{FilePath=$taskOldPath;CheckProfileOnly=$true}
 if($RehearsalRoot){$taskProfileCheck.RehearsalRoot=$RehearsalRoot}
 & (Join-Path $PSScriptRoot 'start-sona.ps1') @taskProfileCheck|Out-Null
+# Refuse to discard session-only History. The explicit finite transfer uses the
+# native save path, restores retention Off and removes only its staged file.
+. (Join-Path $PSScriptRoot 'session-history-transfer.ps1')
+$taskTransferState=Get-SonaTransferStatus $taskOld.Id
+if($taskTransferState.unsavedSettings -or $taskTransferState.preferencesLoad -eq 'Unavailable'){throw 'Save pending settings before upgrade; current app preserved.'}
+$taskTransferWindow=Get-SonaTransferWindow $taskOld.Id
+$taskTransferCount=Get-SonaTransferCount $taskTransferWindow
+(Get-SonaTransferField $taskTransferWindow 'SettingsTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+(Get-SonaTransferField $taskTransferWindow 'SettingsPrivacyNav').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+$taskKeepsHistory=(Get-SonaTransferField $taskTransferWindow 'KeepHistory').GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -eq 'On'
+$taskSessionStage=$null;$taskSessionResult=$null;$taskNew=$null;$taskQuitAttempted=$false
+try{
+if(!$taskKeepsHistory -and $taskTransferCount.Recent -gt 0){
+    if(!$PreserveSessionHistory){throw 'Session-only History would be lost. Use the qualified finite session transfer before Quit.'}
+    $taskProfile=Join-Path $env:LOCALAPPDATA 'Sona'
+    if($RehearsalRoot){$taskProfile=Join-Path $RehearsalRoot 'profile'}
+    elseif($env:SONA_DATA){$taskProfile=$env:SONA_DATA}
+    elseif($env:MURMUR_DATA){$taskProfile=$env:MURMUR_DATA}
+    elseif(!(Test-Path -LiteralPath (Join-Path $taskProfile 'preferences.json')) -and (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Murmur'))){$taskProfile=Join-Path $env:LOCALAPPDATA 'Murmur'}
+    $taskSessionRecovery=Join-Path $env:LOCALAPPDATA 'Sona\recovery'
+    if($RehearsalRoot){$taskSessionRecovery=Join-Path $RehearsalRoot 'recovery'}
+    $taskSessionStage=Save-SonaSessionHistory $taskOld.Id $taskProfile (Join-Path $taskSessionRecovery ('session-history-'+[Guid]::NewGuid().ToString('N')+'.dpapi'))
+}
+if($BeforeSessionQuitForTests){& $BeforeSessionQuitForTests $taskOld.Id $taskProfile}
 $taskRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskOld.MainWindowHandle)
 if(!$taskRoot-or$taskRoot.Current.ProcessId-ne$taskOld.Id){throw 'Open Sona from its tray; hidden app was preserved'}
 function ById([string]$Id){return $taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))}
@@ -59,19 +84,23 @@ if($RehearsalRoot){$taskRecoveryDirectory=Join-Path $RehearsalRoot 'recovery'}
 $taskRecovery=SaveRecovery $taskPayload $taskRecoveryDirectory
 if((ReadRecovery $taskRecovery)-cne$taskPayload){throw 'Encrypted recovery readback differs; app preserved'}
 if(!(Idle)-or(Value 'Draft')-cne$taskDraft){throw 'App or draft changed; app preserved; encrypted checkpoint retained'}
+if($taskSessionStage){
+    Confirm-SonaSessionHistory $taskSessionStage
+    SelectTab 'DictationTab'
+    if(!(Idle)-or(Value 'Draft')-cne$taskDraft){throw 'The app changed before Quit; preserve the session.'}
+}
 SelectTab 'SettingsTab'
 $taskAbout=ById 'SettingsAboutNav'
 if($taskAbout){$taskAbout.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()}
 $taskQuit=$taskRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)))
 if($taskQuit.Count-ne1){throw 'Quit control not unique; app preserved'}
-function LaunchPrivate([string]$Path,[string]$Checkpoint){
-    $launch=@{FilePath=$Path;RecoveryPath=$Checkpoint};if($RehearsalRoot){$launch.RehearsalRoot=$RehearsalRoot}
+function LaunchPrivate([string]$Path,[string]$Checkpoint,[bool]$Rollback=$false){
+    $launch=@{FilePath=$Path;RecoveryPath=$Checkpoint};if($RehearsalRoot){$launch.RehearsalRoot=$RehearsalRoot};if($Rollback -and !$RehearsalRoot){$launch.Hidden=$true}else{$launch.Minimized=$true}
     $launched=& (Join-Path $PSScriptRoot 'start-sona.ps1') @launch
     return Get-Process -Id $launched.PID -ErrorAction Stop
 }
-$taskNew=$null
-try{
-    $taskQuit[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $taskQuitAttempted=$true # Once Invoke may begin, keep both session recovery copies.
+    if($QuitInvokeForTests){& $QuitInvokeForTests}else{$taskQuit[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()}
     if(!$taskOld.WaitForExit(15000)){throw 'Exit not confirmed; checkpoint retained'}
     $taskInstallArgs=@{PackageDirectory=$taskPackage};if($RehearsalRoot){$taskInstallArgs.RehearsalRoot=$RehearsalRoot}
     & (Join-Path $PSScriptRoot 'install.ps1') @taskInstallArgs|Out-Null
@@ -81,12 +110,18 @@ try{
     $taskNewRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskNew.MainWindowHandle)
     $taskNewField=$taskNewRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'Draft'))
     if(!$taskNewField-or$taskNewField.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value-cne$taskDraft){throw 'Draft readback differs; encrypted checkpoint retained'}
+    if($taskSessionStage){$taskSessionResult=Complete-SonaSessionHistory $taskSessionStage $taskNew.Id}
     Remove-Item -LiteralPath $taskRecovery
-    [pscustomobject]@{Version=$taskPackageReceipt.Version;PID=$taskNew.Id;DraftPreserved=$true;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json
+    [pscustomobject]@{Version=$taskPackageReceipt.Version;PID=$taskNew.Id;SessionHistoryTransferred=$taskSessionResult.RecentPreserved;DraftPreserved=$true;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json
 }catch{
+    $taskOld.Refresh()
+    if(!$taskQuitAttempted -and !$taskOld.HasExited){
+        if($taskSessionStage){Undo-SonaSessionHistory $taskSessionStage|Out-Null}
+        throw [InvalidOperationException]::new('Upgrade stopped before Quit. The original session and retention choice are preserved.', $_.Exception)
+    }
     $taskLaunchUncertain=[bool]$_.Exception.Data['DesktopLaunchUncertain']
     $taskRemaining=@(Get-Process -Name Sona -ErrorAction SilentlyContinue)
     if($RehearsalRoot){$taskRemaining=@($taskRemaining|Where-Object{$_.Path-and$_.Path.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)})}
-    if(!$taskRemaining.Count -and !$taskLaunchUncertain){LaunchPrivate $taskOldPath $taskRecovery|Out-Null}
-    throw 'Update did not qualify. Encrypted draft recovery is retained; any running app was preserved.'
+    if(!$taskRemaining.Count -and !$taskLaunchUncertain){LaunchPrivate $taskOldPath $taskRecovery $true|Out-Null}
+    throw [InvalidOperationException]::new('Update did not qualify. Encrypted draft recovery is retained; any running app was preserved.', $_.Exception)
 }finally{$taskDraft=$null;$taskOriginal=$null;$taskPayload=$null}

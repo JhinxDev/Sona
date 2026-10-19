@@ -66,7 +66,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         CommandBindings.Add(new System.Windows.Input.CommandBinding(RepositoryLinks.Open, OpenRepository));
         escape = new EscapeGuard(RequestCancel);
-        if (arguments.Contains("--test-ui")) { RecordButton.IsEnabled = false; StartWithWindows.IsEnabled = false; if (arguments.Contains("--compact")) { Width = 740; Height = 530; } }
+        if (arguments.Contains("--test-ui")) { ShowActivated = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -16000; Top = -16000; RecordButton.IsEnabled = false; StartWithWindows.IsEnabled = false; if (arguments.Contains("--compact")) { Width = 740; Height = 530; } }
         Vocabulary.Text = string.Join("\n", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Spoken + " = " + x.Written)));
         Snippets.Text = SnippetRules.Format(preferences.Snippets);
         SpeechLanguage.SelectedIndex = preferences.Language == "en" ? 1 : preferences.Language == "fr" ? 2 : 0;

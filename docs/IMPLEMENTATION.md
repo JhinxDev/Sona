@@ -54,6 +54,30 @@ profile split with the no-overwrite encrypted recovery procedure in
 [Discord setup](DISCORD-SETUP.md#retained-setup-missing-after-a-desktop-handoff).
 Terminal-side file existence alone does not prove desktop profile visibility.
 
+Session-only History must also survive the restart. The upgrader refuses normal
+Quit when recent entries exist with History storage Off unless the operator uses
+`-PreserveSessionHistory`. The finite transfer requires clean, unpaused preferences,
+unfiltered All recent history and no preexisting history.json. It uses the native
+save path to stage the complete recent list, verifies current-user DPAPI recovery,
+and immediately restores storage Off with byte-identical preferences. Before Quit
+it rechecks counts and native serialization; changed content aborts the upgrade.
+After the new session loads every row, it removes only its exact-owned staging
+file and recovery. Failures strictly before Quit clean up while the original
+session remains alive. Once Quit may be in flight, recovery stays available.
+
+The session transfer must run in the actual desktop profile context, not an MSIX
+redirected alias. Existing retained history, explicit pause, pending edits or
+changed files stop this finite route rather than overwriting owner state.
+`tools/session-history-upgrade-checks.ps1 -PackageDirectory <qualified-package>
+-OutputRoot <fresh-sona-upgrade-rehearsal-guid>` covers success; `-FailurePoint
+AfterStage`, `HistoryChanged`, `QuitInFlight`, and `-WithoutTransfer` cover the
+failure boundaries. Each run uses its own marked profile and disables microphone
+and Discord. Test UI windows now start offscreen without activation.
+
+Candidate activation uses the protected launcher's `-Minimized` mode. Recovery
+of an older binary uses its existing `-Hidden` mode, so rollback does not require
+new command-line support from that older app. Ordinary direct launch is unchanged.
+
 Documentation-only commits do not trigger app activation. Separately qualified
 launcher/tooling changes can reuse the accepted app binaries without rebuilding
 them; retain their tooling checks and the current live identity.

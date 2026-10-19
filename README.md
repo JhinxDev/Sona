@@ -183,7 +183,8 @@ environment alias remains supported for earlier tooling.
 
 If a preview window has an empty client area, launch `Sona.exe --software-rendering`
 to use the optional software renderer. The microphone-disabled `--test-ui` mode
-uses it automatically and requires a separate `SONA_DATA` directory.
+uses it automatically, requires a separate `SONA_DATA` directory, and opens its
+window offscreen without activation so automated checks do not interrupt desktop use.
 
 In **Dictation Models**, choose **Download** for Parakeet v3, then **Use model**.
 Its CPU or CUDA runtime is installed explicitly when needed. For CPU execution,
