@@ -458,3 +458,13 @@ before correction, then all15 status checks passed. The exact0.4.9 package also
 passed the offscreen transfer success18 and pre-Quit failure15 cases. Owner
 processes were preserved. These helper changes reuse the unchanged published
 app modules from source `6cd8e8e7`.
+Exact published 0.4.9 modules from app source `6cd8e8e7` passed Core388,
+Enter49, responsiveness50, completed-paste25, default Windows49, capture11,
+insertion24 and active-target34. Private guarded activation verified running
+version0.4.9/build07731528a9a9, all36 installed hashes, the working draft/original,
+complete recent history and saved preferences. Auto cleanup and the existing
+protection policy were retained. Startup warming initially withheld final
+verification; encrypted recovery stayed intact until idle exact-content readback
+and finite cleanup succeeded without another restart. Physical Enter in the
+owner's receiving app remains separate acceptance; no microphone, global input
+or real Discord behavior was tested.
