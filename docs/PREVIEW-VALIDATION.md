@@ -450,3 +450,11 @@ release-blocking issue. Tests open no microphone, send no global input and use n
 owner profile or Discord session. See [scope and limits](ENTER-DELIVERY.md).
 Exact published-module proof, live activation and physical-owner acceptance are
 separate results; do not infer them from source tests.
+
+A guarded upgrade exposed a separate tooling issue: native retention Save can
+warm models and briefly report busy. Its post-Save polling now has a bounded
+progress wait; normal preflight remains strict. The fake status regression failed
+before correction, then all15 status checks passed. The exact0.4.9 package also
+passed the offscreen transfer success18 and pre-Quit failure15 cases. Owner
+processes were preserved. These helper changes reuse the unchanged published
+app modules from source `6cd8e8e7`.

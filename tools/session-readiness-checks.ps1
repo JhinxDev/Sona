@@ -21,4 +21,22 @@ Trial 'Known owned voice changes refuse immediately' 1 idle $true $true 1 busy
 Trial 'Ordinary transfer checks do not opt into startup retries' 100 idle $false $false 1 unavailable
 Trial 'Known busy state rejects even while voice endpoint is unavailable' 1 recording $false $true 1 busy 100
 Trial 'Known owned voice rejects even while app endpoint is unavailable' 100 idle $true $true 1 busy 1
+function NativeSaveTrial([string]$Name,[string[]]$States,[bool[]]$Pending,[bool]$Owns,[bool]$StateAvailable,[bool]$VoiceAvailable,[bool]$ExpectedToggle,[int]$Calls,[string]$ExpectedFailure){
+    $trial=@{Calls=0}
+    $read={
+        $index=[Math]::Min($trial.Calls,$States.Count-1);$trial.Calls++
+        return @{State=@{ok=$StateAvailable;data=@{state=$States[$index];unsavedSettings=$Pending[[Math]::Min($index,$Pending.Count-1)]}};Voice=@{ok=$VoiceAvailable;data=@{ownsChanges=$Owns}}}
+    }.GetNewClosure()
+    $toggle={return $ExpectedToggle}.GetNewClosure();$failure=$null
+    try{Wait-SonaTransferNativeSave -ReadReply $read -IsExpectedToggle $toggle -MaxAttempts 3}catch{$failure=$_.Exception.Message}
+    if($trial.Calls-ne$Calls -or ($ExpectedFailure -and $failure-notlike('*'+$ExpectedFailure+'*')) -or (!$ExpectedFailure -and $failure)){throw ('Native-save regression: '+$Name+'; '+$failure)}
+    $checks.Add($Name)
+}
+NativeSaveTrial 'Own native Save can settle temporary model warming before idle' @('busy','busy','idle') @($false) $false $true $true $true 3 ''
+NativeSaveTrial 'Own native Save waits for pending edits to commit' @('idle','idle') @($true,$false) $false $true $true $true 2 ''
+NativeSaveTrial 'Native-save wait keeps a finite bound' @('busy') @($false) $false $true $true $true 3 'did not finish'
+NativeSaveTrial 'Native-save wait requires the expected checkbox' @('idle') @($false) $false $true $true $false 3 'did not finish'
+NativeSaveTrial 'New recording interrupts native-save waiting' @('recording') @($false) $false $true $true $true 1 'busy'
+NativeSaveTrial 'Owned voice changes interrupt native-save waiting' @('busy') @($false) $true $true $true $true 1 'busy'
+NativeSaveTrial 'Unavailable save status preserves the session' @('idle') @($false) $false $false $true $true 1 'unavailable'
 @{Passed=$checks.Count;Checks=$checks;SyntheticOnly=$true;OwnerInstanceTouched=$false;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json -Depth 4

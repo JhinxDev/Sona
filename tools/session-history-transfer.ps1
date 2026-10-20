@@ -47,7 +47,21 @@ function Get-SonaTransferCount($Window){
     if($text -notmatch '^(\d+) recent records? in All recent history\. (\d+) saved'){throw 'Use unfiltered All recent history before a session transfer.'}
     return @{Recent=[int]$Matches[1];Saved=[int]$Matches[2]}
 }
+# Only the bounded wait following our own native Save may observe temporary busy.
+# Normal preflight/startup readiness continues to reject every known busy state.
+function Wait-SonaTransferNativeSave([scriptblock]$ReadReply,[scriptblock]$IsExpectedToggle,[ValidateRange(1,300)][int]$MaxAttempts=300){
+    for($attempt=0;$attempt -lt $MaxAttempts;$attempt++){
+        $reply=& $ReadReply
+        if(($reply.State.ok -and $reply.State.data.state -notin @('idle','busy')) -or ($reply.Voice.ok -and $reply.Voice.data.ownsChanges)){throw 'Sona is busy or owns voice changes; preserve the session.'}
+        if(!$reply.State.ok -or !$reply.Voice.ok){throw 'Sona local status is unavailable; preserve recovery.'}
+        $state=$reply.State.data
+        if($state.state -eq 'idle' -and !$state.unsavedSettings -and (& $IsExpectedToggle)){return}
+        if($attempt -lt $MaxAttempts-1){Start-Sleep -Milliseconds 100}
+    }
+    throw 'Native preference Save did not finish; preserve the session.'
+}
 function Set-SonaTransferRetention([int]$ProcessId,[bool]$Enabled){
+    $null=Get-SonaTransferStatus $ProcessId
     $window=Get-SonaTransferWindow $ProcessId
     (Get-SonaTransferField $window 'SettingsTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
     (Get-SonaTransferField $window 'SettingsPrivacyNav').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
@@ -67,12 +81,12 @@ function Set-SonaTransferRetention([int]$ProcessId,[bool]$Enabled){
     }
     if(!$button){throw 'The native preference save is unavailable; session preserved.'}
     $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    for($attempt=0;$attempt -lt 60;$attempt++){
-        Start-Sleep -Milliseconds 100
-        $state=Get-SonaTransferStatus $ProcessId
-        if(!$state.unsavedSettings -and (($toggle.Current.ToggleState -eq 'On') -eq $Enabled)){return}
-    }
-    throw 'Preference save did not finish; preserve the running session.'
+    $agent=Join-Path (Split-Path (Get-Process -Id $ProcessId -ErrorAction Stop).Path) 'sona-agent.exe'
+    $read={
+        return @{State=(((& $agent status)-join "`n")|ConvertFrom-Json);Voice=(((& $agent protection status)-join "`n")|ConvertFrom-Json)}
+    }.GetNewClosure()
+    $expected={return (($toggle.Current.ToggleState -eq 'On') -eq $Enabled)}.GetNewClosure()
+    Wait-SonaTransferNativeSave -ReadReply $read -IsExpectedToggle $expected
 }
 function Save-SonaSessionHistory([int]$ProcessId,[string]$ProfileDirectory,[string]$RecoveryPath){
     $ErrorActionPreference='Stop'

@@ -35,5 +35,7 @@ $taskEnterEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-enter-delivery-
 if ($LASTEXITCODE -ne 0) { throw 'Isolated Enter delivery regressions failed' }
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --completed-paste-fixture
 if ($LASTEXITCODE -ne 0) { throw 'Completed-paste verification regressions failed' }
+& (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
+if (!$?) { throw 'Updater status regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

@@ -72,6 +72,13 @@ The native retention helper waits for both pending edits and the checkbox to set
 A matching Off checkbox is not proof of a saved Off value; reverting a pending On
 edit to its already-saved Off value needs no additional Save. Both interrupted-save
 cases are covered by the maintained offscreen session-upgrade fixture.
+
+Immediately after its own native Save, the helper uses a separate bounded wait
+for model warming to finish: idle, no pending edit and the expected checkbox must
+all be observed. It still refuses recording, owned voice changes or unavailable
+status. Ordinary preflight and new-session readiness retain strict busy refusal.
+This distinction is covered by `tools/session-readiness-checks.ps1` with fake
+status replies and no owner process.
 `tools/session-history-upgrade-checks.ps1 -PackageDirectory <qualified-package>
 -OutputRoot <fresh-sona-upgrade-rehearsal-guid>` covers success; `-FailurePoint
 AfterStage`, `HistoryChanged`, `QuitInFlight`, and `-WithoutTransfer` cover the
