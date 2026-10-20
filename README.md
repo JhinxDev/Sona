@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.8.** Build from source below. There is no published binary
+**Early preview: 0.4.9.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -30,6 +30,18 @@ AI-assisted narration, music and background art. [Capture details](docs/images/R
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
 replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
+
+## New in 0.4.9
+
+- Enter reliably finishes an admitted recording even if Windows changes the
+  field's accessibility identity before the stop handler runs. Recognition and
+  cleanup still finish before any output; changed destinations retain the draft.
+- Full-paste verification accepts complete text inserted between overlapping
+  neighbors while continuing to refuse partial paste and unrelated changes.
+- A verified paste followed by a withheld send says **Draft pasted** and asks you
+  to check the original composer before retrying.
+
+[Enter delivery behavior and isolated verification](docs/ENTER-DELIVERY.md).
 
 ## New in 0.4.8
 

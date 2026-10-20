@@ -11,6 +11,12 @@ public partial class MainWindow
     {
         if (!preferences.CopyOnInsertionFailure || string.IsNullOrWhiteSpace(text)) return;
         if (rejected == TargetCaptureStatus.PasswordField) { StatusDetail.Text += " Password fields stay protected; automatic recovery does not copy this draft."; return; }
+        if (usedPaste && insertion.LastPasteConfirmed)
+        {
+            if (insertion.LastDraftOnClipboard && ClipboardSequence() == insertion.LastDraftClipboardSequence) fallbackCopied = true;
+            StatusDetail.Text += " The complete draft was pasted. Check the original composer before retrying.";
+            return;
+        }
         if (usedPaste && insertion.LastDraftOnClipboard && ClipboardSequence() == insertion.LastDraftClipboardSequence) { fallbackCopied = true; StatusDetail.Text += " The finished draft stays on the clipboard for Ctrl+V. Check the composer before pasting again."; return; }
         // A deliberate newer owner copy wins over automatic recovery.
         if (ClipboardSequence() != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }

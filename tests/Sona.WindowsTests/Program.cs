@@ -62,6 +62,7 @@ if (args.Length == 1 && args[0] == "--discord-disconnect-checks") { Console.Writ
 if (args.Length == 1 && args[0] == "--active-app-state-fixture") { Console.WriteLine($"{await ActiveApplicationChecks.RunAsync(false)} active-app state checks passed."); return; }
 if (args.Length == 2 && args[0] == "--shared-button-fixture") { Console.WriteLine(JsonSerializer.Serialize(SharedButtonContentFixture.Run(args[1]))); return; }
 if (args.Length == 2 && args[0] is "--personalization-fixture" or "--personalization-reopen") { Console.WriteLine(JsonSerializer.Serialize(PersonalizationFixture.Run(args[1], args[0].EndsWith("reopen")))); return; }
+if (args.Length == 2 && args[0] == "--enter-delivery-fixture") { var report=EnterDeliveryFixture.Run(args[1]); Console.WriteLine(JsonSerializer.Serialize(report)); if (JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength() > 0) throw new InvalidOperationException("Enter delivery regression failed"); return; }
 if (args.Length == 1 && args[0] == "--completed-paste-fixture") { Console.WriteLine($"{await CompletedDraftPasteChecks.RunAsync()} completed-paste checks passed."); return; }
 if (args.Length == 2 && args[0] == "--overlay-fixture") { Console.WriteLine(JsonSerializer.Serialize(OverlayVisualFixture.Run(args[1]))); return; }
 if (args.Length == 2 && args[0] == "--native-app-icons") { Console.WriteLine(JsonSerializer.Serialize(await NativeApplicationIconFixture.RunAsync(args[1]))); return; }

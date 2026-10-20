@@ -1,5 +1,12 @@
 # Sona agent interface
 
+0.4.9 adds nullable `lastDelivery` to `status`: the last completed stop's outcome,
+stop/send intent, initial capture status, captured/final focus epochs and
+destination-change, paste-attempt, confirmed-paste, accepted-send and clipboard-
+recovery flags. It is one memory-only snapshot, cleared on exit. No transcript,
+field text, labels, titles or clipboard content is exposed. Status neither
+recaptures focus nor changes recording. See [delivery qualification](ENTER-DELIVERY.md).
+
 0.4.4 adds nullable `destinationCapture` to `status`. It is a snapshot of the last
 intentional recording, Test shortcut or ready-draft capture, not a fresh focus
 inspection. `attempt`, `observedAt`, `status`, control type, process identities,

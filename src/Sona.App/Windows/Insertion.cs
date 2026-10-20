@@ -44,6 +44,20 @@ public sealed partial class Insertion : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
     }
+    internal Func<(nint Window, int Owner)>? ForegroundForTests { get; set; }
+    // Gesture ownership is scoped to this exact window. Field/epoch checks still
+    // authorize output independently, after the complete result is available.
+    public bool IsForegroundWindow(DraftTarget? target)
+    {
+        if (target == null) return false;
+        if (readTarget != null)
+        {
+            var current = readTarget();
+            var foreground = ForegroundForTests?.Invoke() ?? (current?.Window ?? 0, current?.OwnerProcessId ?? 0);
+            return foreground.Item1 == target.Window && foreground.Item2 == target.OwnerProcessId;
+        }
+        return target.Window == GetForegroundWindow() && GetWindowThreadProcessId(target.Window, out var owner) != 0 && owner == target.OwnerProcessId;
+    }
     public bool IsForegroundCurrent(DraftTarget? target) => target != null && target.Window == GetForegroundWindow() && GetWindowThreadProcessId(target.Window, out var owner) != 0 && owner == target.OwnerProcessId && target.FocusEpoch == FocusEpoch;
     public static bool Same(DraftTarget? target, DraftTarget? current) => target != null && current != null && target.Window == current.Window && target.ProcessId == current.ProcessId && target.OwnerProcessId == current.OwnerProcessId && target.RuntimeId.SequenceEqual(current.RuntimeId) && target.FocusEpoch == current.FocusEpoch;
     public async Task<(bool Inserted, string Detail)> InsertAsync(DraftTarget? target, string text, CancellationToken cancellation = default)

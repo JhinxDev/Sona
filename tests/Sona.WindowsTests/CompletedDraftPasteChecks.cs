@@ -7,6 +7,21 @@ internal static class CompletedDraftPasteChecks
         Check(!Insertion.ConfirmsCompleteInsertion("Complete draft", "Complete draftCom", "Complete draft"), "Preexisting full text plus partial paste cannot authorize send");
         Check(Insertion.ConfirmsCompleteInsertion("Prior: ", "Prior: Complete draft", "Complete draft"), "A newly appended complete payload verifies exactly");
         Check(!Insertion.ConfirmsCompleteInsertion("Prior: ", "Prior: Complete draft plus", "Complete draft"), "Extra unrequested changes revoke confirmation");
+        Check(Insertion.ConfirmsCompleteInsertion("ab", "abab", "ba"), "A complete middle insertion with overlapping neighbors verifies without truncating the proof");
+        Check(!Insertion.ConfirmsCompleteInsertion("ab", "abzz", "ba"), "Equal length growth without the complete inserted payload still refuses");
+        Check(Insertion.ConfirmsCompleteInsertion("aaa", "aaaaa", "aa"), "Repeated adjacent text can still prove a complete pure insertion");
+        static IEnumerable<string> Words(int length)
+        {
+            for(var value=0;value<(1<<length);value++)yield return new string(Enumerable.Range(0,length).Select(bit=>(value&(1<<bit))==0?'a':'b').ToArray());
+        }
+        var exact=true;
+        for(var oldLength=0;oldLength<=4;oldLength++)foreach(var before in Words(oldLength))
+        for(var size=1;size<=3;size++)foreach(var payload in Words(size))foreach(var after in Words(oldLength+size))
+        {
+            var expected=Enumerable.Range(0,before.Length+1).Any(index=>after==before.Insert(index,payload));
+            if(Insertion.ConfirmsCompleteInsertion(before,after,payload)!=expected)exact=false;
+        }
+        Check(exact,"Complete-paste proof agrees with every possible exact pure insertion across 28,644 overlap/adversarial cases");
         var target = new DraftTarget(1, 10, [1, 2], 0); DraftTarget? current = target; bool modifiers = false;
         using var insertion = new Insertion(() => current, () => modifiers, _ => throw new Exception("Unicode fallback must not run"));
         var transport = new FakePaste(); insertion.PasteTransportForTests = transport;

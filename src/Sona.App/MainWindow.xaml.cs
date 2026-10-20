@@ -118,7 +118,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
             InitializeProtection();
             modelIdleTimer.Start(); modelPreparation = WarmAllSelectedAsync();
-            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, () => Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) && insertion.IsForegroundCurrent(target), () => pendingSubmission.IsOpen, () => pendingSubmission.TryRequest()); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
+            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, CanFinishAndSendShortcut, () => pendingSubmission.IsOpen, () => pendingSubmission.TryRequest()); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
             var menu = new System.Windows.Forms.ContextMenuStrip();
@@ -165,9 +165,14 @@ public partial class MainWindow : Window
         var begin = BeginRecordingAsync(hold ? () => hotkeys?.CanBeginHold == true : hotkeys?.IsToggleAdmission == true ? () => hotkeys?.CanBeginToggle == true : null);
         operation = begin; return await begin;
     }
+    private bool CanFinishAndSendShortcut() => Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) && insertion.IsForegroundWindow(target);
     private void FinishAndSendShortcut()
     {
-        if (recorder == null || processing || session?.State != SessionState.Recording || !Insertion.Same(target, insertion.Capture())) { hotkeys?.Recording(false); return; }
+        // Once Enter belongs to this recording it must finish capture, even if
+        // the field becomes unavailable before the UI handles the gesture.
+        // Final paste/send retains every exact-field and focus-epoch guard.
+        if (processing) { pendingSubmission.TryRequest(); return; }
+        if (recorder == null || session?.State != SessionState.Recording) return;
         submitOnComplete = true; StartStop();
     }
     private void FinishShortcut()
@@ -254,6 +259,7 @@ public partial class MainWindow : Window
     {
         var current = session; var active = recorder;
         if (current == null || active == null || !current.Stop()) return;
+        var stoppedByEnter = submitOnComplete;
         retainOnly |= active.Elapsed >= RecordingLimits.MaximumSeconds || active.LimitReached;
         if (retainOnly) submitOnComplete = false;
         FeedbackCue? completedFeedback = null;
@@ -312,8 +318,9 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
         finally
         {
+            ObserveDelivery(current, retainOnly, pasteAttempted, stoppedByEnter);
             pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
-            if ((current.State == SessionState.Ready || fallbackCopied) && !shutdownPending && current.State is SessionState.Ready or SessionState.Inserted) ShowRetainedDraftNotice();
+            if ((current.State == SessionState.Ready || fallbackCopied || lastDelivery?.Outcome == "PasteConfirmedSendWithheld") && !shutdownPending && current.State is SessionState.Ready or SessionState.Inserted) ShowRetainedDraftNotice();
             if (completedFeedback.HasValue && current.State is SessionState.Ready or SessionState.Inserted) _ = PlayFeedbackAsync(completedFeedback.Value);
         }
     }

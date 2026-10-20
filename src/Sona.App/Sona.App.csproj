@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><AssemblyName>Sona</AssemblyName><Product>Sona</Product><Title>Sona</Title><Version>0.4.8</Version><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/Sona.ico</ApplicationIcon></PropertyGroup>
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><AssemblyName>Sona</AssemblyName><Product>Sona</Product><Title>Sona</Title><Version>0.4.9</Version><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/Sona.ico</ApplicationIcon></PropertyGroup>
   <ItemGroup><ProjectReference Include="../Sona.Core/Sona.Core.csproj"/><PackageReference Include="NAudio" Version="2.2.1"/></ItemGroup>
   <ItemGroup><Using Remove="System.Windows.Forms"/><Using Remove="System.Drawing"/></ItemGroup>
   <ItemGroup><Resource Include="Assets/Sona.ico"/></ItemGroup>

@@ -30,5 +30,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Isolated protection switch regressions failed'
 $taskSpeedEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-responsiveness-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --responsiveness-fixture $taskSpeedEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Isolated responsiveness regressions failed' }
+$taskEnterEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-enter-delivery-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --enter-delivery-fixture $taskEnterEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Isolated Enter delivery regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --completed-paste-fixture
+if ($LASTEXITCODE -ne 0) { throw 'Completed-paste verification regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

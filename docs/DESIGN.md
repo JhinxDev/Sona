@@ -291,3 +291,16 @@ Clipboard recovery is opt-in and separate from always-copy. A failed or unconfir
 paste can retain only its owned complete draft; a newer owner copy wins. Cancelled
 operations restore owned clipboard state. A missing target can copy the ready draft
 only if the clipboard sequence has not changed while recognition was running.
+
+## Enter completion and delivery, 0.4.9
+
+Gesture ownership uses the captured foreground HWND and owner process, independently
+of field identity and epoch. An admitted Enter always stops active capture or queues
+intent during final processing; the output path retains every exact-field, epoch,
+full-paste, final-readback, key, clipboard and cancellation guard. Consumed Return
+repeats/up cannot escape after focus movement. Complete pure insertion verification
+accepts overlapping neighbors only with exact length growth and all old characters
+preserved. Confirmed paste takes precedence over later focus-change classification
+for recovery guidance; the destination-change flag remains recorded. One memory-only
+last-delivery snapshot exposes classifications and flags without text or new focus
+inspection. [Behavior and evidence](ENTER-DELIVERY.md).

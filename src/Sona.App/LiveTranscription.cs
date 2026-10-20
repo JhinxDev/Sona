@@ -129,7 +129,8 @@ public partial class MainWindow
     private void ShowRetainedDraftNotice()
     {
         overlay.UpdateTranscript("", "");
-        overlay.Update("Draft ready", recordingLimitReached ? "Five-minute limit reached. Open draft to review or copy; nothing was pasted or sent." : fallbackCopied ? "Draft is on the clipboard. Check the composer, then use normal Ctrl+V if needed." : "Open draft to review or copy. To insert later, focus the composer and press Ctrl + Alt + Shift + V.");
+        var pastedNotSent = lastDelivery?.Outcome == "PasteConfirmedSendWithheld";
+        overlay.Update(pastedNotSent ? "Draft pasted" : "Draft ready", pastedNotSent ? "The complete draft was pasted; sending was withheld. Check the original composer before retrying." : recordingLimitReached ? "Five-minute limit reached. Open draft to review or copy; nothing was pasted or sent." : fallbackCopied ? "Draft is on the clipboard. Check the composer, then use normal Ctrl+V if needed." : "Open draft to review or copy. To insert later, focus the composer and press Ctrl + Alt + Shift + V.");
         overlay.SetReviewAction(true); overlay.ShowFor(target?.Window ?? 0);
         barPreview.Interval = TimeSpan.FromSeconds(12); barPreview.Start();
     }

@@ -436,3 +436,17 @@ Current encrypted recovery was retained, then exact native draft/original and al
 restart. The status helper now retries only unavailable new-session reads; known
 busy/owned state refuses immediately. Its eight pure readiness checks include mixed endpoint availability and use no owner
 process or profile. The already-qualified app modules remain unchanged.
+
+## October 20 Enter completion repair, 0.4.9
+
+The actual stop handler was exercised with fake capture and delayed recognition.
+Before repair, epoch drift, field changes and the hook/UI race left capture active.
+A separate red regression caught misleading Ctrl+V feedback after full-paste
+confirmation and later focus movement. The corrected fixture passes49; complete
+paste passes25, including28,644 exhaustive pure-insertion/adversarial examples.
+Core388, default Windows49, capture11, insertion24, active-target34 and native
+responsiveness50 also pass. Independent source/report review found no remaining
+release-blocking issue. Tests open no microphone, send no global input and use no
+owner profile or Discord session. See [scope and limits](ENTER-DELIVERY.md).
+Exact published-module proof, live activation and physical-owner acceptance are
+separate results; do not infer them from source tests.

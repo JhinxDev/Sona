@@ -87,6 +87,22 @@ public sealed partial class Insertion
         before = NormalizePasted(before); after = NormalizePasted(after); text = NormalizePasted(text);
         int start = 0, oldEnd = before.Length, newEnd = after.Length;
         while (start < oldEnd && start < newEnd && before[start] == after[start]) start++;
+        // Maximal prefix/suffix trimming can consume part of a valid payload
+        // when it overlaps its neighbors (a|b + ba becomes abab). For pure
+        // insertion, prove exact length growth and preservation of all old text.
+        if (text.Length > 0 && after.Length == before.Length + text.Length)
+        {
+            var suffix = 0;
+            while (suffix < before.Length && before[^(suffix + 1)] == after[^(suffix + 1)]) suffix++;
+            var first = before.Length - suffix;
+            if (first <= start)
+            {
+                var index = after.IndexOf(text, first, start - first + text.Length, StringComparison.Ordinal);
+                if (index >= 0 && after.AsSpan(0, index).SequenceEqual(before.AsSpan(0, index)) &&
+                    after.AsSpan(index + text.Length).SequenceEqual(before.AsSpan(index))) return true;
+            }
+            return false;
+        }
         while (oldEnd > start && newEnd > start && before[oldEnd - 1] == after[newEnd - 1]) { oldEnd--; newEnd--; }
         // Require a newly inserted full payload. Existing occurrences, partial
         // paste, unrelated edits and ambiguous selection overlap cannot authorize Enter.
