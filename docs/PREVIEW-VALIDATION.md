@@ -429,3 +429,10 @@ Quit. Both interrupted-save directions were reproduced against the old helper.
 The repaired native helper passed the 18-check successful session upgrade and
 15-check pre-Quit failure fixture against the exact 0.4.8 package. These tooling
 changes reuse the unchanged published app modules from source `ff6a72a7`.
+
+The actual new process could precede its protection status interface during startup.
+Current encrypted recovery was retained, then exact native draft/original and all
+11 History entries were verified and finite cleanup completed without another
+restart. The status helper now retries only unavailable new-session reads; known
+busy/owned state refuses immediately. Its eight pure readiness checks include mixed endpoint availability and use no owner
+process or profile. The already-qualified app modules remain unchanged.

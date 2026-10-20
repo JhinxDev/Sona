@@ -206,3 +206,8 @@ original attempt. No history or file is written. The passive test diagnostic can
 record these observations only when explicitly run, with a 20-second bound and
 optional exact HWND filter. The current API still cannot start a recording,
 capture a new destination, export transcripts or submit a message.
+
+The new-session History completion opts into a bounded read-only status-availability
+retry. Known recording/busy state or owned voice changes still refuses immediately;
+ordinary transfer checks never wait. `tools/session-readiness-checks.ps1` covers
+ready, transient, exhausted, busy, owned-voice and default nonretry cases.

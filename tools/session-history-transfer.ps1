@@ -18,13 +18,28 @@ function Get-SonaTransferWindow([int]$ProcessId){
     }
     throw 'Exact Sona transfer window is unavailable.'
 }
-function Get-SonaTransferStatus([int]$ProcessId){
+# Only local status availability is retried. A known busy/owned session refuses
+# immediately; no restart, setting change, or input is performed by this wait.
+function Read-SonaReadyStatus([scriptblock]$ReadReply,[switch]$WaitForAvailability){
+    for($attempt=0;$attempt -lt 10;$attempt++){
+        $reply=& $ReadReply
+        if(($reply.State.ok -and $reply.State.data.state -ne 'idle') -or ($reply.Voice.ok -and $reply.Voice.data.ownsChanges)){throw 'Sona is busy or owns voice changes; preserve the session.'}
+        if(!$reply.State.ok -or !$reply.Voice.ok){
+            if($WaitForAvailability -and $attempt -lt 9){Start-Sleep -Milliseconds 100;continue}
+            throw 'Sona local status is unavailable; preserve recovery.'
+        }
+        return $reply.State.data
+    }
+}
+function Get-SonaTransferStatus([int]$ProcessId,[switch]$WaitForAvailability){
     $process=Get-Process -Id $ProcessId -ErrorAction Stop
     $agent=Join-Path (Split-Path $process.Path) 'sona-agent.exe'
-    $state=((& $agent status)-join "`n")|ConvertFrom-Json
-    $voice=((& $agent protection status)-join "`n")|ConvertFrom-Json
-    if(!$state.ok -or !$voice.ok -or $state.data.state -ne 'idle' -or $voice.data.ownsChanges){throw 'Sona is busy or owns voice changes; preserve the session.'}
-    return $state.data
+    $read={
+        $state=((& $agent status)-join "`n")|ConvertFrom-Json
+        $voice=((& $agent protection status)-join "`n")|ConvertFrom-Json
+        return @{State=$state;Voice=$voice}
+    }.GetNewClosure()
+    return Read-SonaReadyStatus -ReadReply $read -WaitForAvailability:$WaitForAvailability
 }
 function Get-SonaTransferCount($Window){
     (Get-SonaTransferField $Window 'HistoryTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
@@ -142,7 +157,7 @@ function Confirm-SonaSessionHistory($Stage){
 }
 function Complete-SonaSessionHistory($Stage,[int]$ProcessId){
     $ErrorActionPreference='Stop'
-    $state=Get-SonaTransferStatus $ProcessId
+    $state=Get-SonaTransferStatus $ProcessId -WaitForAvailability
     if($state.unsavedSettings -or $state.historyPaused){throw 'App changed; retain session recovery.'}
     $profile=[IO.Path]::GetFullPath($Stage.Profile)
     $history=Join-Path $profile 'history.json';$preferences=Join-Path $profile 'preferences.json'
