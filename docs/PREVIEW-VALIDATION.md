@@ -423,3 +423,9 @@ profiles, fake audio and paste transport, no global input and no owner clipboard
 The pill and both tooltip palettes were rendered and visually inspected offscreen.
 See [the scope and explicit limits](RESPONSIVENESS.md). Exact published-module,
 guarded live activation and physical owner acceptance remain separate gates.
+
+The live-update preparation also exposed a pending-retention save defect before
+Quit. Both interrupted-save directions were reproduced against the old helper.
+The repaired native helper passed the 18-check successful session upgrade and
+15-check pre-Quit failure fixture against the exact 0.4.8 package. These tooling
+changes reuse the unchanged published app modules from source `ff6a72a7`.

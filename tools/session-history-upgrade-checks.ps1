@@ -45,6 +45,19 @@ try{
     $taskWindow=Get-SonaTransferWindow $taskOld.Id
     Check ($taskWindow.Current.BoundingRectangle.Right -lt 0) 'Isolated test window stays offscreen without activation'
     Check ((Get-SonaTransferCount $taskWindow).Recent -eq 4) 'Synthetic session starts with four complete History records'
+    Set-SonaTransferRetention $taskOld.Id $true
+    (Get-SonaTransferField $taskWindow 'SettingsTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    (Get-SonaTransferField $taskWindow 'SettingsPrivacyNav').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    (Get-SonaTransferField $taskWindow 'KeepHistory').GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Toggle()
+    for($taskAttempt=0;$taskAttempt -lt 40;$taskAttempt++){if((Get-SonaTransferStatus $taskOld.Id).unsavedSettings){break};Start-Sleep -Milliseconds 50}
+    Check ((Get-SonaTransferStatus $taskOld.Id).unsavedSettings -and (Get-Content -LiteralPath (Join-Path $taskProfile 'preferences.json') -Raw|ConvertFrom-Json).KeepHistory) 'Fixture reproduces pending Off while History storage is still saved On'
+    Set-SonaTransferRetention $taskOld.Id $false
+    Check (!(Get-SonaTransferStatus $taskOld.Id).unsavedSettings -and !(Get-Content -LiteralPath (Join-Path $taskProfile 'preferences.json') -Raw|ConvertFrom-Json).KeepHistory) 'Transfer settles a matching pending checkbox instead of assuming it is saved'
+    (Get-SonaTransferField $taskWindow 'KeepHistory').GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Toggle()
+    for($taskAttempt=0;$taskAttempt -lt 40;$taskAttempt++){if((Get-SonaTransferStatus $taskOld.Id).unsavedSettings){break};Start-Sleep -Milliseconds 50}
+    Check ((Get-SonaTransferStatus $taskOld.Id).unsavedSettings -and !(Get-Content -LiteralPath (Join-Path $taskProfile 'preferences.json') -Raw|ConvertFrom-Json).KeepHistory) 'Fixture reproduces pending On while History storage is still saved Off'
+    Set-SonaTransferRetention $taskOld.Id $false
+    Check (!(Get-SonaTransferStatus $taskOld.Id).unsavedSettings -and !(Get-Content -LiteralPath (Join-Path $taskProfile 'preferences.json') -Raw|ConvertFrom-Json).KeepHistory) 'Transfer accepts an inverse pending edit restored to its saved value without a save'
     Remove-Item -LiteralPath $taskHistory
     Check (!(Test-Path -LiteralPath $taskHistory)) 'All four records now exist only in the isolated app session'
     (Get-SonaTransferField $taskWindow 'DictationTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()

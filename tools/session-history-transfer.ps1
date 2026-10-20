@@ -37,16 +37,25 @@ function Set-SonaTransferRetention([int]$ProcessId,[bool]$Enabled){
     (Get-SonaTransferField $window 'SettingsTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
     (Get-SonaTransferField $window 'SettingsPrivacyNav').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
     $toggle=(Get-SonaTransferField $window 'KeepHistory').GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
-    if(($toggle.Current.ToggleState -eq 'On') -eq $Enabled){return}
-    $toggle.Toggle()
+    # A matching checkbox may still be a pending edit after an interrupted save.
+    # The active preference and native pending state must settle before returning.
+    if(($toggle.Current.ToggleState -eq 'On') -eq $Enabled){
+        if(!(Get-SonaTransferStatus $ProcessId).unsavedSettings){return}
+    }else{$toggle.Toggle()}
     $button=$null
-    for($attempt=0;$attempt -lt 30;$attempt++){$button=Get-SonaTransferField $window 'SavePreferencesButton';if($button){break};Start-Sleep -Milliseconds 100}
+    for($attempt=0;$attempt -lt 30;$attempt++){
+        $button=Get-SonaTransferField $window 'SavePreferencesButton'
+        $pending=(Get-SonaTransferStatus $ProcessId).unsavedSettings
+        if(!$pending -and (($toggle.Current.ToggleState -eq 'On') -eq $Enabled)){return}
+        if($button -and $button.Current.IsEnabled -and $pending){break}
+        $button=$null;Start-Sleep -Milliseconds 100
+    }
     if(!$button){throw 'The native preference save is unavailable; session preserved.'}
     $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
     for($attempt=0;$attempt -lt 60;$attempt++){
         Start-Sleep -Milliseconds 100
         $state=Get-SonaTransferStatus $ProcessId
-        if(!$state.unsavedSettings){return}
+        if(!$state.unsavedSettings -and (($toggle.Current.ToggleState -eq 'On') -eq $Enabled)){return}
     }
     throw 'Preference save did not finish; preserve the running session.'
 }

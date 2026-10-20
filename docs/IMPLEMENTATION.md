@@ -68,6 +68,10 @@ session remains alive. Once Quit may be in flight, recovery stays available.
 The session transfer must run in the actual desktop profile context, not an MSIX
 redirected alias. Existing retained history, explicit pause, pending edits or
 changed files stop this finite route rather than overwriting owner state.
+The native retention helper waits for both pending edits and the checkbox to settle.
+A matching Off checkbox is not proof of a saved Off value; reverting a pending On
+edit to its already-saved Off value needs no additional Save. Both interrupted-save
+cases are covered by the maintained offscreen session-upgrade fixture.
 `tools/session-history-upgrade-checks.ps1 -PackageDirectory <qualified-package>
 -OutputRoot <fresh-sona-upgrade-rehearsal-guid>` covers success; `-FailurePoint
 AfterStage`, `HistoryChanged`, `QuitInFlight`, and `-WithoutTransfer` cover the
