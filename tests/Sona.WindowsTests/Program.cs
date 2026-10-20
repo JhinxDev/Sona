@@ -5,6 +5,10 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if(args.Length==2 && args[0]=="--responsiveness-fixture") {
+    var report=ResponsivenessFixture.Run(args[1]);Console.WriteLine(JsonSerializer.Serialize(report));
+    if(JsonSerializer.SerializeToElement(report).GetProperty("Failures").GetArrayLength()>0)Environment.ExitCode=1;return;
+}
 if (args.Length == 2 && args[0] == "--protection-controls-fixture")
 {
     BoundedProcess.ContainApplication();

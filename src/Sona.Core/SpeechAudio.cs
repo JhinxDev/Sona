@@ -10,7 +10,7 @@ public static class SpeechAudio
 {
     public static IReadOnlyList<SpeechChunk> Plan(byte[] wav)
     {
-        if (wav.Length is < 44 or > 8 * 1024 * 1024 || !Tag(wav, 0, "RIFF") || !Tag(wav, 8, "WAVE")) throw new IOException("Parakeet requires a bounded PCM WAV recording.");
+        if (wav.Length is < 44 or > 64 * 1024 * 1024 || !Tag(wav, 0, "RIFF") || !Tag(wav, 8, "WAVE")) throw new IOException("Parakeet requires a bounded PCM WAV recording.");
         var end = (long)BinaryPrimitives.ReadUInt32LittleEndian(wav.AsSpan(4, 4)) + 8;
         if (end > wav.Length || end < 44) throw new IOException("The WAV recording is incomplete.");
         var rate = 0; var dataOffset = -1; var dataBytes = 0; var count = 0;
@@ -37,7 +37,7 @@ public static class SpeechAudio
             }
             cursor = next;
         }
-        if (rate == 0 || dataOffset < 0 || dataBytes > (long)rate * 2 * 128) throw new IOException("The PCM recording exceeds the supported duration.");
+        if (rate == 0 || dataOffset < 0 || dataBytes > (long)rate * 2 * RecordingLimits.MaximumSeconds) throw new IOException("The PCM recording exceeds the supported duration.");
         var result = new List<SpeechChunk>(); var offset = dataOffset; var remaining = dataBytes;
         var maximum = rate * 2 * 25; var minimum = rate * 2 * 18;
         var window = rate / 10 * 2; var hop = Math.Max(2, rate / 50 * 2);

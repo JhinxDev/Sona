@@ -27,12 +27,14 @@ public partial class MainWindow
     private void RefreshCleanupChoices()
     {
         CleanupEnabled.IsChecked = preferences.CleanupEnabled;
+        Choose(CleanupModeChoice, preferences.CleanupMode);
         Choose(CleanupToneChoice, preferences.CleanupTone); Choose(CleanupEngineChoice, preferences.CleanupEngine);
         Choose(CleanupIdleChoice, preferences.CleanupIdleMinutes.ToString());
     }
     private void ReadCleanupPreferences(Preferences next)
     {
         next.CleanupEnabled = CleanupEnabled.IsChecked == true;
+        next.CleanupMode = (string)((ComboBoxItem)CleanupModeChoice.SelectedItem).Tag;
         next.CleanupTone = (string)((ComboBoxItem)CleanupToneChoice.SelectedItem).Tag;
         next.CleanupEngine = (string)((ComboBoxItem)CleanupEngineChoice.SelectedItem).Tag;
         next.CleanupIdleMinutes = int.Parse((string)((ComboBoxItem)CleanupIdleChoice.SelectedItem).Tag);
@@ -83,6 +85,7 @@ public partial class MainWindow
         var fallback = TextPipeline.Apply(original, preferences);
         var snippet = preferences.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
         if (!preferences.CleanupEnabled || preferences.Style == "Verbatim" || snippet) return new(fallback, false);
+        if (CleanupPolicy.SkipModel(original, preferences)) { CleanupResult.Text = "Auto: this short sentence is already formatted. Basic cleanup was used."; return new(fallback, false); }
         if (arguments.Contains("--test-ui") && CleanupForTests != null) return new(await CleanupForTests(original, token), true);
         if (!cleanupModel.AvailableFor(preferences)) { CleanupResult.Text = "Local cleanup is not ready. Basic cleanup was used."; return new(fallback, false); }
         Status.Text = "Polishing your draft"; StatusDetail.Text = "Cleaning up locally. Esc still cancels."; overlay.Update("Polishing", "Esc cancels");

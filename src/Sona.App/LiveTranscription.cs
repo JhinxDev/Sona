@@ -18,11 +18,13 @@ public partial class MainWindow
     private Task liveOperation = Task.CompletedTask;
     private CancellationTokenSource? livePolling;
     private bool liveVisible;
+    private long previewAudioBytes = -1;
+    private string? previewOriginal;
     private long liveRevision;
     private Guid? suggestionSession;
     private void ResetLiveReview()
     {
-        liveDraft?.Cancel(); liveDraft = null; suggestionSession = null;
+        liveDraft?.Cancel(); liveDraft = null; suggestionSession = null; previewAudioBytes = -1; previewOriginal = null;
         CleanedSuggestion.Text = ""; CleanedReview.Visibility = Visibility.Collapsed;
         DraftStage.Text = "Editable"; overlay.UpdateTranscript("", "");
     }
@@ -50,7 +52,8 @@ public partial class MainWindow
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), polling);
                 if (!ReferenceEquals(recorder, capture) || current.State != SessionState.Recording) break;
-                var wav = capture.Snapshot();
+                if (capture.CapturedBytes == previewAudioBytes) continue;
+                var wav = capture.Snapshot(out var snapshotBytes);
                 if (wav == null) continue;
                 try
                 {
@@ -59,6 +62,7 @@ public partial class MainWindow
                     var raw = await RecognizeAsync(wav, deadline.Token);
                     token.ThrowIfCancellationRequested();
                     if (!ReferenceEquals(session, current) || !ReferenceEquals(liveDraft, review) || current.State != SessionState.Recording) break;
+                    previewAudioBytes = snapshotBytes; previewOriginal = raw;
                     if (review.Preview(++liveRevision, raw))
                     {
                         rendering = true; Original.Text = raw; if (!review.ManuallyEdited) Draft.Text = review.Draft; rendering = false;
@@ -125,7 +129,7 @@ public partial class MainWindow
     private void ShowRetainedDraftNotice()
     {
         overlay.UpdateTranscript("", "");
-        overlay.Update("Draft ready", "Open draft to review or copy. To insert later, focus the composer and press Ctrl + Alt + Shift + V.");
+        overlay.Update("Draft ready", recordingLimitReached ? "Five-minute limit reached. Open draft to review or copy; nothing was pasted or sent." : fallbackCopied ? "Draft is on the clipboard. Check the composer, then use normal Ctrl+V if needed." : "Open draft to review or copy. To insert later, focus the composer and press Ctrl + Alt + Shift + V.");
         overlay.SetReviewAction(true); overlay.ShowFor(target?.Window ?? 0);
         barPreview.Interval = TimeSpan.FromSeconds(12); barPreview.Start();
     }

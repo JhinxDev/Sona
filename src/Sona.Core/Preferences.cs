@@ -29,12 +29,14 @@ public sealed class Preferences
     public bool HistoryPaused { get; set; }
     public string Style { get; set; } = "Clean";
     public bool CleanupEnabled { get; set; }
+    public string CleanupMode { get; set; } = "Always";
     public string CleanupTone { get; set; } = "formal";
     public string CleanupEngine { get; set; } = "Auto";
     public int CleanupIdleMinutes { get; set; } = 10;
     public int Device { get; set; } = -1;
     public bool AutoInsert { get; set; } = true;
     public bool CopyToClipboard { get; set; }
+    public bool CopyOnInsertionFailure { get; set; }
     public bool CheckForUpdates { get; set; }
     public bool CloseToTray { get; set; } = true;
     public bool Startup { get; set; }
@@ -83,6 +85,7 @@ public sealed class Preferences
         if (RecordingDisplay is not ("Panel" or "Capsule")) RecordingDisplay = "Capsule";
         Theme = ThemeCatalog.Resolve(Theme).Id;
         if (ShortcutMode is not ("Hold" or "Toggle")) ShortcutMode = "Hold";
+        if (CleanupMode is not ("Always" or "Auto")) CleanupMode = "Always";
         if (CleanupTone is not ("formal" or "casual" or "very casual")) CleanupTone = "formal";
         if (CleanupEngine is not ("Auto" or "Cpu")) CleanupEngine = "Auto";
         CleanupIdleMinutes = Math.Clamp(CleanupIdleMinutes, 0, 240);

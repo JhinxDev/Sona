@@ -47,10 +47,10 @@ public static class AgentProtocol
 public static class AgentSettings
 {
     // No credentials, transcripts, microphone start, paths or startup registration.
-    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.CleanupEnabled, p.CleanupTone, p.CleanupEngine, p.CleanupIdleMinutes, p.Device, p.SoundEffects, p.PasteCompletedDraft, p.EnterToSend, p.LiveTranscription, p.AutoInsert, p.CopyToClipboard, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
+    public static object View(Preferences p) => new { p.Language, p.Engine, p.Model, p.ModelIdleMinutes, p.RecordingDisplay, p.Theme, p.ShortcutMode, p.Style, p.CleanupEnabled, p.CleanupMode, p.CleanupTone, p.CleanupEngine, p.CleanupIdleMinutes, p.Device, p.SoundEffects, p.PasteCompletedDraft, p.EnterToSend, p.LiveTranscription, p.AutoInsert, p.CopyToClipboard, p.CopyOnInsertionFailure, p.CloseToTray, p.ProtectionEnabled, p.SilenceIncoming, p.ProtectionReleaseDelayMs, p.ProtectionShortcut, p.WatchedApps };
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
-        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 25) throw new ArgumentException("Settings must be a bounded JSON object.");
+        if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 27) throw new ArgumentException("Settings must be a bounded JSON object.");
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
@@ -65,6 +65,7 @@ public static class AgentSettings
                 case "recordingDisplay": next.RecordingDisplay = Choice(property.Value, "Panel", "Capsule"); break;
                 case "theme": next.Theme = Choice(property.Value, ThemeCatalog.All.Select(t => t.Id).ToArray()); break;
                 case "shortcutMode": next.ShortcutMode = Choice(property.Value, "Hold", "Toggle"); break;
+                case "cleanupMode": next.CleanupMode = Choice(property.Value, "Always", "Auto"); break;
                 case "cleanupEnabled": next.CleanupEnabled = Boolean(property.Value); break;
                 case "cleanupTone": next.CleanupTone = Choice(property.Value, "formal", "casual", "very casual"); break;
                 case "cleanupEngine": next.CleanupEngine = Choice(property.Value, "Auto", "Cpu"); break;
@@ -76,6 +77,7 @@ public static class AgentSettings
                 case "enterToSend": next.EnterToSend = Boolean(property.Value); break;
                 case "liveTranscription": next.LiveTranscription = Boolean(property.Value); break;
                 case "autoInsert": next.AutoInsert = Boolean(property.Value); break;
+                case "copyOnInsertionFailure": next.CopyOnInsertionFailure = Boolean(property.Value); break;
                 case "copyToClipboard": next.CopyToClipboard = Boolean(property.Value); break;
                 case "closeToTray": next.CloseToTray = Boolean(property.Value); break;
                 case "protectionEnabled": next.ProtectionEnabled = Boolean(property.Value); break;

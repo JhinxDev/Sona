@@ -1,4 +1,5 @@
 using NAudio.Wave;
+using Sona.Core;
 namespace Sona.App.Audio;
 
 public sealed class Recorder : IDisposable
@@ -10,7 +11,9 @@ public sealed class Recorder : IDisposable
     private readonly TaskCompletionSource stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object gate = new();
     private bool disposed, stopRequested, unexpectedReported;
-    private long startedAt, lastFrame;
+    private long startedAt, lastFrame, capturedBytes;
+    public long CapturedBytes { get { lock (gate) return capturedBytes; } }
+    public bool LimitReached => CapturedBytes >= RecordingLimits.MaximumPcmBytes;
     public event Action<string>? UnexpectedStop;
     public double Level { get; private set; }
     public double Seconds { get { lock (gate) return disposed ? 0 : data.Length / 32000.0; } }
@@ -27,7 +30,8 @@ public sealed class Recorder : IDisposable
             {
                 if (disposed || stopRequested || e.BytesRecorded == 0) return;
                 lastFrame = clock.GetTimestamp();
-                if (data.Length + e.BytesRecorded <= 32000 * 120) data.Write(e.Buffer, 0, e.BytesRecorded);
+                var count = (int)Math.Min(e.BytesRecorded, RecordingLimits.MaximumPcmBytes - data.Length) & ~1;
+                if (count > 0) { data.Write(e.Buffer, 0, count); capturedBytes = data.Length; }
                 double sum = 0;
                 for (var i = 0; i + 1 < e.BytesRecorded; i += 2) { var sample = BitConverter.ToInt16(e.Buffer, i) / 32768.0; sum += sample * sample; }
                 Level = Math.Sqrt(sum / Math.Max(1, e.BytesRecorded / 2));
@@ -55,10 +59,12 @@ public sealed class Recorder : IDisposable
     }
     // Independent, bounded in-memory copy. Never pauses or restarts capture.
     // A quiet buffer yields no recognition request, avoiding silence hallucinations.
-    public byte[]? Snapshot()
+    public byte[]? Snapshot() => Snapshot(out _);
+    public byte[]? Snapshot(out long captured)
     {
         lock (gate)
         {
+            captured = capturedBytes;
             if (disposed || stopRequested || data.Length < 32000) return null;
             var pcm = data.GetBuffer(); var length = (int)data.Length;
             double energy = 0;

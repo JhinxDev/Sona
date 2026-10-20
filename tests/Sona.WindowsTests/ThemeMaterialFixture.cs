@@ -476,7 +476,7 @@ internal static class ThemeMaterialFixture
             var overlaySurface = application.Resources["OverlaySurface"];
             var overlayEdge = application.Resources["OverlayEdge"];
             var allowOverlay = !highContrast && Sona.App.Windows.WindowBackdrop.TransparencyEnabled();
-            var expectedAlpha = theme.IsDark ? 200 : 224;
+            var expectedAlpha = theme.Id == "fjord" ? 200 : theme.IsDark ? 192 : 216;
             var overlayMatches = (allowOverlay
                 ? overlaySurface is LinearGradientBrush glass && glass.GradientStops.All(stop => stop.Color.A == expectedAlpha)
                 : ReferenceEquals(overlaySurface, application.Resources["Panel"]) || highContrast && ReferenceEquals(overlaySurface, SystemColors.WindowBrush))

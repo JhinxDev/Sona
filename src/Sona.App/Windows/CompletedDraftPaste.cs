@@ -20,20 +20,24 @@ internal interface ICompletedDraftTransport
 public sealed partial class Insertion
 {
     internal bool LastSubmissionAccepted { get; private set; }
+    internal bool LastPasteConfirmed { get; private set; }
+    internal bool LastDraftOnClipboard { get; private set; }
+    internal uint LastDraftClipboardSequence { get; private set; }
     internal ICompletedDraftTransport? PasteTransportForTests { get; set; }
-    public async Task<(bool Inserted, string Detail)> PasteAsync(DraftTarget? target, string text, bool submit, CancellationToken cancellation = default)
+    public async Task<(bool Inserted, string Detail)> PasteAsync(DraftTarget? target, string text, bool submit, CancellationToken cancellation = default, bool keepOnFailure = false, uint? recoverySequence = null, Func<bool>? requestSubmission = null)
     {
-        LastSubmissionAccepted = false;
+        LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = false;
         if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > 6000 || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
             return (false, "No supported draft or focused composer. Your text stays in Sona.");
         var transport = PasteTransportForTests ?? new NativeDraftTransport();
         for (var i = 0; i < 40 && (ModifiersDown() || transport.EnterHeld); i++) await transport.Delay(20);
         cancellation.ThrowIfCancellationRequested();
         if (ModifiersDown() || transport.EnterHeld || !Same(target, Capture())) return (false, "Focus or held keys changed. Your draft stays in Sona.");
-        object? previous = null; uint sequence = 0; bool changed = false, pasted = false;
+        object? previous = null; uint sequence = 0; bool changed = false, pasted = false, confirmed = false, allowRecovery = false;
         try
         {
             var initialSequence = transport.ClipboardSequence;
+            allowRecovery = keepOnFailure && (!recoverySequence.HasValue || initialSequence == recoverySequence.Value);
             previous = transport.SaveClipboard();
             var before = transport.ReadText(target);
             cancellation.ThrowIfCancellationRequested();
@@ -44,7 +48,7 @@ public sealed partial class Insertion
             // Exactly one paste gesture, never per-character typing or retries.
             if (!transport.Paste()) return (false, "Windows did not accept the full paste shortcut. Check the destination before retrying.");
             pasted = true;
-            bool confirmed = false; string? confirmedText = null;
+            string? confirmedText = null;
             for (var i = 0; i < 12; i++)
             {
                 await transport.Delay(100);
@@ -53,6 +57,8 @@ public sealed partial class Insertion
                 confirmed = before != null && after != null && ConfirmsCompleteInsertion(before, after, text);
                 if (confirmed) { confirmedText = NormalizePasted(after!); break; }
             }
+            LastPasteConfirmed = confirmed;
+            submit |= requestSubmission?.Invoke() == true;
             if (!submit) return (true, confirmed ? "Complete draft pasted once. Nothing was submitted." : "Paste requested once. Check the result; nothing was submitted.");
             if (!confirmed || cancellation.IsCancellationRequested || !Same(target, Capture()) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence)
                 return (true, "Paste requested, but sending was withheld because the full draft, focus or key state could not be confirmed. Review the composer and press Enter yourself.");
@@ -70,7 +76,8 @@ public sealed partial class Insertion
             // A newer owner copy always wins. Never restore across a clipboard change.
             if (changed && transport.ClipboardSequence == sequence)
             {
-                try { transport.RestoreClipboard(previous); }
+                if (allowRecovery && !cancellation.IsCancellationRequested && (!pasted || !confirmed || submit && !LastSubmissionAccepted)) { LastDraftOnClipboard = true; LastDraftClipboardSequence = sequence; }
+                else try { transport.RestoreClipboard(previous); }
                 catch (Exception ex) when (ex is ExternalException or InvalidOperationException) { /* The complete draft remains on clipboard; never erase it on failed restoration. */ }
             }
         }

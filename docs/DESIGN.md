@@ -194,7 +194,7 @@ The nonactivating Capsule is 310 by at least 72 DIP; the Panel is 420 by at leas
 
 Default Ctrl+Win Hold has a 200 ms dwell and ends on release. Explicit Toggle starts/stops on a press; a revocable admission token survives normal release but cancellation/reset revokes it, including during target inspection. Keyboard processing is on a dedicated hook/message-loop thread. Only current down-state and current gesture tokens are held, never typed text or general key history. Legacy shortcuts fail independently. A competitor warning appears visibly rather than remaining only in the tray window.
 
-Local recording is 16 kHz mono, at most 120 seconds. Each transcription request has a 90-second deadline; resident workers retain CPU 1.5 GiB and Turbo CUDA 3 GiB host job ceilings. GPU device allocation is separate from host job memory. The selected model stays resident until configured inactivity, switching, explicit unload or quit. Default history is memory-only; explicitly saved text has a 200-record/16 MiB load limit, no audio, atomic replacement, and malformed existing files are preserved.
+Local recording is 16 kHz mono, at most five minutes. A limit stop always retains a reviewable draft without automatic copy, paste or send. Each transcription request has a 90-second deadline; resident workers retain CPU 1.5 GiB and Turbo CUDA 3 GiB host job ceilings. GPU device allocation is separate from host job memory. The selected model stays resident until configured inactivity, switching, explicit unload or quit. Default history is memory-only; explicitly saved text has a 200-record/16 MiB load limit, no audio, atomic replacement, and malformed existing files are preserved.
 
 Insertion retains the original captured field identity, focus epoch/window/process/runtime ID and released modifier requirements. It uses Unicode input without Enter, Tab, clipboard overwrite or automatic retry. Focus drift preserves the draft. Multiline/large text uses explicit copy. Owner-started physical key/microphone, Codex delivery, Hush call and creative acceptance are distinct required proof.
 
@@ -262,3 +262,32 @@ apparently applied choice. Advanced fields retain Save protection; imported
 choices remain pending review. Busy operations disable both switches. The new
 native fixture preserves general/advanced pending edits while checking runtime,
 persistence, restoration failures, manual choices, pause and initialization.
+
+## Responsiveness and delivery, 0.4.8
+
+The capsule shows Preparing before asynchronous protection and feedback barriers;
+Recording still means actual capture has started. Unchanged overlay state no longer
+restarts busy indicators or reconstructs tooltip text on each microphone sample.
+The 228px capsule expands to 320px for provisional transcript text.
+
+The nonactivating pill button cycles Off, Auto and Always without a menu. It commits
+only cleanup enabled/mode to the saved preference snapshot, applies to the current
+recording, preserves other pending form edits and is disabled during final processing.
+Always remains the migration default. Auto is a conservative short-text rule;
+uncertainty, requested tone transforms and long text stay on the model path.
+
+A completed live preview is reusable only in the same session with the exact final
+captured PCM byte count. New audio, cancellation and session changes invalidate reuse.
+Recording storage and PCM request planning share a five-minute bound; Parakeet still
+receives independent segments of at most 25 seconds covering every sample once.
+
+Enter during pending recognition/cleanup records atomic intent on the keyboard
+thread and remains intercepted through complete-paste verification. The operation
+clears intent on completion. Shift+Enter, disabled submission, modifiers,
+injected keys, changed focus and forced-limit completion cannot authorize sending.
+The full existing paste/readback/focus checks remain the final send barrier.
+
+Clipboard recovery is opt-in and separate from always-copy. A failed or unconfirmed
+paste can retain only its owned complete draft; a newer owner copy wins. Cancelled
+operations restore owned clipboard state. A missing target can copy the ready draft
+only if the clipboard sequence has not changed while recognition was running.

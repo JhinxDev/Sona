@@ -114,7 +114,7 @@ public static class ThemeManager
         // Protected surfaces remain almost opaque over native backdrops. These aliases
         // also give the overlay a stable material contract without theme-specific hues.
         resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(32, 30, 36));
-        resources["OverlaySurface"] = CreateOverlaySurface(Current.UsesGlassMaterial && WindowBackdrop.TransparencyEnabled(), highContrast);
+        resources["OverlaySurface"] = CreateOverlaySurface(WindowBackdrop.TransparencyEnabled(), highContrast);
         resources["OverlayEdge"] = resources["MaterialEdge"];
     }
 
@@ -125,7 +125,7 @@ public static class ThemeManager
         if (highContrast) return SystemColors.WindowBrush;
         if (!transparencyEnabled) return (Brush)Application.Current.Resources["Panel"];
         return Surface(PaletteColor("Panel"), PaletteColor("Canvas"), PaletteColor("Accent"),
-            .035, .07, true, Current.IsDark ? (byte)200 : (byte)224);
+            .035, .07, true, Current.Id == "fjord" ? (byte)200 : Current.IsDark ? (byte)192 : (byte)216);
     }
 
     private static Brush Surface(Color baseColor, Color neighbor, Color accent, double accentMix, double neighborMix, bool translucent, byte opacity)

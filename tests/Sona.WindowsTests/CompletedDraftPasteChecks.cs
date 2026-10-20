@@ -41,6 +41,27 @@ internal static class CompletedDraftPasteChecks
         transport = new(); transport.BeforePasteRead = () => transport.Sequence++; insertion.PasteTransportForTests = transport;
         result = await insertion.PasteAsync(target, "hello", true);
         Check(!result.Inserted && transport.Payload == "" && transport.Restores == 0, "Copy during destination readback is preserved before any Sona clipboard write");
+        transport=new(){UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true);
+        Check(transport.Enters==0 && transport.Restores==0 && insertion.LastDraftOnClipboard && transport.Payload=="finished draft","Unconfirmed send keeps opted-in draft in the ordinary clipboard");
+        transport=new();transport.AfterPaste=()=>transport.Sequence++;insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true);
+        Check(transport.Restores==0 && !insertion.LastDraftOnClipboard,"New owner clipboard content wins over opted-in recovery");
+        using var recoverCancel=new CancellationTokenSource();transport=new(){AfterPaste=recoverCancel.Cancel};insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"cancelled draft",true,recoverCancel.Token,keepOnFailure:true);
+        Check(transport.Restores==1 && !insertion.LastDraftOnClipboard,"Cancellation restores prior clipboard even when recovery is enabled");
+        transport=new();insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"complete draft",true,keepOnFailure:true);
+        Check(transport.Enters==1 && transport.Restores==1 && !insertion.LastDraftOnClipboard && insertion.LastPasteConfirmed,"Verified successful send restores the prior clipboard");
+        transport=new(){Sequence=2,UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true,recoverySequence:1);
+        Check(transport.Enters==0 && transport.Restores==1 && !insertion.LastDraftOnClipboard,"A newer copy before paste is restored instead of retained over by recovery");
+        transport=new();insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"finished draft",false,requestSubmission:()=>true);
+        Check(transport.Enters==1 && transport.Pastes==1,"Enter arriving during complete-paste verification sends once after proof");
+        transport=new(){UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
+        await insertion.PasteAsync(target,"finished draft",false,requestSubmission:()=>true);
+        Check(transport.Enters==0,"Late queued Enter still cannot send without full draft readback");
         return count;
     }
     private sealed class FakePaste : ICompletedDraftTransport

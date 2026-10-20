@@ -409,3 +409,17 @@ the qualified package with the documented failure modes before changing this
 transfer. A fixture marker proves the intended fault occurred after staging;
 an earlier failure is not evidence that this fault path passed. Test windows stay
 offscreen and never activate; no production microphone or Discord test is implied.
+
+## October 20 responsiveness and delivery candidate, 0.4.8
+
+Core388, native responsiveness/delivery50 and completed-paste21 checks pass on the
+candidate. New checks first reproduced missing Auto bypass, old timer/layout/help,
+native/agent mode activation and missing pending-send intent. Final review also
+reproduced Enter after pill Stop, a manual stop before the limit timer, and a newer
+copy during recognition; their regressions now pass. Enter remains intercepted
+through full-paste verification, with late intent still requiring every send guard.
+Tests use isolated
+profiles, fake audio and paste transport, no global input and no owner clipboard.
+The pill and both tooltip palettes were rendered and visually inspected offscreen.
+See [the scope and explicit limits](RESPONSIVENESS.md). Exact published-module,
+guarded live activation and physical owner acceptance remain separate gates.

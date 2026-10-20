@@ -1,6 +1,7 @@
 using Sona.Core;
 int count = 0;
 void Check(bool pass, string name) { if (!pass) throw new Exception(name); Console.WriteLine("PASS " + name); count++; }
+ResponsivenessChecks.Run(Check);
 AppPathsChecks.Run(Check);
 HistoryPreservationChecks.Run(Check);
 var preferences = new Preferences();

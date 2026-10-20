@@ -10,6 +10,7 @@ public static class CleanupProcessor
         var basic = TextPipeline.Apply(original, settings);
         var snippet = settings.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
         if (!settings.CleanupEnabled || settings.Style == "Verbatim" || snippet) return new(basic, false, "bypassed");
+        if (CleanupPolicy.SkipModel(original, settings)) return new(basic, false, "already-clean");
         var request = CleanupRules.Prepare(original, settings, app);
         if (request == null) return new(original.Trim(), false, "preserved");
         try

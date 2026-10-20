@@ -68,3 +68,11 @@ observation does not establish physical Ctrl+Windows or live-microphone acceptan
 
 Builds, simulated boundaries, file replays and personal target-app acceptance
 remain separate. [Verification receipts and commands](PREVIEW-VALIDATION.md).
+
+## October 20, responsiveness and delivery follow-up
+
+The owner requested earlier popup feedback, quicker results where safely possible,
+readable hover help, a compact pill, a quick Auto cleanup button, a longer recording
+limit, queued Enter-to-send and ordinary Ctrl+V recovery. The0.4.8 implementation
+and maintained synthetic qualification are documented in [RESPONSIVENESS.md](RESPONSIVENESS.md).
+This does not close physical Homepage/suggestion focus or real microphone acceptance.

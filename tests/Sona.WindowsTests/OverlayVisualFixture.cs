@@ -37,7 +37,7 @@ internal static class OverlayVisualFixture
                         }
                         ThemeManager.Apply("amethyst");
                         typeof(ThemeManager).GetMethod("ApplyMaterialResources", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.Invoke(null, [true]);
-                        Check(app.Resources["OverlaySurface"] is LinearGradientBrush overlayMaterial && overlayMaterial.GradientStops.All(stop => stop.Color.A == 200), "Controlled native-glass resource branch preserves the independent translucent overlay");
+                        Check(app.Resources["OverlaySurface"] is LinearGradientBrush overlayMaterial && overlayMaterial.GradientStops.All(stop => stop.Color.A == 192), "Controlled native-glass resource branch preserves the independent translucent overlay");
                         foreach (var display in new[] { "Panel", "Capsule" })
                         {
                             var overlay = new Overlay();

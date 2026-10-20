@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private int shortcutToggleMode;
     private int enterToSendEnabled;
     private bool submitOnComplete;
+    private readonly PendingSubmission pendingSubmission = new();
+    private bool fallbackCopied;
     private System.Windows.Forms.NotifyIcon? tray;
     private bool quitting;
     private bool rendering;
@@ -44,8 +46,10 @@ public partial class MainWindow : Window
     private bool shutdownPending;
     private bool preparedInsertionTest;
     private bool preparing;
+    private bool recordingLimitReached;
     internal Func<CancellationToken, Task>? PreparationForTests { get; set; }
     internal Func<Recorder>? RecorderForTests { get; set; }
+    internal Action<string>? ClipboardForTests { get; set; }
     internal Overlay OverlayForTests => overlay;
     internal Task<bool> BeginForTestsAsync() => arguments.Contains("--test-ui") ? BeginRecordingAsync() : Task.FromResult(false);
     internal Task<bool> BeginShortcutForTestsAsync(bool hold) => BeginShortcutAsync(hold);
@@ -66,14 +70,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         CommandBindings.Add(new System.Windows.Input.CommandBinding(RepositoryLinks.Open, OpenRepository));
         escape = new EscapeGuard(RequestCancel);
-        if (arguments.Contains("--test-ui")) { ShowActivated = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -16000; Top = -16000; RecordButton.IsEnabled = false; StartWithWindows.IsEnabled = false; if (arguments.Contains("--compact")) { Width = 740; Height = 530; } }
+        if (arguments.Contains("--test-ui")) { overlay.SuppressNativeDisplayForTests = true; ShowActivated = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -16000; Top = -16000; RecordButton.IsEnabled = false; StartWithWindows.IsEnabled = false; if (arguments.Contains("--compact")) { Width = 740; Height = 530; } }
         Vocabulary.Text = string.Join("\n", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Spoken + " = " + x.Written)));
         Snippets.Text = SnippetRules.Format(preferences.Snippets);
         SpeechLanguage.SelectedIndex = preferences.Language == "en" ? 1 : preferences.Language == "fr" ? 2 : 0;
         TranscriptionEngine.SelectedIndex = preferences.Engine == "FastCpu" ? 1 : 0;
         DraftStyle.SelectedIndex = preferences.Style == "Verbatim" ? 1 : preferences.Style == "Notes" ? 2 : 0;
         SoundEffects.IsChecked = preferences.SoundEffects; PasteCompletedDraft.IsChecked = preferences.PasteCompletedDraft; EnterToSend.IsChecked = preferences.EnterToSend; enterToSendEnabled = preferences.EnterToSend ? 1 : 0;
-        LiveTranscription.IsChecked = preferences.LiveTranscription; AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CheckUpdates.IsChecked = preferences.CheckForUpdates; CloseToTray.IsChecked = preferences.CloseToTray; StartWithWindows.IsChecked = preferences.Startup;
+        LiveTranscription.IsChecked = preferences.LiveTranscription; AutoInsert.IsChecked = preferences.AutoInsert; CopyToClipboard.IsChecked = preferences.CopyToClipboard; CopyOnInsertionFailure.IsChecked = preferences.CopyOnInsertionFailure; CheckUpdates.IsChecked = preferences.CheckForUpdates; CloseToTray.IsChecked = preferences.CloseToTray; StartWithWindows.IsChecked = preferences.Startup;
         ShortcutMode.SelectedIndex = preferences.ShortcutMode == "Toggle" ? 1 : 0; KeepHistory.IsChecked = preferences.KeepHistory;
         shortcutToggleMode = preferences.ShortcutMode == "Toggle" ? 1 : 0; LoadHistory();
         ModelStatus.Text = transcriber.Available ? "Installed local runtime is ready." : "Run setup-runtime.ps1 to install the local runtime.";
@@ -81,15 +85,16 @@ public partial class MainWindow : Window
         RefreshEditors(); RestoreTransferredDraft();
         RefreshModelCards();
         InitializeAppearance(); InitializeCleanup();
+        overlay.QuickCleanupRequested += CycleQuickCleanup; RefreshQuickCleanup();
         overlay.ReviewRequested += OpenDraftFromOverlay; overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
         if (!transcriber.Available) { Status.Text = "Local engine not installed"; StatusDetail.Text = "Run setup-runtime.ps1 before recording."; }
         SourceInitialized += (_, _) => InitializeRuntime();
-        timer.Tick += (_, _) => { if (recorder == null) return; overlay.Update("Listening", "Esc to cancel", recorder.Elapsed, recorder.Level); if (recorder.Elapsed >= 120) StartStop(); else recorder.CheckHealth(); };
+        timer.Tick += (_, _) => RecordingTick();
         SystemEvents.PowerModeChanged += PowerChanged;
         SystemEvents.SessionSwitch += SessionChanged;
         Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; soundFeedback.Dispose(); activeApplication?.Dispose(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); livePolling?.Dispose(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
-        Loaded += (_, _) => { if (!arguments.Contains("--start-hidden")) _ = PlayFeedbackAsync(FeedbackCue.Open); };
+        Loaded += (_, _) => { if (!arguments.Contains("--start-hidden") && !arguments.Contains("--start-minimized")) _ = PlayFeedbackAsync(FeedbackCue.Open); };
         Closing += ClosingWindow;
         InitializeSettingsActions();
         ProfileIdentity.Text = "Build " + AppVersion.BuildId + "\nPreferences: " + preferencesPath + "\n" + preferencesLoad.Status;
@@ -113,7 +118,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
             InitializeProtection();
             modelIdleTimer.Start(); modelPreparation = WarmAllSelectedAsync();
-            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, () => Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) && insertion.IsForegroundCurrent(target)); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
+            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, () => Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) && insertion.IsForegroundCurrent(target), () => pendingSubmission.IsOpen, () => pendingSubmission.TryRequest()); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
             var menu = new System.Windows.Forms.ContextMenuStrip();
@@ -183,7 +188,7 @@ public partial class MainWindow : Window
         if (transcriber.CleanupPending) { ReportError("A temporary recording still needs cleanup. Use Quit to retry before recording again."); return false; }
         if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
-        cancellation?.Dispose(); cancellation = new(); submitOnComplete = false;
+        cancellation?.Dispose(); cancellation = new(); submitOnComplete = false; recordingLimitReached = false; fallbackCopied = false; pendingSubmission.Complete();
         recordingCapture = CaptureDestination("recording");
         target = recordingCapture.Target;
         activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
@@ -196,6 +201,13 @@ public partial class MainWindow : Window
         try
         {
             if (!arguments.Contains("--test-ui")) escape.Arm(true);
+            if (admission != null && !admission()) { Cancel(); return false; }
+            overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
+            overlay.Update("Preparing", "Getting ready · Esc cancels"); overlay.ShowFor(target?.Window ?? 0);
+            // Let WPF paint feedback before waiting for call protection or the cue.
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            captureCancellation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(session, captureSession) || captureSession.State != SessionState.Recording || shutdownPending) return false;
             if (admission != null && !admission()) { Cancel(); return false; }
             if (arguments.Contains("--test-ui") && PreparationForTests != null) await PreparationForTests(captureCancellation.Token);
             else if (protection != null)
@@ -229,66 +241,89 @@ public partial class MainWindow : Window
         finally { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); }
     }
     private void StartStop() { if (!processing && session?.State == SessionState.Recording) { if (recorder == null) RequestCancel(); else operation = StopAsync(); } }
-    private async Task StopAsync()
+    private void RecordingTick()
     {
-        var current = session;
-        if (current == null || !current.Stop() || recorder == null) return;
+        if (recorder is not { } active || processing) return;
+        if (active.Elapsed >= RecordingLimits.MaximumSeconds || active.LimitReached)
+        { submitOnComplete = false; operation = StopAsync(retainOnly: true); return; }
+        var remaining = RecordingLimits.MaximumSeconds - active.Elapsed;
+        var hint = remaining <= 30 ? $"{Math.Ceiling(remaining):0}s left · limit keeps a draft · Esc cancels" : "Esc to cancel";
+        overlay.Update("Listening", hint, active.Elapsed, active.Level); active.CheckHealth();
+    }
+    private async Task StopAsync(bool retainOnly = false)
+    {
+        var current = session; var active = recorder;
+        if (current == null || active == null || !current.Stop()) return;
+        retainOnly |= active.Elapsed >= RecordingLimits.MaximumSeconds || active.LimitReached;
+        if (retainOnly) submitOnComplete = false;
         FeedbackCue? completedFeedback = null;
-        var active = recorder; recorder = null; livePolling?.Cancel();
-        processing = true;
+        recorder = null; livePolling?.Cancel(); recordingLimitReached = retainOnly;
+        processing = true; pendingSubmission.Begin(!retainOnly && preferences.EnterToSend); RefreshQuickCleanup();
+        var recoverySequence = ClipboardSequence(); var pasteAttempted = false;
         timer.Stop(); RecordButton.Content = "Record";
         try
         {
             Status.Text = "Making your draft"; StatusDetail.Text = "Transcribing locally. Esc still cancels."; overlay.Update("Transcribing", "Esc cancels");
-            var wav = await active.StopAsync(); active.Dispose();
+            var wav = await active.StopAsync();
+            // Capture can reach its PCM bound on the last callback while Stop is entering.
+            if (active.LimitReached) { retainOnly = recordingLimitReached = true; submitOnComplete = false; pendingSubmission.Begin(false); }
+            active.Dispose();
             await ReleaseOwnProtectionAsync();
             // Drain the one in-flight preview before final recognition. No partial
             // requests queue behind the final request; cancellation stops both.
             try { await liveOperation; cancellation!.Token.ThrowIfCancellationRequested(); }
             catch { Array.Clear(wav); throw; }
-            var original = await RecognizeAsync(wav, cancellation!.Token);
+            string original;
+            if (previewOriginal != null && previewAudioBytes == active.CapturedBytes)
+            { original = previewOriginal; Array.Clear(wav); }
+            else original = await RecognizeAsync(wav, cancellation!.Token);
             if (current.State == SessionState.Cancelled || !ReferenceEquals(current, session)) return;
             ShowFinalRaw(original);
             var cleanupResult = await PolishAsync(original, cancellation!.Token);
             cancellation.Token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(current, session) || current.State == SessionState.Cancelled) return;
+            submitOnComplete |= pendingSubmission.IsRequested;
             if (!current.Complete(original, CompleteLiveDraft(original, cleanupResult.Text, cleanupResult.Applied))) { Render(current); Status.Text = "No draft to insert"; StatusDetail.Text = liveDraft?.ManuallyEdited == true ? "Your empty edit was kept. The original and cleanup suggestion remain available for review." : current.Error; return; }
             Render(current); AddHistory(current); completedFeedback = FeedbackCue.Ready;
             var clipboardDetail = cleanupResult.Applied ? " Polished locally." : "";
-            if (preferences.CopyToClipboard)
+            if (preferences.CopyToClipboard && !retainOnly)
             {
-                try { Clipboard.SetText(current.Draft); clipboardDetail += " Copied to clipboard."; }
+                try { if (arguments.Contains("--test-ui") && ClipboardForTests != null) ClipboardForTests(current.Draft); else Clipboard.SetText(current.Draft); clipboardDetail += " Copied to clipboard."; }
                 catch (COMException) { clipboardDetail += " Clipboard is busy; use Copy draft to retry."; }
             }
             activeApplication?.Refresh();
-            if ((preferences.AutoInsert || submitOnComplete) && target != null && !destinationContext.DestinationChanged && liveDraft?.ManuallyEdited != true)
+            if (!retainOnly && (preferences.AutoInsert || submitOnComplete) && target != null && !destinationContext.DestinationChanged && liveDraft?.ManuallyEdited != true)
             {
                 overlay.Update("Preparing your draft", submitOnComplete ? "Paste, then Enter in the captured composer" : "Inserting the complete draft");
-                var result = preferences.PasteCompletedDraft || submitOnComplete
-                    ? await insertion.PasteAsync(target, current.Draft, submitOnComplete, cancellation!.Token)
+                pasteAttempted = preferences.PasteCompletedDraft || submitOnComplete;
+                var result = pasteAttempted
+                    ? await insertion.PasteAsync(target, current.Draft, submitOnComplete, cancellation!.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence, requestSubmission: () => { submitOnComplete |= pendingSubmission.IsRequested; return submitOnComplete; })
                     : await insertion.InsertAsync(target, current.Draft, cancellation!.Token);
                 if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); }
                 if (submitOnComplete && insertion.LastSubmissionAccepted) completedFeedback = FeedbackCue.Sent;
                 Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
             }
-            else { Status.Text = "Draft ready"; StatusDetail.Text = (liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
+            else { Status.Text = "Draft ready"; StatusDetail.Text = (retainOnly ? "The five-minute recording limit was reached. Your draft is ready for review; nothing was pasted or sent." : liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
+            if (!retainOnly && !cancellation!.IsCancellationRequested && (preferences.AutoInsert || submitOnComplete) && liveDraft?.ManuallyEdited != true &&
+                (current.State == SessionState.Ready || pasteAttempted && (!insertion.LastPasteConfirmed || submitOnComplete && !insertion.LastSubmissionAccepted)))
+                RecoverClipboard(current.Draft, recoverySequence, pasteAttempted, recordingCapture?.Status);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
         finally
         {
-            active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
-            if (current.State == SessionState.Ready && !shutdownPending) ShowRetainedDraftNotice();
+            pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
+            if ((current.State == SessionState.Ready || fallbackCopied) && !shutdownPending && current.State is SessionState.Ready or SessionState.Inserted) ShowRetainedDraftNotice();
             if (completedFeedback.HasValue && current.State is SessionState.Ready or SessionState.Inserted) _ = PlayFeedbackAsync(completedFeedback.Value);
         }
     }
     private async Task InsertReadyAsync(DraftTarget? suppliedTarget = null)
     {
         if (shutdownPending || processing || recorder != null || session?.State != SessionState.Ready) { StatusDetail.Text = "Choose a new ready draft first. Already inserted drafts cannot be inserted twice."; return; }
-        var current = session;
+        var current = session; var recoverySequence = ClipboardSequence();
         var capture = suppliedTarget == null ? CaptureDestination("ready-draft") : new TargetCaptureResult(suppliedTarget, TargetCaptureStatus.Ready);
         var destination = capture.Target;
-        if (destination == null) { Status.Text = "Draft ready"; StatusDetail.Text = capture.Detail; return; }
+        if (destination == null) { Status.Text = "Draft ready"; StatusDetail.Text = capture.Detail; RecoverClipboard(current.Draft, recoverySequence, false, capture.Status); return; }
         activeApplication?.Refresh();
         if (suppliedTarget != null && destinationContext.DestinationChanged) { Status.Text = "Draft ready"; StatusDetail.Text = "Focus changed. Your draft stayed in Sona."; overlay.Hide(); destinationContext.End(); return; }
         cancellation?.Dispose(); cancellation = new();
@@ -296,9 +331,10 @@ public partial class MainWindow : Window
         processing = true;
         try
         {
-            var result = preferences.PasteCompletedDraft ? await insertion.PasteAsync(destination, current.Draft, false, cancellation.Token) : await insertion.InsertAsync(destination, current.Draft, cancellation.Token);
+            var result = preferences.PasteCompletedDraft ? await insertion.PasteAsync(destination, current.Draft, false, cancellation.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence) : await insertion.InsertAsync(destination, current.Draft, cancellation.Token);
             if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); preparedInsertionTest = false; }
             Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail;
+            if (!cancellation.IsCancellationRequested && (!result.Inserted || preferences.PasteCompletedDraft && !insertion.LastPasteConfirmed)) RecoverClipboard(current.Draft, recoverySequence, preferences.PasteCompletedDraft);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); }
@@ -393,9 +429,9 @@ public partial class MainWindow : Window
             // unsaved form values into a later theme-only save or dictation.
             preferences.Language = next.Language; preferences.Engine = next.Engine; preferences.Style = next.Style; preferences.Device = next.Device;
             preferences.SoundEffects = next.SoundEffects; preferences.PasteCompletedDraft = next.PasteCompletedDraft; preferences.EnterToSend = next.EnterToSend; Volatile.Write(ref enterToSendEnabled, next.EnterToSend ? 1 : 0);
-            preferences.LiveTranscription = next.LiveTranscription; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CheckForUpdates = next.CheckForUpdates; preferences.CloseToTray = next.CloseToTray; preferences.Startup = next.Startup;
+            preferences.LiveTranscription = next.LiveTranscription; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CopyOnInsertionFailure = next.CopyOnInsertionFailure; preferences.CheckForUpdates = next.CheckForUpdates; preferences.CloseToTray = next.CloseToTray; preferences.Startup = next.Startup;
             preferences.ShortcutMode = next.ShortcutMode; preferences.KeepHistory = next.KeepHistory; preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
-            preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes;
+            preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupMode = next.CleanupMode; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes;
             ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
             RefreshModelCards(); modelPreparation = WarmAllSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();

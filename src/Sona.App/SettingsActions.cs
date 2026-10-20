@@ -32,6 +32,7 @@ public partial class MainWindow
         next.Device = Device.SelectedItem is DeviceOption option ? option.Id : -1;
         next.SoundEffects = SoundEffects.IsChecked == true; next.PasteCompletedDraft = PasteCompletedDraft.IsChecked == true; next.EnterToSend = EnterToSend.IsChecked == true;
         next.LiveTranscription = LiveTranscription.IsChecked == true; next.AutoInsert = AutoInsert.IsChecked == true; next.CopyToClipboard = CopyToClipboard.IsChecked == true;
+        next.CopyOnInsertionFailure = CopyOnInsertionFailure.IsChecked == true;
         next.CheckForUpdates = CheckUpdates.IsChecked == true; next.CloseToTray = CloseToTray.IsChecked == true;
         next.Startup = StartWithWindows.IsChecked == true; next.KeepHistory = KeepHistory.IsChecked == true;
         next.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
@@ -45,9 +46,9 @@ public partial class MainWindow
     private void InitializeSettingsActions()
     {
         RefreshProtectionFields();
-        foreach (var choice in new[] { SpeechLanguage, TranscriptionEngine, DraftStyle, Device, ShortcutMode, CleanupToneChoice, CleanupEngineChoice, CleanupIdleChoice, ThemeChoice })
+        foreach (var choice in new[] { SpeechLanguage, TranscriptionEngine, DraftStyle, Device, ShortcutMode, CleanupModeChoice, CleanupToneChoice, CleanupEngineChoice, CleanupIdleChoice, ThemeChoice })
             choice.SelectionChanged += (_, _) => RefreshSettingsActions();
-        foreach (var choice in new[] { SoundEffects, PasteCompletedDraft, EnterToSend, LiveTranscription, AutoInsert, CopyToClipboard, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
+        foreach (var choice in new[] { SoundEffects, PasteCompletedDraft, EnterToSend, LiveTranscription, AutoInsert, CopyToClipboard, CopyOnInsertionFailure, CheckUpdates, CloseToTray, StartWithWindows, KeepHistory, CleanupEnabled })
         { choice.Checked += (_, _) => RefreshSettingsActions(); choice.Unchecked += (_, _) => RefreshSettingsActions(); }
         PanelDisplay.Checked += (_, _) => RefreshSettingsActions(); CapsuleDisplay.Checked += (_, _) => RefreshSettingsActions();
         ProtectionEnabled.Checked += ProtectionToggleChanged; ProtectionEnabled.Unchecked += ProtectionToggleChanged;
@@ -65,7 +66,7 @@ public partial class MainWindow
         PreferencesSaveBar.Visibility = HasUnsavedGeneralSettings(next) ? Visibility.Visible : Visibility.Collapsed;
 
         SavePreferencesButton.IsEnabled = !SettingsBusy;
-        RefreshHistoryActions();
+        RefreshHistoryActions(); RefreshQuickCleanup();
         // Programmatic initialization is guarded; deliberate switch changes save directly.
         ProtectionEnabled.IsEnabled = !SettingsBusy && !discordConnectionBusy;
         SilenceIncoming.IsEnabled = ProtectionEnabled.IsChecked == true && !SettingsBusy && !discordConnectionBusy;

@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.7.** Build from source below. There is no published binary
+**Early preview: 0.4.8.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -30,6 +30,27 @@ AI-assisted narration, music and background art. [Capture details](docs/images/R
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
 replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
+
+## New in 0.4.8
+
+- Earlier Preparing feedback before call protection, the cue and microphone setup.
+- A narrower recording capsule with readable themed hover help and a small cleanup
+  button. Click to cycle **Off → Auto → Always → Off**; **A** means Auto.
+- Optional Auto cleanup skips inference only for short, already formatted sentences.
+  Uncertain text still uses the local model; the original transcript stays available.
+- A completed live preview can supply the final result only when every captured
+  byte is unchanged. New audio always receives final recognition.
+- Recording can continue for five minutes. The limit keeps a draft for review and
+  never automatically copies, pastes or sends it.
+- With Enter-to-send enabled, Enter during transcription or cleanup queues sending
+  after the entire draft is ready and the same composer is verified.
+- Optional **Keep the draft on the clipboard if insertion fails** makes normal
+  Ctrl+V available. A newer owner copy wins; cancellation restores owned clipboard
+  changes. Check the composer before pasting after an unconfirmed request.
+
+Existing profiles retain their cleanup choice; new profiles keep model cleanup,
+Enter submission and clipboard recovery off until enabled. See
+[responsiveness and delivery checks](docs/RESPONSIVENESS.md).
 
 ## New in 0.4.7
 
@@ -227,7 +248,8 @@ Startup, saved transcript history, clipboard backup, local model cleanup,
 Discord protection and update checking start disabled on new profiles.
 Optional local history is capped at 200 text entries and stores no audio.
 
-Recordings are bounded to 120 seconds and speech requests to 90 seconds.
+Recordings are bounded to five minutes and speech requests to 90 seconds.
+A duration-limit stop retains a draft without automatic copy, insertion or submission.
 Long Parakeet recordings use independent segments of at most 25 seconds.
 File transcription accepts short 16 kHz mono PCM WAVs. Medium, Turbo and Large
 Whisper require the separately installed CUDA engine. Cleanup is limited to

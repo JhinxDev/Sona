@@ -1,6 +1,6 @@
 namespace Sona.Core;
 
-public enum HoldAction { None, Begin, Finish, Cancel }
+public enum HoldAction { None, Begin, Finish, Cancel, QueueSend }
 public readonly record struct HoldChange(HoldAction Action, long Generation, bool Suppress = false, bool Toggle = false, bool HandsFree = false, bool Submit = false);
 
 // Only current physical down-state, never typed text or key history. One listener
@@ -44,7 +44,7 @@ public sealed class HoldGesture
         handsFree = toggleSession = tapPending = secondTap = false; Volatile.Write(ref pendingSubmit, 0);
         draining = Control || Windows; latched = latched && draining;
     }
-    public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false, bool finishOnEnter = false)
+    public HoldChange Key(int key, bool pressed, long milliseconds, bool injected = false, bool toggle = false, bool finishOnEnter = false, bool completing = false)
     {
         key = Normalize(key);
         if (injected || key < 0 || key >= 256) return default;
@@ -52,6 +52,11 @@ public sealed class HoldGesture
         {
             down[key] = pressed; if (!pressed) swallowEnter = false;
             return new(HoldAction.None, generation, Suppress: true);
+        }
+        if (key == 0x0D && pressed && completing && finishOnEnter && !Control && !Windows && !Other)
+        {
+            down[key] = true; swallowEnter = true; Volatile.Write(ref pendingSubmit, 1);
+            return new(HoldAction.QueueSend, generation, Suppress: true, Submit: true);
         }
         // Only an admitted hands-free session consumes a bare physical Enter.
         // Drain repeat/up events so the original key cannot submit stale text.

@@ -15,7 +15,14 @@ public partial class Overlay : Window
     public ImageSource ActiveAppIcon => (ImageSource)GetValue(ActiveAppIconProperty);
     private ImageSource appIcon = Windows.ApplicationIconCache.DefaultIcon;
     private bool quietIdentity = true;
-    public void UpdateAppIcon(ImageSource icon) { appIcon = icon; SetValue(ActiveAppIconPropertyKey, quietIdentity ? Windows.ApplicationIconCache.DefaultIcon : appIcon); }
+    public void UpdateAppIcon(ImageSource icon) { appIcon = icon; RefreshIconPresence(); }
+    private void RefreshIconPresence()
+    {
+        var available = !quietIdentity && !ReferenceEquals(appIcon, Windows.ApplicationIconCache.DefaultIcon);
+        SetValue(ActiveAppIconPropertyKey, available ? appIcon : Windows.ApplicationIconCache.DefaultIcon);
+        PanelIconPlate.Visibility = CapsuleIconPlate.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        PanelIconColumn.Width = new GridLength(available ? 20 : 0); CapsuleIconColumn.Width = new GridLength(available ? 15 : 0);
+    }
     private const int SampleCount = 28;
     private readonly double[] samples = new double[SampleCount];
     private readonly double[] displayed = new double[SampleCount];
@@ -31,9 +38,19 @@ public partial class Overlay : Window
     internal bool SuppressNativeDisplayForTests { get; set; }
     private string display = "Panel";
     private string transcriptText = "";
+    private string? lastLabel, lastHint;
 
     public event Action? StopRequested;
     public event Action? CancelRequested;
+    public event Action? QuickCleanupRequested;
+    private void QuickCleanup_Click(object sender, RoutedEventArgs e) => QuickCleanupRequested?.Invoke();
+    public void SetQuickCleanup(string mode, bool enabled)
+    {
+        CapsuleCleanup.Content = mode == "Auto" ? "A" : mode == "Always" ? "✦" : "○"; CapsuleCleanup.IsEnabled = enabled;
+        var next = mode == "Off" ? "Auto" : mode == "Auto" ? "Always" : "Off";
+        CapsuleCleanup.ToolTip = enabled ? $"Text cleanup: {mode}. Click for {next}." : $"Text cleanup: {mode}. Available after this draft finishes.";
+        System.Windows.Automation.AutomationProperties.SetName(CapsuleCleanup, $"Text cleanup: {mode}. Click for {next}.");
+    }
 
     public Overlay()
     {
@@ -79,7 +96,7 @@ public partial class Overlay : Window
         ReviewDraft.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         TranscriptStage.Visibility = panel && !string.IsNullOrEmpty(TranscriptStage.Text) ? Visibility.Visible : Visibility.Collapsed;
         LiveTranscript.Margin = new Thickness(0, panel ? 5 : 0, 0, 0);
-        Width = panel ? 320 : 272;
+        Width = panel || TranscriptArea.Visibility == Visibility.Visible ? 320 : 228;
         MinHeight = panel ? 144 : 66;
         Shell.Padding = new Thickness(panel ? 10 : 8);
         Shell.CornerRadius = new CornerRadius(panel ? 18 : 22);
@@ -97,7 +114,7 @@ public partial class Overlay : Window
         PanelTarget.ToolTip = CapsuleTarget.ToolTip = PanelAppImage.ToolTip = CapsuleAppImage.ToolTip = name;
         System.Windows.Automation.AutomationProperties.SetName(PanelAppImage, name);
         System.Windows.Automation.AutomationProperties.SetName(CapsuleAppImage, name);
-        SetValue(ActiveAppIconPropertyKey, quietIdentity ? Windows.ApplicationIconCache.DefaultIcon : appIcon);
+        RefreshIconPresence();
     }
 
     public void UpdateModel(string name)
@@ -136,33 +153,38 @@ public partial class Overlay : Window
     {
         var wasListening = listening;
         listening = label == "Listening";
-        PanelLabel.Text = CapsuleLabel.Text = listening ? "Recording" : label;
-        PanelRecordingDot.Visibility = CapsuleRecordingDot.Visibility = listening ? Visibility.Visible : Visibility.Collapsed;
-        if (!wasListening || !listening) { indicatorSeconds = 0; PanelRecordingDot.Opacity = CapsuleRecordingDot.Opacity = 1; }
-        var busy = label is "Preparing your draft" or "Transcribing" or "Polishing" or "Preparing";
-        PanelBusy.Visibility = CapsuleBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-        PanelBusy.IsIndeterminate = CapsuleBusy.IsIndeterminate = busy && SystemParameters.ClientAreaAnimation;
-        PanelBusy.Value = CapsuleBusy.Value = 0;
-        var busyBackground = busy && !SystemParameters.ClientAreaAnimation ? "Accent" : "Inset";
-        PanelBusy.SetResourceReference(System.Windows.Controls.ProgressBar.BackgroundProperty, busyBackground);
-        CapsuleBusy.SetResourceReference(System.Windows.Controls.ProgressBar.BackgroundProperty, busyBackground);
-        PanelWave.Visibility = CapsuleWave.Visibility = busy ? Visibility.Hidden : Visibility.Visible;
-        var elapsed = TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Clamp(seconds, 0, 120) : 0).ToString(@"m\:ss");
-        PanelTime.Text = listening ? elapsed : "";
-        CapsuleTime.Text = listening ? elapsed : "";
-        PanelHint.Text = hint;
-        CapsuleHint.Text = hint;
-        CapsuleHint.Visibility = listening || string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
-        Shell.ToolTip = string.IsNullOrWhiteSpace(hint) ? label : $"{label}. {hint}";
-        System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona recording, {elapsed}. {hint}" : $"Sona {label}. {hint}");
-        PanelStop.Visibility = CapsuleStop.Visibility = listening ? Visibility.Visible : Visibility.Hidden;
+        var elapsed = TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Clamp(seconds, 0, Sona.Core.RecordingLimits.MaximumSeconds) : 0).ToString(@"m\:ss");
+        if (label != lastLabel || hint != lastHint)
+        {
+            lastLabel = label; lastHint = hint;
+            PanelLabel.Text = CapsuleLabel.Text = listening ? "Recording" : label;
+            PanelRecordingDot.Visibility = CapsuleRecordingDot.Visibility = listening ? Visibility.Visible : Visibility.Collapsed;
+            if (!wasListening || !listening) { indicatorSeconds = 0; PanelRecordingDot.Opacity = CapsuleRecordingDot.Opacity = 1; }
+            var busy = label is "Preparing your draft" or "Transcribing" or "Polishing" or "Preparing";
+            PanelBusy.Visibility = CapsuleBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            PanelBusy.IsIndeterminate = CapsuleBusy.IsIndeterminate = busy && SystemParameters.ClientAreaAnimation;
+            PanelBusy.Value = CapsuleBusy.Value = 0;
+            var busyBackground = busy && !SystemParameters.ClientAreaAnimation ? "Accent" : "Inset";
+            PanelBusy.SetResourceReference(System.Windows.Controls.ProgressBar.BackgroundProperty, busyBackground);
+            CapsuleBusy.SetResourceReference(System.Windows.Controls.ProgressBar.BackgroundProperty, busyBackground);
+            PanelWave.Visibility = CapsuleWave.Visibility = busy ? Visibility.Hidden : Visibility.Visible;
+            PanelHint.Text = CapsuleHint.Text = hint;
+            CapsuleHint.Visibility = listening || string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
+            Shell.ToolTip = string.IsNullOrWhiteSpace(hint) ? label : $"{label}. {hint}";
+            PanelStop.Visibility = CapsuleStop.Visibility = listening ? Visibility.Visible : Visibility.Hidden;
+        }
+        var time = listening ? elapsed : "";
+        if (PanelTime.Text != time)
+        {
+            PanelTime.Text = CapsuleTime.Text = time;
+            System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona recording, {elapsed}. {hint}" : $"Sona {label}. {hint}");
+        }
+        else if (!listening) System.Windows.Automation.AutomationProperties.SetName(Shell, $"Sona {label}. {hint}");
         if (listening)
         {
             if (!wasListening) ResetWaveform();
-            // Each point is one actual recorder RMS sample. No idle or preview signal is synthesized.
             Array.Copy(samples, 1, samples, 0, SampleCount - 1);
-            samples[^1] = MapLevel(level);
-            hasSamples = true;
+            samples[^1] = MapLevel(level); hasSamples = true;
         }
         else ResetWaveform();
     }
@@ -212,8 +234,8 @@ public partial class Overlay : Window
         transcriptText = text; TranscriptStage.Text = stage; TranscriptStage.ToolTip = stage;
         TranscriptStage.Visibility = display == "Panel" && !string.IsNullOrEmpty(stage) ? Visibility.Visible : Visibility.Collapsed;
         LiveTranscript.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
-        RefreshTranscriptTail();
         TranscriptArea.Visibility = !string.IsNullOrEmpty(stage) && (display == "Panel" || !string.IsNullOrEmpty(text)) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateCapsuleWidth(); RefreshTranscriptTail();
     }
     private void RefreshTranscriptTail()
     {
@@ -221,7 +243,13 @@ public partial class Overlay : Window
         var typeface = new Typeface(LiveTranscript.FontFamily, LiveTranscript.FontStyle, LiveTranscript.FontWeight, LiveTranscript.FontStretch);
         LiveTranscript.Text = RecentTranscriptTail.Fit(transcriptText, width, typeface, LiveTranscript.FontSize, LiveTranscript.Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
-    public void SetReviewAction(bool visible) => TranscriptArea.Visibility = visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed;
+    private void UpdateCapsuleWidth()
+    {
+        var next = display == "Panel" || TranscriptArea.Visibility == Visibility.Visible ? 320 : 228;
+        if (Width != next) Width = next;
+    }
+    public void SetReviewAction(bool visible)
+    { TranscriptArea.Visibility = visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed; UpdateCapsuleWidth(); }
     private void Review_Click(object sender, RoutedEventArgs e) => ReviewRequested?.Invoke();
     private void Stop_Click(object sender, RoutedEventArgs e) => StopRequested?.Invoke();
     private void Cancel_Click(object sender, RoutedEventArgs e) => CancelRequested?.Invoke();
