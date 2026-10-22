@@ -11,6 +11,17 @@
  <Border x:Name="Shell" CornerRadius="18" BorderBrush="{DynamicResource OverlayEdge}" BorderThickness="1" Background="{DynamicResource OverlaySurface}" Padding="10" Margin="3">
   <Grid>
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <Grid x:Name="NoticeDisplay" Visibility="Collapsed" MinHeight="42">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/></Grid.ColumnDefinitions>
+    <Image x:Name="NoticeIcon" Width="14" Height="14" Margin="0,6,0,0" VerticalAlignment="Top" Visibility="Collapsed" Source="{Binding ActiveAppIcon, RelativeSource={RelativeSource AncestorType=Window}}" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
+    <Button x:Name="NoticeReview" Grid.Column="1" Style="{StaticResource OverlayAction}" Padding="0,3" MinHeight="42" Background="Transparent" BorderThickness="0" Click="Review_Click" ToolTip="Open draft" AutomationProperties.Name="Open draft to review or copy">
+     <StackPanel>
+      <TextBlock x:Name="NoticeTitle" FontSize="13" FontWeight="SemiBold" TextAlignment="Center"/>
+      <TextBlock x:Name="NoticeHint" FontSize="11" Margin="0,3,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
+     </StackPanel>
+    </Button>
+    <Button x:Name="NoticeDismiss" Grid.Column="2" Style="{StaticResource OverlayAction}" MinWidth="24" MinHeight="24" Width="24" Height="24" Padding="6" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Click="DismissNotice_Click" ToolTip="Dismiss notice" AutomationProperties.Name="Dismiss draft notice"><Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{DynamicResource Muted}" StrokeThickness="1.5"/></Button>
+   </Grid>
    <Grid x:Name="PanelDisplay">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="36"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid>

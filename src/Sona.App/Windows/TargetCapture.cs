@@ -14,6 +14,10 @@ public enum TargetCaptureStatus
 
 public sealed record TargetCaptureResult(DraftTarget? Target, TargetCaptureStatus Status)
 {
+    private TargetCaptureStatus? initialStatus;
+    public TargetCaptureStatus InitialStatus { get => initialStatus ?? Status; init => initialStatus = value; }
+    public int CaptureAttempts { get; init; } = 1;
+    public bool? ReadOnly { get; init; }
     public int? ControlTypeId { get; init; }
     public int? ProviderProcessId { get; init; }
     public int? WindowProcessId { get; init; }
@@ -88,7 +92,7 @@ public sealed partial class Insertion
         var stable = field.RuntimeId.Length > 0 && firstEpoch == finalEpoch;
         TargetCaptureResult Result(TargetCaptureStatus status, DraftTarget? target = null) => new(target, status)
         {
-            ControlTypeId = field.ControlTypeId, ProviderProcessId = field.ProcessId, WindowProcessId = owner,
+            ReadOnly = field.ReadOnly, ControlTypeId = field.ControlTypeId, ProviderProcessId = field.ProcessId, WindowProcessId = owner,
             ForegroundWindow = window.ToInt64(), FocusEpochBefore = firstEpoch, FocusEpochAfter = finalEpoch,
             Stable = stable, FieldInForegroundWindow = contained, RuntimeIdentityHash = TargetCaptureResult.HashRuntimeId(field.RuntimeId)
         };

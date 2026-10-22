@@ -11,7 +11,7 @@ It started with a frustration: subscriptions and quotas can make an everyday
 dictation tool feel harder to use than it should. Sona is an early open-source
 attempt at a native Windows alternative that you can inspect, adapt and improve.
 
-**Early preview: 0.4.9.** Build from source below. There is no published binary
+**Early preview: 0.4.10.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -30,6 +30,17 @@ AI-assisted narration, music and background art. [Capture details](docs/images/R
 These captures show the actual 0.4.2 WPF interface in Amethyst, rendered from
 isolated demo profiles with synthetic text and no live microphone. The capsule
 replays measured prerecorded speech through the actual UI. [Capture details](docs/images/README.md).
+
+## New in 0.4.10
+
+- A short, guarded retry at recording start handles Windows temporarily reporting
+  a container before an editable field is ready. It keeps the original window
+  and focus epoch; a changed destination still retains the draft.
+- Compact centered draft notices hide the recording controls. They distinguish
+  copied, unconfirmed and confirmed pastes, with concise guidance.
+- Rapid cancellation finishes its queued cleanup before a new recording can start.
+
+[Capture readiness, notice behavior and acceptance limits](docs/CAPTURE-READINESS.md).
 
 ## New in 0.4.9
 

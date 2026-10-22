@@ -18,6 +18,16 @@ if ($LASTEXITCODE -ne 0) { throw 'Capture policy regressions failed' }
 $taskCaptureEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-capture-status-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --capture-status-fixture $taskCaptureEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Capture status regressions failed' }
+foreach ($taskFixture in @('capture-readiness', 'retained-notice')) {
+    $taskEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-' + $taskFixture + '-' + [Guid]::NewGuid().ToString('N'))
+    $taskInfo = [Diagnostics.ProcessStartInfo]::new("$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe")
+    $taskInfo.UseShellExecute = $false; $taskInfo.CreateNoWindow = $true
+    $taskInfo.Arguments = '--' + $taskFixture + '-fixture "' + $taskEvidence + '"'
+    $taskProcess = [Diagnostics.Process]::Start($taskInfo)
+    if (!$taskProcess.WaitForExit(45000)) { $taskProcess.Kill(); throw ($taskFixture + ' fixture exceeded its bound') }
+    if ($taskProcess.ExitCode -ne 0) { throw ($taskFixture + ' regressions failed') }
+    $taskProcess.Dispose()
+}
 $taskHistoryEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-history-controls-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --history-controls-fixture $taskHistoryEvidence
 if ($LASTEXITCODE -ne 0) { throw 'History control regressions failed' }

@@ -95,6 +95,14 @@ identity is inferred from a browser process. Live active-app observation never
 retargets a recording; the original destination stays fixed, and a focus change
 shows a retention warning. Physical Codex/Discord typing acceptance remains open.
 
+October 22, 0.4.10: retained-draft notices use a centered 228 DIP layout,
+short delivery-specific text and an optional real app icon. Recording controls,
+waveform and provisional transcript are hidden in this state. Clicking the text
+opens the draft; X dismisses only the notice. New recording restores its selected
+layout. The capsule remains 228 DIP without transcript and 320 with transcript;
+the current Panel is 320 DIP, minimum height 144. The earlier Frost dimensions
+above are historical. The existing translucent material is unchanged.
+
 Earlier design checkpoints follow for context; the shared glass identity above
 supersedes the optional-material and original-Amethyst descriptions.
 

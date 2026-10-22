@@ -20,7 +20,7 @@ public partial class Overlay : Window
     {
         var available = !quietIdentity && !ReferenceEquals(appIcon, Windows.ApplicationIconCache.DefaultIcon);
         SetValue(ActiveAppIconPropertyKey, available ? appIcon : Windows.ApplicationIconCache.DefaultIcon);
-        PanelIconPlate.Visibility = CapsuleIconPlate.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        PanelIconPlate.Visibility = CapsuleIconPlate.Visibility = NoticeIcon.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
         PanelIconColumn.Width = new GridLength(available ? 20 : 0); CapsuleIconColumn.Width = new GridLength(available ? 15 : 0);
     }
     private const int SampleCount = 28;
@@ -36,6 +36,7 @@ public partial class Overlay : Window
     private bool hasSamples;
     private double indicatorSeconds;
     internal bool SuppressNativeDisplayForTests { get; set; }
+    private bool retainedNotice;
     private string display = "Panel";
     private string transcriptText = "";
     private string? lastLabel, lastHint;
@@ -90,6 +91,16 @@ public partial class Overlay : Window
     public void SetDisplay(string id)
     {
         display = string.Equals(id, "Capsule", StringComparison.OrdinalIgnoreCase) ? "Capsule" : "Panel";
+        if (retainedNotice)
+        {
+            NoticeDisplay.Visibility = Visibility.Visible;
+            PanelDisplay.Visibility = CapsuleDisplay.Visibility = TranscriptArea.Visibility = Visibility.Collapsed;
+            Width = 228; MinHeight = 66;
+            Shell.Padding = new Thickness(8); Shell.CornerRadius = new CornerRadius(22);
+            if (IsVisible) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, Position);
+            return;
+        }
+        NoticeDisplay.Visibility = Visibility.Collapsed;
         var panel = display == "Panel";
         PanelDisplay.Visibility = panel ? Visibility.Visible : Visibility.Collapsed;
         CapsuleDisplay.Visibility = panel ? Visibility.Collapsed : Visibility.Visible;
@@ -151,6 +162,7 @@ public partial class Overlay : Window
 
     public void Update(string label, string hint, double seconds = 0, double level = 0)
     {
+        if (retainedNotice) { retainedNotice = false; SetDisplay(display); }
         var wasListening = listening;
         listening = label == "Listening";
         var elapsed = TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Clamp(seconds, 0, Sona.Core.RecordingLimits.MaximumSeconds) : 0).ToString(@"m\:ss");
@@ -188,6 +200,16 @@ public partial class Overlay : Window
         }
         else ResetWaveform();
     }
+
+    public void UpdateRetainedNotice(string title, string hint)
+    {
+        UpdateTranscript("", "");
+        Update(title, hint);
+        NoticeTitle.Text = title; NoticeHint.Text = hint;
+        retainedNotice = true; SetDisplay(display);
+    }
+
+    private void DismissNotice_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void Animate(object? sender, EventArgs e)
     {
@@ -234,7 +256,7 @@ public partial class Overlay : Window
         transcriptText = text; TranscriptStage.Text = stage; TranscriptStage.ToolTip = stage;
         TranscriptStage.Visibility = display == "Panel" && !string.IsNullOrEmpty(stage) ? Visibility.Visible : Visibility.Collapsed;
         LiveTranscript.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
-        TranscriptArea.Visibility = !string.IsNullOrEmpty(stage) && (display == "Panel" || !string.IsNullOrEmpty(text)) ? Visibility.Visible : Visibility.Collapsed;
+        TranscriptArea.Visibility = !retainedNotice && !string.IsNullOrEmpty(stage) && (display == "Panel" || !string.IsNullOrEmpty(text)) ? Visibility.Visible : Visibility.Collapsed;
         UpdateCapsuleWidth(); RefreshTranscriptTail();
     }
     private void RefreshTranscriptTail()
@@ -245,11 +267,11 @@ public partial class Overlay : Window
     }
     private void UpdateCapsuleWidth()
     {
-        var next = display == "Panel" || TranscriptArea.Visibility == Visibility.Visible ? 320 : 228;
+        var next = !retainedNotice && (display == "Panel" || TranscriptArea.Visibility == Visibility.Visible) ? 320 : 228;
         if (Width != next) Width = next;
     }
     public void SetReviewAction(bool visible)
-    { TranscriptArea.Visibility = visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed; UpdateCapsuleWidth(); }
+    { TranscriptArea.Visibility = !retainedNotice && visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed; UpdateCapsuleWidth(); }
     private void Review_Click(object sender, RoutedEventArgs e) => ReviewRequested?.Invoke();
     private void Stop_Click(object sender, RoutedEventArgs e) => StopRequested?.Invoke();
     private void Cancel_Click(object sender, RoutedEventArgs e) => CancelRequested?.Invoke();

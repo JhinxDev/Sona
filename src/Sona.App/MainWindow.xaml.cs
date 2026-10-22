@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private bool shutdownPending;
     private bool preparedInsertionTest;
     private bool preparing;
+    private int cancellationRequestsPending;
     private bool recordingLimitReached;
     internal Func<CancellationToken, Task>? PreparationForTests { get; set; }
     internal Func<Recorder>? RecorderForTests { get; set; }
@@ -188,27 +189,36 @@ public partial class MainWindow : Window
     {
         if (!preferencesLoad.CanSave) { StatusDetail.Text = preferencesLoad.Message; return false; }
         if (arguments.Contains("--test-ui") && RecorderForTests == null) return false;
-        if (processing || shutdownPending || preferencesApplying || preparing) { StatusDetail.Text = "The previous operation is finishing. Try again in a moment."; return false; }
+        if (processing || shutdownPending || preferencesApplying || preparing || Volatile.Read(ref cancellationRequestsPending) != 0) { StatusDetail.Text = "The previous operation is finishing. Try again in a moment."; return false; }
         if (session?.State is SessionState.Recording or SessionState.Transcribing) return false;
         if (transcriber.CleanupPending) { ReportError("A temporary recording still needs cleanup. Use Quit to retry before recording again."); return false; }
         if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
         cancellation?.Dispose(); cancellation = new(); submitOnComplete = false; recordingLimitReached = false; fallbackCopied = false; pendingSubmission.Complete();
-        recordingCapture = CaptureDestination("recording");
-        target = recordingCapture.Target;
-        activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
+        // Own preparation before the first asynchronous readiness wait. A late
+        // capture cannot install a destination into a cancelled or newer session.
+        target = null; recordingCapture = null; destinationContext.End();
         barPreview.Stop();
         RetainCurrentDraft(); historySelection = null;
         preparedInsertionTest = insertionTestHolding = false;
         session = new(); session.Begin();
         var captureSession = session; var captureCancellation = cancellation;
+        var captureToken = captureCancellation.Token;
+        bool Admitted() => ReferenceEquals(session, captureSession) && ReferenceEquals(cancellation, captureCancellation) &&
+            captureSession.State == SessionState.Recording && !shutdownPending && !windowClosed && (admission == null || admission());
         preparing = true;
         try
         {
             if (!arguments.Contains("--test-ui")) escape.Arm(true);
-            if (admission != null && !admission()) { Cancel(); return false; }
+            if (!Admitted()) { Cancel(); return false; }
+            overlay.UpdateTarget("Checking destination"); overlay.UpdateAppIcon(ApplicationIconCache.DefaultIcon);
+            overlay.Update("Preparing", "Getting ready · Esc cancels"); overlay.ShowFor(0);
+            var acquired = await CaptureRecordingDestinationAsync(Admitted, captureToken);
+            captureToken.ThrowIfCancellationRequested();
+            if (!Admitted()) throw new OperationCanceledException(captureToken);
+            recordingCapture = acquired; target = acquired.Target;
+            activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
             overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
-            overlay.Update("Preparing", "Getting ready · Esc cancels"); overlay.ShowFor(target?.Window ?? 0);
             // Let WPF paint feedback before waiting for call protection or the cue.
             await Dispatcher.Yield(DispatcherPriority.Background);
             captureCancellation.Token.ThrowIfCancellationRequested();
@@ -243,7 +253,7 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) { if (ReferenceEquals(session, captureSession)) Cancel(); return false; }
         catch (Exception ex) when (ex is IOException or NAudio.MmException or InvalidOperationException or System.Text.Json.JsonException) { if (ReferenceEquals(session, captureSession)) { recorder?.Dispose(); recorder = null; captureSession.Fail(ex.Message); ReportError(ex is IOException ? ex.Message : "Microphone or call protection unavailable. Check Settings and reconnect Discord."); } return false; }
-        finally { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); }
+        finally { if (ReferenceEquals(cancellation, captureCancellation)) { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); } }
     }
     private void StartStop() { if (!processing && session?.State == SessionState.Recording) { if (recorder == null) RequestCancel(); else operation = StopAsync(); } }
     private void RecordingTick()
@@ -396,7 +406,21 @@ public partial class MainWindow : Window
         Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted.";
         if (liveDraft != null) DraftStage.Text = "Cancelled · review text retained";
     }
-    private void RequestCancel() { if (windowClosed) return; try { cancellation?.Cancel(); } catch (ObjectDisposedException) { return; } session?.Cancel(); if (!windowClosed && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(Cancel); }
+    private void RequestCancel()
+    {
+        if (windowClosed) return;
+        var cancelledSession = session; var cancelledSource = cancellation;
+        Interlocked.Increment(ref cancellationRequestsPending);
+        try { cancelledSource?.Cancel(); }
+        catch (ObjectDisposedException) { Interlocked.Decrement(ref cancellationRequestsPending); return; }
+        cancelledSession?.Cancel();
+        if (windowClosed || Dispatcher.HasShutdownStarted) { Interlocked.Decrement(ref cancellationRequestsPending); return; }
+        Dispatcher.BeginInvoke(() =>
+        {
+            try { if (ReferenceEquals(session, cancelledSession) && ReferenceEquals(cancellation, cancelledSource)) Cancel(); }
+            finally { Interlocked.Decrement(ref cancellationRequestsPending); }
+        });
+    }
     public void ReportError(string detail) { Cancel(); Status.Text = "Something needs attention"; StatusDetail.Text = detail; }
     private void Render(DictationSession current) { reviewBaseline = CleanedSuggestion.Text.Length > 0 ? CleanedSuggestion.Text : current.Draft; CorrectionSuggestions.ItemsSource = null; rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; }
     private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else operation = BeginRecordingAsync(); }
