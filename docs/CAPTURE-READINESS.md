@@ -67,3 +67,11 @@ global input, owner composer or Discord behavior is exercised. Normal Codex inse
 and the owner's physical notice acceptance remain unverified. If Windows still
 cannot prove a focused editor, the safe draft-only result is intentional. Focus
 the message box before starting dictation; the retry cannot replace that gesture.
+Private guarded activation verified running version0.4.10/buildd7041c37462a,
+all36installed receipt hashes, the draft/original, complete session History and
+saved/active preferences. The replacement stayed minimized. Startup model warming
+initially retained recovery; exact draft and native History serialization matched
+the protected checkpoints after idle, and only this update's proven-owned temporary
+files were removed without another restart. OLED, enabled Auto cleanup, Enter and
+clipboard recovery were retained; History storage and incoming silencing remain Off.
+This installation proof does not qualify physical keyboard or real-composer input.
