@@ -1,5 +1,22 @@
 # Preview validation
 
+## October 22 capture readiness and retained notice, 0.4.10
+
+Exact published 0.4.10 modules passed 59 initial-capture readiness checks and
+92 centered-notice checks. Existing overlay51, capture-status10, Quit5, Core388,
+Enter49, responsiveness50, completed-paste25, Windows49, capture-policy11,
+insertion24 and active-target34 also passed. The package passed the offscreen
+18-check finite encrypted upgrade rehearsal, preserving the owner process.
+Builds had zero warnings/errors. Independent review findings were repaired with
+regressions before qualification. Dependencies and speech/cleanup engines did not
+change; their unchanged prior evidence is retained.
+
+This qualifies the bounded initial capture retry and real WPF notice controls,
+without microphone, global input, production profile or Discord behavior tests.
+The reported Codex attempt had no eligible captured editor and no paste request;
+its initial focus state is unknown. Normal Codex insertion and physical notice
+acceptance remain separate. [Behavior and limits](CAPTURE-READINESS.md).
+
 ## October 16 History controls, 0.4.5
 
 The owner's disabled Clear recent button was observed on the actual idle0.4.4

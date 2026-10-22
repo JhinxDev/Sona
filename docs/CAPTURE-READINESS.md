@@ -48,8 +48,19 @@ terminal rejection, cancellation, released admission, overlapping starts, cleari
 shutdown and stale diagnostics. Notice checks cover delivery facts, theme/layout
 reset, centered sizing, explicit review and dismissal without cancellation. They
 render the real WPF controls at 96, 144 and 192 DPI without showing a window.
-The build entrypoint includes both fixtures. Final package qualification is
-recorded separately after testing the exact published modules.
+The build entrypoint includes both fixtures. The exact private 0.4.10 package
+passed 59 readiness checks, 92 notice checks, 51 existing overlay checks, 10 capture
+status checks and five Quit-preparation checks. Core388, Enter49, responsiveness50,
+completed-paste25, default Windows49, capture-policy11, insertion24 and active-target34
+also passed against its published modules. Builds had zero warnings/errors.
+The same package passed the offscreen 18-check encrypted draft/session-history
+upgrade rehearsal. Unchanged updater status15 and abort15 evidence was reused
+from October20 after verifying those tool paths were byte-identical.
+
+An independent source review found and closed the queued-cancellation recorder
+cleanup race and an initial-status diagnostic mismatch. A final admission-boundary
+regression also reproduced and repaired preparation remaining active after a
+released gesture. No remaining scoped review finding was reported.
 
 These tests use fake capture/recognition and isolated profiles. No live microphone,
 global input, owner composer or Discord behavior is exercised. Normal Codex insertion
