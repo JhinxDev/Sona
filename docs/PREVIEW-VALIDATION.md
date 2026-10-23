@@ -12,8 +12,13 @@ Affected recording/responsiveness50, Enter49 and speech-preflight35 checks passe
 All captures and deliveries were fake and isolated; no live microphone, system
 input, native test popup or Discord session was used. Existing target insertion,
 notice, model health/deadline and updater acceptance limits remain unchanged.
-Exact published-module qualification and installed version/hash/data preservation
-are recorded separately at the live delivery checkpoint.
+Exact published modules repeated these affected checks and passed overlay51,
+retained-notice92, Core388 and completed-paste25. Actual installed **0.4.11** build
+`204a6c75342a` matched all 36 package-file hashes. Guarded normal Quit and minimized
+Explorer-owned launch preserved the current draft/original, all 36 session History
+entries and settings. The first attempt safely stopped before Quit while the app
+was closed to its tray; activation completed after the owner opened the native
+window. Physical microphone/composer acceptance remains distinct.
 
 # Preview validation
 
