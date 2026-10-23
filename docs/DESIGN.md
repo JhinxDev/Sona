@@ -1,3 +1,17 @@
+## October 23 model-loading feedback, 0.4.11
+
+The existing translucent capsule and panel distinguish actual integrity verification
+(`Checking model`), worker memory loading (`Loading model`), and inference
+(`Transcribing` or `Polishing`). A short secondary line names the speech or cleanup
+model and preserves Escape guidance. Loading uses the existing indeterminate busy
+line, with its static reduced-motion fallback; there is no invented percentage.
+The title fits the unchanged 228 DIP capsule. During provisional recognition,
+`Recording`, elapsed time, the measured waveform and Stop remain visible, with the
+loading hint underneath. Warm models skip these preparation states. Only an active
+user operation updates the pill; startup/settings warming never opens it. Loader
+state is sampled every 80 ms during processing and by the recording timer during
+capture, without delaying recognition or cleanup.
+
 # Current 0.4.3 design
 
 October 16 reliability changes add specific retained-draft capture guidance and

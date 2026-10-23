@@ -27,6 +27,8 @@ internal sealed class ResidentModel
     private int usedCuda;
     private int processId;
     private bool cleanupPending;
+    private int loadStage;
+    public ModelLoadStage LoadStage => (ModelLoadStage)Volatile.Read(ref loadStage);
     private bool parakeet;
     private string? apiKey;
     public bool CleanupPending => Volatile.Read(ref cleanupPending);
@@ -127,6 +129,7 @@ internal sealed class ResidentModel
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(startupTimeout);
         try
         {
+            Volatile.Write(ref loadStage, (int)ModelLoadStage.Verifying);
             var verified = await verifyModel(model, deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();
             if (!verified) throw new IOException("Install and verify the selected local model first.");
@@ -151,6 +154,7 @@ internal sealed class ResidentModel
                 if (!cuda) info.ArgumentList.Add("-ng");
             }
             Volatile.Write(ref usedCuda, 0);
+            Volatile.Write(ref loadStage, (int)ModelLoadStage.Loading);
             worker = new BoundedProcess(info, cuda || isParakeet ? 3072 : 1536);
             Volatile.Write(ref processId, worker.Process.Id);
             drainOutput = DrainAsync(worker.Process.StandardOutput, false);
@@ -210,6 +214,7 @@ internal sealed class ResidentModel
                 throw new IOException("The local model could not start safely. Check its files and runtime.", ex);
             throw;
         }
+        finally { Volatile.Write(ref loadStage, (int)ModelLoadStage.None); }
     }
     private HttpRequestMessage Request(HttpMethod method, string path)
     {

@@ -263,7 +263,8 @@ public partial class MainWindow : Window
         { submitOnComplete = false; operation = StopAsync(retainOnly: true); return; }
         var remaining = RecordingLimits.MaximumSeconds - active.Elapsed;
         var hint = remaining <= 30 ? $"{Math.Ceiling(remaining):0}s left · limit keeps a draft · Esc cancels" : "Esc to cancel";
-        overlay.Update("Listening", hint, active.Elapsed, active.Level); active.CheckHealth();
+        var stage = preferences.LiveTranscription ? GetModelLoadStage(ModelPurpose.Speech) : ModelLoadStage.None;
+        overlay.Update("Listening", LoadingHint(ModelPurpose.Speech, stage) ?? hint, active.Elapsed, active.Level, showRecordingHint: stage != ModelLoadStage.None); active.CheckHealth();
     }
     private async Task StopAsync(bool retainOnly = false)
     {

@@ -160,19 +160,20 @@ public partial class Overlay : Window
         if (!SetWindowPos(hwnd, (nint)(-1), x, y, 0, 0, 0x0011)) throw new IOException("The recording display could not be shown safely.");
     }
 
-    public void Update(string label, string hint, double seconds = 0, double level = 0)
+    public void Update(string label, string hint, double seconds = 0, double level = 0, bool showRecordingHint = false)
     {
         if (retainedNotice) { retainedNotice = false; SetDisplay(display); }
         var wasListening = listening;
         listening = label == "Listening";
         var elapsed = TimeSpan.FromSeconds(double.IsFinite(seconds) ? Math.Clamp(seconds, 0, Sona.Core.RecordingLimits.MaximumSeconds) : 0).ToString(@"m\:ss");
-        if (label != lastLabel || hint != lastHint)
+        var changed = label != lastLabel || hint != lastHint;
+        if (changed)
         {
             lastLabel = label; lastHint = hint;
             PanelLabel.Text = CapsuleLabel.Text = listening ? "Recording" : label;
             PanelRecordingDot.Visibility = CapsuleRecordingDot.Visibility = listening ? Visibility.Visible : Visibility.Collapsed;
             if (!wasListening || !listening) { indicatorSeconds = 0; PanelRecordingDot.Opacity = CapsuleRecordingDot.Opacity = 1; }
-            var busy = label is "Preparing your draft" or "Transcribing" or "Polishing" or "Preparing";
+            var busy = label is "Preparing your draft" or "Transcribing" or "Polishing" or "Preparing" or "Checking model" or "Loading model";
             PanelBusy.Visibility = CapsuleBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             PanelBusy.IsIndeterminate = CapsuleBusy.IsIndeterminate = busy && SystemParameters.ClientAreaAnimation;
             PanelBusy.Value = CapsuleBusy.Value = 0;
@@ -181,7 +182,7 @@ public partial class Overlay : Window
             CapsuleBusy.SetResourceReference(System.Windows.Controls.ProgressBar.BackgroundProperty, busyBackground);
             PanelWave.Visibility = CapsuleWave.Visibility = busy ? Visibility.Hidden : Visibility.Visible;
             PanelHint.Text = CapsuleHint.Text = hint;
-            CapsuleHint.Visibility = listening || string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
+            CapsuleHint.Visibility = listening && !showRecordingHint || string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
             Shell.ToolTip = string.IsNullOrWhiteSpace(hint) ? label : $"{label}. {hint}";
             PanelStop.Visibility = CapsuleStop.Visibility = listening ? Visibility.Visible : Visibility.Hidden;
         }
@@ -191,7 +192,7 @@ public partial class Overlay : Window
             PanelTime.Text = CapsuleTime.Text = time;
             System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona recording, {elapsed}. {hint}" : $"Sona {label}. {hint}");
         }
-        else if (!listening) System.Windows.Automation.AutomationProperties.SetName(Shell, $"Sona {label}. {hint}");
+        else if (!listening || changed) System.Windows.Automation.AutomationProperties.SetName(Shell, listening ? $"Sona recording, {elapsed}. {hint}" : $"Sona {label}. {hint}");
         if (listening)
         {
             if (!wasListening) ResetWaveform();

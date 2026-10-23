@@ -86,12 +86,12 @@ public partial class MainWindow
         var snippet = preferences.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
         if (!preferences.CleanupEnabled || preferences.Style == "Verbatim" || snippet) return new(fallback, false);
         if (CleanupPolicy.SkipModel(original, preferences)) { CleanupResult.Text = "Auto: this short sentence is already formatted. Basic cleanup was used."; return new(fallback, false); }
-        if (arguments.Contains("--test-ui") && CleanupForTests != null) return new(await CleanupForTests(original, token), true);
+        if (arguments.Contains("--test-ui") && CleanupForTests != null) return new(await WithModelProgressAsync(() => CleanupForTests(original, token), ModelPurpose.Cleanup, token), true);
         if (!cleanupModel.AvailableFor(preferences)) { CleanupResult.Text = "Local cleanup is not ready. Basic cleanup was used."; return new(fallback, false); }
         Status.Text = "Polishing your draft"; StatusDetail.Text = "Cleaning up locally. Esc still cancels."; overlay.Update("Polishing", "Esc cancels");
         try
         {
-            var result = await CleanupProcessor.RunAsync(original, preferences, appName ?? Insertion.AppName(target), (prompt, ct) => cleanupModel.RunAsync(prompt, preferences, ct), token);
+            var result = await CleanupProcessor.RunAsync(original, preferences, appName ?? Insertion.AppName(target), (prompt, ct) => WithModelProgressAsync(() => cleanupModel.RunAsync(prompt, preferences, ct), ModelPurpose.Cleanup, ct), token);
             CleanupResult.Text = result.Outcome switch
             {
                 "polished" => "Text polished locally. Use original restores the transcript.",

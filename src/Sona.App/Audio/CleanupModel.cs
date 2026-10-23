@@ -16,6 +16,7 @@ internal sealed class CleanupModel
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly HttpClient http = new(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
     private readonly TimeProvider clock;
+    private readonly Func<string, CancellationToken, Task<bool>> verifyAssets;
     private BoundedProcess? worker;
     private Uri? endpoint;
     private string? capability;
@@ -27,7 +28,13 @@ internal sealed class CleanupModel
     private int idleMinutes = 10;
     private int cudaOffload, cudaBuffer;
     private double modelVramMiB = double.NaN;
-    public CleanupModel(TimeProvider? clock = null) => this.clock = clock ?? TimeProvider.System;
+    private int loadStage;
+    public ModelLoadStage LoadStage => (ModelLoadStage)Volatile.Read(ref loadStage);
+    public CleanupModel(TimeProvider? clock = null, Func<string, CancellationToken, Task<bool>>? verifyAssets = null)
+    {
+        this.clock = clock ?? TimeProvider.System;
+        this.verifyAssets = verifyAssets ?? CleanupAssets.VerifyAsync;
+    }
     public string? LoadedBackend => Volatile.Read(ref loadedBackend);
     public int? ProcessId => Volatile.Read(ref processId) is var id && id > 0 ? id : null;
     public bool CleanupPending => Volatile.Read(ref cleanupPending);
@@ -109,7 +116,8 @@ internal sealed class CleanupModel
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(45));
         try
         {
-            if (!await CleanupAssets.VerifyAsync(p.CleanupEngine, deadline.Token).ConfigureAwait(false)) throw new IOException("Install and verify the local cleanup model and runtime first.");
+            Volatile.Write(ref loadStage, (int)ModelLoadStage.Verifying);
+            if (!await verifyAssets(p.CleanupEngine, deadline.Token).ConfigureAwait(false)) throw new IOException("Install and verify the local cleanup model and runtime first.");
             var directory = CleanupAssets.RuntimePath(backend);
             var socket = new TcpListener(IPAddress.Loopback, 0); socket.Start(); var port = ((IPEndPoint)socket.LocalEndpoint).Port; socket.Stop();
             endpoint = new Uri($"http://127.0.0.1:{port}/");
@@ -118,6 +126,7 @@ internal sealed class CleanupModel
             foreach (var arg in new[] { "-m", CleanupAssets.ModelPath, "-c", "4096", "-np", "1", "-t", "6", "-tb", "6", "-ngl", backend == "GPU" ? "99" : "0", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--api-key", capability, "--log-verbosity", backend == "GPU" ? "4" : "3" }) info.ArgumentList.Add(arg);
             Volatile.Write(ref cudaOffload, 0); Volatile.Write(ref cudaBuffer, 0);
             Volatile.Write(ref modelVramMiB, double.NaN);
+            Volatile.Write(ref loadStage, (int)ModelLoadStage.Loading);
             worker = new BoundedProcess(info, backend == "GPU" ? 3072 : 1536);
             Volatile.Write(ref processId, worker.Process.Id);
             drainOutput = DrainAsync(worker.Process.StandardOutput, false);
@@ -155,6 +164,7 @@ internal sealed class CleanupModel
             if (ex is System.ComponentModel.Win32Exception or UnauthorizedAccessException or InvalidOperationException) throw new IOException("Cleanup could not start safely. Repair its local runtime.", ex);
             throw;
         }
+        finally { Volatile.Write(ref loadStage, (int)ModelLoadStage.None); }
     }
     private HttpRequestMessage Request(HttpMethod method, string route)
     {

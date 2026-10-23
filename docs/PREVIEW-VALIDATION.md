@@ -1,3 +1,20 @@
+## October 23 model-loading feedback, 0.4.11
+
+The new isolated native fixture passed 36 checks. It covers actual gated speech
+and cleanup verification, worker-free cancellation/failure state reset, cold/warm
+processing labels, full-draft completion, cancelled status suppression, readable
+capsule/panel layout, and recording controls with a secondary loading hint.
+The original regression failed on both absent busy indicators and both absent
+loader-state properties before implementation. Offscreen renders were visually
+inspected. A read-only independent review found no important issues.
+
+Affected recording/responsiveness50, Enter49 and speech-preflight35 checks passed.
+All captures and deliveries were fake and isolated; no live microphone, system
+input, native test popup or Discord session was used. Existing target insertion,
+notice, model health/deadline and updater acceptance limits remain unchanged.
+Exact published-module qualification and installed version/hash/data preservation
+are recorded separately at the live delivery checkpoint.
+
 # Preview validation
 
 ## October 22 capture readiness and retained notice, 0.4.10

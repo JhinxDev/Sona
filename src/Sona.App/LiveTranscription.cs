@@ -10,7 +10,7 @@ public partial class MainWindow
     internal Task StopForTestsAsync() => arguments.Contains("--test-ui") ? StopAsync() : Task.CompletedTask;
     private async Task<string> RecognizeAsync(byte[] wav, CancellationToken token)
     {
-        try { return arguments.Contains("--test-ui") && RecognitionForTests != null ? await RecognitionForTests(wav, token) : await transcriber.RunAsync(wav, preferences, token); }
+        try { return await WithModelProgressAsync(() => arguments.Contains("--test-ui") && RecognitionForTests != null ? RecognitionForTests(wav, token) : transcriber.RunAsync(wav, preferences, token), ModelPurpose.Speech, token); }
         finally { Array.Clear(wav); }
     }
     internal Task LiveOperationForTests => liveOperation;

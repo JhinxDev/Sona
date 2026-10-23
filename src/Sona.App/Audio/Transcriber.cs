@@ -8,6 +8,7 @@ public sealed class Transcriber
 {
     private readonly ResidentModel resident = new();
     public string? LoadedModel => resident.LoadedModel;
+    internal ModelLoadStage LoadStage => resident.LoadStage;
     public bool ResidentCleanupPending => resident.CleanupPending;
     public int? ResidentProcessId => resident.ProcessId;
     public Task ReconcileAsync(Preferences p, CancellationToken cancellation = default) => AvailableFor(p) ? resident.WarmAsync(p, cancellation) : resident.UnloadAsync(cancellation);
