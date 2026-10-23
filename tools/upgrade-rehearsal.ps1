@@ -34,10 +34,11 @@ try{
     if($LASTEXITCODE-ne0){throw 'Isolated app publish failed'}
     & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Sona.Agent\Sona.Agent.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
     if($LASTEXITCODE-ne0){throw 'Isolated agent publish failed'}
+    $taskVersion=[Reflection.AssemblyName]::GetAssemblyName((Join-Path $taskBuilt 'Sona.dll')).Version.ToString(3)
     $taskFiles=@(Get-ChildItem -LiteralPath $taskBuilt -File -Recurse|ForEach-Object{@{Path=[IO.Path]::GetRelativePath($taskBuilt,$_.FullName);SHA256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();Bytes=$_.Length}})
-    foreach($taskFixture in @('a','b')){$taskPackage=Join-Path $OutputRoot ('package-'+$taskFixture);New-Item -ItemType Directory -Path $taskPackage|Out-Null;Copy-Item -Path (Join-Path $taskBuilt '*') -Destination $taskPackage -Recurse;@{Version='0.3.0';SourceHead=($taskFixture*40);Files=$taskFiles;SyntheticReceipt=$true}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $taskPackage 'package.json')}
+    foreach($taskFixture in @('a','b')){$taskPackage=Join-Path $OutputRoot ('package-'+$taskFixture);New-Item -ItemType Directory -Path $taskPackage|Out-Null;Copy-Item -Path (Join-Path $taskBuilt '*') -Destination $taskPackage -Recurse;@{Version=$taskVersion;SourceHead=($taskFixture*40);Files=$taskFiles;SyntheticReceipt=$true}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $taskPackage 'package.json')}
     & (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-a') -RehearsalRoot $OutputRoot|Out-Null
-    $taskOldPath=Join-Path $OutputRoot 'Programs\Sona\0.3.0-aaaaaaaa\Sona.exe'
+    $taskOldPath=Join-Path $OutputRoot ('Programs\Sona\'+$taskVersion+'-aaaaaaaa\Sona.exe')
     $taskDraft="Synthetic café draft`nfoo_bar = 42";$taskOriginal="fixture original`nline two"
     $taskPayload=@{Draft=$taskDraft;Original=$taskOriginal}|ConvertTo-Json -Compress
     $taskOld=PrivateLaunch $taskOldPath $taskPayload;$taskWindow=Root $taskOld
@@ -49,7 +50,7 @@ try{
     Proof $taskRejected 'NextLaunch refuses any simultaneous launch request'
     & (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-b') -RehearsalRoot $OutputRoot -NextLaunch|Out-Null
     $taskStagedTarget=(Get-Item -LiteralPath (Join-Path $OutputRoot 'Programs\Sona\current')).Target
-    Proof ($taskStagedTarget -eq (Join-Path $OutputRoot 'Programs\Sona\0.3.0-bbbbbbbb') -and !$taskOld.HasExited) 'NextLaunch targets verified new bytes while old process stays running'
+    Proof ($taskStagedTarget -eq (Join-Path $OutputRoot ('Programs\Sona\'+$taskVersion+'-bbbbbbbb')) -and !$taskOld.HasExited) 'NextLaunch targets verified new bytes while old process stays running'
     Proof ((ReadField $taskWindow 'Draft')-ceq$taskDraft-and(ReadField $taskWindow 'Original')-ceq$taskOriginal) 'NextLaunch leaves both live synthetic draft fields unchanged'
     $taskRejected=$false;try{& (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-a') -RehearsalRoot $OutputRoot -NextLaunch|Out-Null}catch{$taskRejected=$true}
     Proof $taskRejected 'NextLaunch refuses writes to the currently running version directory'

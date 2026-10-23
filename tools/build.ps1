@@ -47,5 +47,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Isolated Enter delivery regressions failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Completed-paste verification regressions failed' }
 & (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
 if (!$?) { throw 'Updater status regressions failed' }
+& (Join-Path $taskRepo 'tools\owned-startup-checks.ps1')
+if (!$?) { throw 'Owned startup readiness regressions failed' }
 & "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

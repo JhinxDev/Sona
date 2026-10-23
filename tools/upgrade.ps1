@@ -106,6 +106,16 @@ function LaunchPrivate([string]$Path,[string]$Checkpoint,[bool]$Rollback=$false)
     & (Join-Path $PSScriptRoot 'install.ps1') @taskInstallArgs|Out-Null
     $taskNewPath=Join-Path $taskProgramRoot ($taskPackageReceipt.Version+'-'+$taskPackageReceipt.SourceHead.Substring(0,8)+'\Sona.exe')
     $taskNew=LaunchPrivate $taskNewPath $taskRecovery
+    $taskStartupId=$taskNew.Id;$taskStartupTicks=$taskNew.StartTime.ToUniversalTime().Ticks
+    $taskStartupAgent=Join-Path (Split-Path $taskNewPath) 'sona-agent.exe'
+    $taskStartupRead={
+        return @{State=(((& $taskStartupAgent status)-join "`n")|ConvertFrom-Json);Voice=(((& $taskStartupAgent protection status)-join "`n")|ConvertFrom-Json)}
+    }.GetNewClosure()
+    $taskStartupOwned={
+        $candidate=Get-Process -Id $taskStartupId -ErrorAction SilentlyContinue
+        return $candidate -and $candidate.Path-eq$taskNewPath -and $candidate.StartTime.ToUniversalTime().Ticks-eq$taskStartupTicks
+    }.GetNewClosure()
+    $null=Wait-SonaOwnedStartup -ReadReply $taskStartupRead -IsExactProcess $taskStartupOwned -ExpectedVersion $taskPackageReceipt.Version -ExpectedPreferencesLoad $taskTransferState.preferencesLoad
     for($taskTry=0;$taskTry-lt100;$taskTry++){$taskNew.Refresh();if($taskNew.MainWindowHandle-ne0){break};if($taskNew.HasExited){throw 'Candidate exited'};Start-Sleep -Milliseconds 100}
     $taskNewRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskNew.MainWindowHandle)
     $taskNewField=$taskNewRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'Draft'))

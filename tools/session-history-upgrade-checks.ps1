@@ -34,10 +34,10 @@ try{
     foreach($taskLabel in @('a','b')){
         $taskPackage=Join-Path $OutputRoot ('package-'+$taskLabel);New-Item -ItemType Directory -Path $taskPackage|Out-Null
         Copy-Item -Path (Join-Path $PackageDirectory '*') -Destination $taskPackage -Recurse
-        @{Version='0.3.0';SourceHead=($taskLabel*40);Files=$taskReceipt.Files;SyntheticReceipt=$true}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $taskPackage 'package.json')
+        @{Version=$taskReceipt.Version;SourceHead=($taskLabel*40);Files=$taskReceipt.Files;SyntheticReceipt=$true}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $taskPackage 'package.json')
     }
     & (Join-Path $PSScriptRoot 'install.ps1') -PackageDirectory (Join-Path $OutputRoot 'package-a') -RehearsalRoot $OutputRoot|Out-Null
-    $taskOldPath=Join-Path $OutputRoot 'Programs\Sona\0.3.0-aaaaaaaa\Sona.exe'
+    $taskOldPath=Join-Path $OutputRoot ('Programs\Sona\'+$taskReceipt.Version+'-aaaaaaaa\Sona.exe')
     $taskInfo=[Diagnostics.ProcessStartInfo]::new($taskOldPath);$taskInfo.UseShellExecute=$false;$taskInfo.ArgumentList.Add('--test-ui');$taskInfo.ArgumentList.Add('--test-transfer');$taskInfo.Environment['SONA_DATA']=$taskProfile;$taskInfo.Environment['MURMUR_DATA']=$taskProfile
     $taskInfo.Environment['SONA_DRAFT_TRANSFER']=(@{Draft='Synthetic working draft';Original='Synthetic working original'}|ConvertTo-Json -Compress)
     $taskOld=[Diagnostics.Process]::Start($taskInfo)

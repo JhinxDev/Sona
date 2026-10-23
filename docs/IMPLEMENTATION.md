@@ -76,7 +76,7 @@ cases are covered by the maintained offscreen session-upgrade fixture.
 Immediately after its own native Save, the helper uses a separate bounded wait
 for model warming to finish: idle, no pending edit and the expected checkbox must
 all be observed. It still refuses recording, owned voice changes or unavailable
-status. Ordinary preflight and new-session readiness retain strict busy refusal.
+status. Ordinary preflight and independent session checks retain strict busy refusal.
 This distinction is covered by `tools/session-readiness-checks.ps1` with fake
 status replies and no owner process.
 `tools/session-history-upgrade-checks.ps1 -PackageDirectory <qualified-package>
@@ -84,6 +84,26 @@ status replies and no owner process.
 AfterStage`, `HistoryChanged`, `QuitInFlight`, and `-WithoutTransfer` cover the
 failure boundaries. Each run uses its own marked profile and disables microphone
 and Discord. Test UI windows now start offscreen without activation.
+
+The exact candidate just launched by the guarded updater now has a separate
+read-only startup wait. It rechecks PID, executable path and process start time
+before and after each status poll, requires the receipt version and readable
+preferences, and permits temporary busy model warming. A prior Loaded profile must
+remain Loaded; a prior Missing profile may remain Missing or become Loaded after
+its first Save. Unavailable preferences always refuse. Recording, owned voice
+changes, pending edits, explicit History pause or identity drift refuse safely.
+No setting or input changes occur during this wait. It does not relax ordinary
+preflight, native-Save or final transfer checks.
+
+The wait allows at most300polls and uses a30-second soft readiness deadline.
+The deadline is checked around synchronous status polls; each of the two local
+CLI calls has its own16-second cancellation limit, so an in-flight poll can
+extend return beyond30seconds. A late ready reply is rejected. This is not a
+hard30-second completion bound. `tools/owned-startup-checks.ps1` covers22synthetic
+cases, alongside15existing ordinary/native-Save checks. The offscreen18-check
+upgrade rehearsal passed with the actual package version preserved in synthetic
+receipts. This tool-only repair reuses accepted app binaries without another
+production restart.
 
 Candidate activation uses the protected launcher's `-Minimized` mode. Recovery
 of an older binary uses its existing `-Hidden` mode, so rollback does not require

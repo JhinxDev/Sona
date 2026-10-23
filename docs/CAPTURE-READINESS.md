@@ -75,3 +75,11 @@ the protected checkpoints after idle, and only this update's proven-owned tempor
 files were removed without another restart. OLED, enabled Auto cleanup, Enter and
 clipboard recovery were retained; History storage and incoming silencing remain Off.
 This installation proof does not qualify physical keyboard or real-composer input.
+
+The updater-only follow-up now waits for its own exact replacement process to
+finish model warming before final verification. Normal busy/recording/voice and
+pending-edit safeguards remain. It passed22fake startup cases,15ordinary/native-Save
+cases and the18-check offscreen upgrade rehearsal without touching the running
+owner app. Its30-second readiness deadline is soft around bounded synchronous
+status polls, not a hard return-time guarantee. The accepted0.4.10app binaries and
+live process were reused unchanged. [Updater contract](IMPLEMENTATION.md#live-upgrade-delivery-rule).

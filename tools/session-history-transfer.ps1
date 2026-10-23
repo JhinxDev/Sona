@@ -41,6 +41,31 @@ function Get-SonaTransferStatus([int]$ProcessId,[switch]$WaitForAvailability){
     }.GetNewClosure()
     return Read-SonaReadyStatus -ReadReply $read -WaitForAvailability:$WaitForAvailability
 }
+# Only the candidate just launched by this upgrade may wait through model warming.
+# Preflight and ordinary session checks retain their immediate busy refusal.
+# This is a soft readiness deadline around synchronous status polls. Each CLI
+# call has its own 16s cancellation timeout; an in-flight poll can extend return.
+function Wait-SonaOwnedStartup([scriptblock]$ReadReply,[scriptblock]$IsExactProcess,[Parameter(Mandatory)][string]$ExpectedVersion,[ValidateSet('Loaded','Missing')][string]$ExpectedPreferencesLoad='Loaded',[ValidateRange(1,300)][int]$MaxAttempts=300,[ValidateRange(1,30000)][int]$TimeoutMilliseconds=30000){
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    for($attempt=0;$attempt-lt$MaxAttempts;$attempt++){
+        if(!(& $IsExactProcess)){throw 'Owned startup process identity changed; preserve recovery.'}
+        if($clock.ElapsedMilliseconds-ge$TimeoutMilliseconds){break}
+        $reply=& $ReadReply
+        if(!(& $IsExactProcess)){throw 'Owned startup process identity changed; preserve recovery.'}
+        if(($reply.State.ok -and $reply.State.data.state-notin@('idle','busy')) -or ($reply.Voice.ok -and $reply.Voice.data.ownsChanges)){throw 'Sona is recording or owns voice changes; preserve recovery.'}
+        if($reply.State.ok){
+            if($reply.State.data.version-ne$ExpectedVersion){throw 'Owned startup version changed; preserve recovery.'}
+            # The app reports its initial load result for the entire session. A
+            # formerly Missing profile can have been saved before this restart.
+            $validLoad=$reply.State.data.preferencesLoad-eq$ExpectedPreferencesLoad -or ($ExpectedPreferencesLoad-eq'Missing' -and $reply.State.data.preferencesLoad-eq'Loaded')
+            if($reply.State.data.unsavedSettings -or $reply.State.data.historyPaused -or !$validLoad){throw 'Owner preferences changed during startup; preserve recovery.'}
+        }
+        if($clock.ElapsedMilliseconds-ge$TimeoutMilliseconds){break}
+        if($reply.State.ok -and $reply.Voice.ok -and $reply.State.data.state-eq'idle'){return $reply.State.data}
+        if($attempt-lt$MaxAttempts-1){Start-Sleep -Milliseconds ([Math]::Min(100,[Math]::Max(0,$TimeoutMilliseconds-$clock.ElapsedMilliseconds)))}
+    }
+    throw 'Owned startup did not become idle within its bound; preserve recovery.'
+}
 function Get-SonaTransferCount($Window){
     (Get-SonaTransferField $Window 'HistoryTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
     $text=(Get-SonaTransferField $Window 'HistoryCountPreview').Current.Name
@@ -48,7 +73,7 @@ function Get-SonaTransferCount($Window){
     return @{Recent=[int]$Matches[1];Saved=[int]$Matches[2]}
 }
 # Only the bounded wait following our own native Save may observe temporary busy.
-# Normal preflight/startup readiness continues to reject every known busy state.
+# Normal preflight and ordinary session checks still reject every known busy state.
 function Wait-SonaTransferNativeSave([scriptblock]$ReadReply,[scriptblock]$IsExpectedToggle,[ValidateRange(1,300)][int]$MaxAttempts=300){
     for($attempt=0;$attempt -lt $MaxAttempts;$attempt++){
         $reply=& $ReadReply
