@@ -32,11 +32,36 @@ stalls past its bounded wait while preserving the audio captured before the stal
 
 No real microphone, owner profile, clipboard, target application, Discord session
 or global input was used. The 0.5.0 README captures are offscreen WPF renders from
-the professional polish fixture. Exact installed package identity, live version,
-build ID, hash receipt and preservation readback are recorded in the project
-evidence packet after the guarded activation. Physical key, microphone,
-target-composer, real-call and screen-reader acceptance remain owner checks and
-are not claimed here.
+the professional polish fixture.
+
+### Live activation, November 6
+
+The guarded `tools/upgrade.ps1` path installed the exact package
+`artifacts/0.5.0-c400431d` (source head
+`c400431deb1e56b628bf910d1c5c065be536ad7f`, 36 package files, version 0.5.0) and
+launched it through the Explorer-owned desktop bootstrap. Verified live readback
+at 02:28 Toronto:
+
+- Running `C:\Users\qazws\AppData\Local\Programs\Sona\0.5.0-c400431d\Sona.exe`,
+  PID `13932`, file version 0.5.0.0, product version
+  `0.5.0+c400431deb1e56b628bf910d1c5c065be536ad7f`.
+- The current-user agent reports version **0.5.0** and build `e15a6117a366`, so
+  the app and agent now agree (the 0.4.11 agent still reported 0.4.2).
+- All 36 installed files match the package receipt hashes; `installation.json`,
+  the `current` junction, the Start Menu target and the owned Windows Run entry
+  all point at the new version directory.
+- The encrypted draft checkpoint restored the owner's draft
+  (`DraftPreserved: true`), 13 session-only History records were transferred and
+  loaded, and `preferences.json` is byte-identical to its pre-upgrade SHA-256
+  `1fe927f54ae90fbd54e42f65407bb575031cf7d2020cecd689b6482c1b9c27bf`.
+  OLED theme, Hold shortcut, Auto cleanup, Enter-to-send and clipboard recovery
+  remain; history storage and incoming silencing remain off.
+- Discord protection is enabled, connected, unpaused and owns no voice changes
+  before and after activation. No microphone or global input was used by the
+  upgrade, and the app is idle.
+
+Physical key, microphone, target-composer, real-call and screen-reader acceptance
+remain owner checks and are not claimed here.
 
 ## 0.4.0 Parakeet and English-first model choice, October 13
 
