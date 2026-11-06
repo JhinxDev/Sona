@@ -35,6 +35,8 @@ public partial class MainWindow
         next.CopyOnInsertionFailure = CopyOnInsertionFailure.IsChecked == true;
         next.CheckForUpdates = CheckUpdates.IsChecked == true; next.CloseToTray = CloseToTray.IsChecked == true;
         next.Startup = StartWithWindows.IsChecked == true; next.KeepHistory = KeepHistory.IsChecked == true;
+        // Per-app rules are edited on the Modes page and committed by Save preferences.
+        next.AppModes = pendingAppModes.Select(mode => new AppMode(mode.App, mode.Style, mode.Tone)).ToList();
         next.ShortcutMode = ShortcutMode.SelectedIndex == 1 ? "Toggle" : "Hold";
         next.Theme = ThemeChoice.SelectedItem is ThemeDefinition theme ? theme.Id : "charcoal";
         next.RecordingDisplay = PanelDisplay.IsChecked == true ? "Panel" : "Capsule";

@@ -57,7 +57,7 @@ public partial class MainWindow
                 if (wav == null) continue;
                 try
                 {
-                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token, polling);
                     deadline.CancelAfter(TimeSpan.FromSeconds(12));
                     var raw = await RecognizeAsync(wav, deadline.Token);
                     token.ThrowIfCancellationRequested();

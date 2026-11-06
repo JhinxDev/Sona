@@ -69,6 +69,42 @@ observation does not establish physical Ctrl+Windows or live-microphone acceptan
 Builds, simulated boundaries, file replays and personal target-app acceptance
 remain separate. [Verification receipts and commands](PREVIEW-VALIDATION.md).
 
+## November 6, 0.5.0 reliability repairs
+
+An independent read-only source review of 0.4.11 found no critical defect but four
+high-severity reliability paths. Each is repaired with a maintained regression:
+
+- **Esc cancellation hook.** The low-level hook previously ran on the WPF UI
+  thread. Windows drops low-level hooks that exceed its hook timeout, and armed
+  recording preparation can block that thread for seconds. The hook now owns a
+  dedicated message-loop thread, and disarm clears the armed flag before unhooking
+  so an orphaned hook can never suppress Esc.
+- **Stop-path failures.** A stalled microphone stop threw before the captured PCM
+  reached recognition, a faulted optional live preview discarded recorded audio,
+  and an unexpected stop fault could leave the session in Transcribing with no
+  recorder and no way to start again. The bounded stop now reuses the audio
+  captured before the stall and explains the incomplete stop, preview faults never
+  discard audio, and an unexpected fault resets the session with an explicit
+  message.
+- **Quit finalizers.** A faulted agent or Discord cleanup await could leave the
+  window disabled with the shutdown flag set. Each finalizer is now guarded, a
+  failure surfaces retry guidance, and an unexpected quit fault keeps the app
+  usable with the draft and settings intact.
+- **Startup registration.** A source or debug build running with Launch at
+  startup enabled could repoint the user's Windows Run entry at a temporary
+  executable that the installed app could not repair. Run registration is now
+  limited to installed builds; a source build reports the limitation instead.
+- **Durable local state.** Preferences, history, saved drafts and encrypted
+  Discord setup are written through a shared atomic helper that flushes the
+  candidate to disk before replacement. The existing pre-commit revalidation of a
+  damaged history file is retained.
+
+Two lower-severity items remain deliberate carries: the whisper speech engine and
+its DLLs are existence-checked rather than hash-verified (Parakeet and cleanup
+runtimes are hash-verified), and the installer's per-file copy into a version
+directory has no separate staging rename. Both are recorded in the project
+current state rather than claimed fixed.
+
 ## October 20, responsiveness and delivery follow-up
 
 The owner requested earlier popup feedback, quicker results where safely possible,

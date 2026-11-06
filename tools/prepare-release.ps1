@@ -6,7 +6,7 @@ $env:DOTNET_CLI_HOME=Join-Path $taskRuntime 'dotnet-home'; $env:NUGET_PACKAGES=J
 $taskHead = git -C $taskRepo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Commit the reviewed source before preparing its install package.' }
 if (git -C $taskRepo status --porcelain) { throw 'The source must be clean for a source-identified release package.' }
-$taskVersion = ([xml](Get-Content -LiteralPath (Join-Path $taskRepo 'src\Sona.App\Sona.App.csproj'))).Project.PropertyGroup.Version
+$taskVersion = ([xml](Get-Content -LiteralPath (Join-Path $taskRepo 'Directory.Build.props'))).Project.PropertyGroup.Version
 if ($taskVersion -notmatch '^0\.[0-9]+\.[0-9]+$') { throw 'Unrecognized private candidate version.' }
 $taskPackage = Join-Path $taskRepo ('artifacts\' + $taskVersion + '-' + $taskHead.Substring(0,8))
 if (Test-Path -LiteralPath $taskPackage) { throw 'This candidate package already exists; inspect its receipt instead of overwriting it.' }

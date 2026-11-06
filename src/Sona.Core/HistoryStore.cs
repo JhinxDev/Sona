@@ -31,17 +31,13 @@ public static class HistoryStore
     public static void Save(string path, IEnumerable<HistoryItem> entries)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
+        // Revalidate at the write boundary. A file damaged or made unavailable
+        // since startup must not be replaced by an older in-memory snapshot.
+        AtomicFile.WriteAllText(path, JsonSerializer.Serialize(Bounded(entries)), () =>
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(Bounded(entries)));
-            // Revalidate at the write boundary. A file damaged or made unavailable
-            // since startup must not be replaced by an older in-memory snapshot.
             try { _ = Load(path); }
             catch (Exception ex) when (ex is JsonException or System.Security.SecurityException)
             { throw new IOException("Saved drafts could not be verified. The existing file was preserved.", ex); }
-            File.Move(temporary, path, true);
-        }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        });
     }
 }

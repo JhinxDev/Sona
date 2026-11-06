@@ -21,16 +21,30 @@ public static class Startup
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException) { return false; }
     }
+    private static string InstalledRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Sona") + Path.DirectorySeparatorChar;
+    // Startup registration belongs to an installed build only. A source/debug build
+    // must never repoint the user's Run entry at a temporary executable.
+    private static string? InstalledExecutable()
+    {
+        var path = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        var full = Path.GetFullPath(path);
+        return full.StartsWith(InstalledRoot, StringComparison.OrdinalIgnoreCase) ? full : null;
+    }
     public static void MigrateLegacy(bool enabled)
     {
         using var read = Registry.CurrentUser.OpenSubKey(RunPath);
-        var desired = "\"" + Environment.ProcessPath + "\" --start-hidden";
-        if (read?.GetValue("Murmur") is string legacy && Owned(legacy, "Murmur") || read?.GetValue("Sona") is string sona && sona != desired && Owned(sona, "Sona")) Set(enabled);
+        var desired = InstalledExecutable() is { } executable ? "\"" + executable + "\" --start-hidden" : null;
+        var legacyOwned = read?.GetValue("Murmur") is string legacy && Owned(legacy, "Murmur");
+        var sonaOwned = read?.GetValue("Sona") is string sona && Owned(sona, "Sona") && (desired == null || sona != desired);
+        if (desired != null && (legacyOwned || sonaOwned)) Set(enabled);
     }
     public static void Set(bool enabled)
     {
+        var executable = InstalledExecutable()
+            ?? throw new IOException("Launch at startup is available from the installed Sona build, not a source build. Install Sona, then enable this there.");
         using var run = Registry.CurrentUser.OpenSubKey(RunPath, true) ?? throw new IOException("Windows startup preferences were unavailable.");
-        var desired = "\"" + Environment.ProcessPath + "\" --start-hidden";
+        var desired = "\"" + executable + "\" --start-hidden";
         if (run.GetValue("Sona") is string existing && existing != desired && !Owned(existing, "Sona")) throw new IOException("An unrelated Sona startup entry was preserved.");
         if (enabled) run.SetValue("Sona", desired); else run.DeleteValue("Sona", false);
         if (run.GetValue("Murmur") is string legacy && Owned(legacy, "Murmur")) run.DeleteValue("Murmur", false);

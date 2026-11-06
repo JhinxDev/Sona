@@ -1,3 +1,32 @@
+## November 6 professional polish, 0.5.0
+
+Home adds two mutually exclusive onboarding surfaces inside the existing scroll
+content. A new profile sees the **Welcome to Sona** card first: the existing
+`SettingGroup` material, an 18 DIP inset, semibold title, two description lines,
+a real local-model status line with a polite live region, a wrapping action row
+(primary model action, Settings, recording-display practice, quiet Dismiss) and a
+closing privacy line. A profile whose selected model is unusable instead sees the
+compact **Local speech model needed** callout with one primary model action. The
+welcome card never appears for an existing profile. Record is disabled until a
+usable model is present, with a matching tooltip.
+
+The Latest draft heading becomes a two-column row: unchanged title and editable
+state on the left, a muted live word count on the right. The count uses the shared
+1-word/plural label and updates with real text edits and rendered drafts.
+
+Modes gains a **Per-app modes** group below the default mode: the same grouped
+material, a short matching explanation, a four-column add row (app name, draft
+style, cleanup tone, primary Add rule), an accent live-region result line, a
+separator-ruled rule list with quiet remove buttons, an explicit empty state and
+a save reminder. Adding or removing a rule only changes the unsaved candidate;
+the existing preferences footer owns the commit. The default mode, palette,
+typography, spacing and all recording-display geometry are unchanged.
+
+The setup guidance for a missing runtime now names the user step ("see Build and
+run in the README") instead of only a script name. No new colors, fonts or
+decorative effects were introduced; all surfaces use existing semantic brushes and
+respect the theme and high-contrast fallbacks.
+
 ## October 23 model-loading feedback, 0.4.11
 
 The existing translucent capsule and panel distinguish actual integrity verification

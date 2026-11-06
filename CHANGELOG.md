@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.5.0 - per-app modes and first-run guidance
+
+- Add ordered **per-app modes**. A captured app identity can select its own draft
+  style and local cleanup tone. Matching uses process, friendly and executable
+  identities only; unmatched apps use the default mode. Managed on Modes and
+  saved with preferences. See docs/MODES.md.
+- Add a first-run welcome card and a separate **local speech model needed**
+  callout. The card links to model, settings and recording-display setup, reports
+  the actual model state, and remembers dismissal. Record is disabled until a
+  usable model exists.
+- Add a live draft word count on Home.
+- Move Esc cancellation onto its own listener thread so a busy WPF dispatcher
+  cannot delay the low-level hook past the Windows hook timeout. Disarm clears
+  the armed flag before unhooking, so an orphaned hook never suppresses Esc.
+- A microphone that stalls while stopping now keeps the audio captured before
+  the stall instead of throwing it away, and the result explains the incomplete
+  stop. A failed optional live preview no longer discards recorded audio, and an
+  unexpected stop-path fault resets the session instead of stranding it.
+- Harden Quit: agent and Discord cleanup faults surface retry guidance instead of
+  leaving the window disabled, and an unexpected quit fault keeps the app usable.
+- Windows startup registration can only be written from an installed build, so a
+  source build can no longer repoint the user's Run entry.
+- Flush preferences, history and encrypted Discord setup to disk before atomic
+  replacement (docs/VERIFICATION.md).
+- Centralize the product version so the app, agent and MCP server report the same
+  version.
+
+## 0.4.11 - model loading feedback
+
+- The recording pill distinguishes **Checking model**, **Loading model** and
+  recognition or cleanup. Warm runs skip preparation feedback; live preview keeps
+  the timer and Stop visible while explaining a model-loading wait.
+
+## 0.4.10 - capture readiness and retained notices
+
+- Guarded start retry when Windows reports a container before the editable field
+  is ready. Compact centered draft notices distinguish copied, unconfirmed and
+  confirmed pastes.
+
+## 0.4.9 - Enter completion
+
+- Enter reliably finishes an admitted recording even if the field identity
+  changes, while destination, epoch and readback guards remain mandatory.
+  Full-paste verification accepts overlapping complete insertions and withholds
+  a misleading second-paste suggestion.
+
+## 0.4.8 - responsiveness and delivery
+
+- Earlier preparation feedback, narrower capsule with quick cleanup cycling,
+  five-minute recording bound that retains a draft, queued Enter during
+  processing, optional clipboard recovery and live-preview reuse only for
+  unchanged audio.
 ## 0.4.7
 
 - Discord mute and incoming-audio switches apply/save immediately and show their saved policy beside the controls. Advanced edits retain their separate Save action.

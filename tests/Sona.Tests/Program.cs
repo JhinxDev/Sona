@@ -270,7 +270,16 @@ using (var lateCancel = new CancellationTokenSource())
     try { await CleanupProcessor.RunAsync("keep Sona", cleanupPrefs, "Codex", (prompt, ct) => { lateCancel.Cancel(); return Task.FromResult("Keep [TERM_0]."); }, lateCancel.Token); } catch (OperationCanceledException) { rejected = true; }
     Check(rejected, "Cancellation after inference cannot return a late polished result");
 }
+var sessionRule = AppModes.Resolve([new AppMode("codex", "Clean", "casual")], ["Codex", "Codex.exe"]);
+Check(sessionRule is { Style: "Clean", Tone: "casual" }, "Captured app identity resolves its per-app mode for one session");
+var sessionDelivery = new Preferences { CleanupEnabled = true, Terms = ["Sona"], Style = sessionRule!.Style, CleanupTone = sessionRule.Tone };
+var sessionPrompts = new List<string>();
+var sessionClean = await CleanupProcessor.RunAsync("um keep Sona", sessionDelivery, "Codex", (prompt, ct) => { sessionPrompts.Add(prompt); return Task.FromResult("Keep [TERM_0]."); }, CancellationToken.None);
+Check(sessionClean.Applied && sessionPrompts.Single().Contains("tone: casual", StringComparison.Ordinal), "Per-app mode cleanup tone reaches the local model prompt only for the matched session");
+var verbatimMode = await CleanupProcessor.RunAsync("um keep Sona", new Preferences { CleanupEnabled = true, Style = "Verbatim", CleanupTone = "casual" }, "Codex", (prompt, ct) => throw new Exception("Verbatim mode called model"), CancellationToken.None);
+Check(!verbatimMode.Applied && verbatimMode.Text == "um keep Sona", "Per-app Verbatim mode keeps original words without the cleanup model");
 PersonalizationChecks.Run(Check);
+ProfessionalChecks.Run(Check);
 ReleaseVersionChecks.Run(Check);
 Console.WriteLine($"{count} checks passed.");
 

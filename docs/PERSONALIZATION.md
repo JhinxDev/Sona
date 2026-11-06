@@ -44,6 +44,12 @@ Readback that is missing, partial or ambiguous withholds Enter. The user then
 reviews the composer and sends normally. There is no automatic retry. Windows
 accepting input is not proof that the receiving app delivered a message.
 
+## Per-app modes
+
+0.5.0 adds ordered [per-app modes](MODES.md): a captured app identity can select
+its own draft style and local cleanup tone for that dictation only. Matching uses
+process and executable identities, never window titles or field text.
+
 ## History by local day
 
 History groups recent dictations by their local calendar day, with explicitly

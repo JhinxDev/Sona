@@ -1,5 +1,43 @@
 # Candidate verification
 
+## 0.5.0 professional polish and reliability, November 6
+
+The consolidated local gate in `tools/build.ps1` passed end to end on the release
+candidate:
+
+- Release builds of Sona.App and Sona.Agent: zero warnings, zero errors.
+- Sona.Tests: **414 checks passed**.
+- Sona.WindowsTests default suite: **53 checks passed**, including the new
+  Esc-guard listener-thread lifecycle and stalled-stop audio-retention checks.
+- Isolation fixtures: capture policy and capture status (empty failure lists),
+  capture readiness 59, retained notice 92, both History retention modes,
+  protection switches 19, responsiveness 44, Enter delivery 49, completed paste
+  25, session readiness 18, owned startup 22, all with empty failure lists.
+- New professional polish fixture: **17 checks passed** on the actual MainWindow
+  from a fresh isolated profile (welcome card and copy against real model state,
+  navigation, live word count, dismissal persistence, per-app rule add/save,
+  unsaved bar, captured-identity session resolution and reset).
+- New setup guidance fixture: **4 checks passed** with a loaded profile and an
+  empty `SONA_RUNTIME` (no welcome card, visible setup callout with the exact
+  runtime explanation, working Dictation Models action).
+- NuGet dependency audit: no known vulnerable packages for the current App
+  dependency set.
+
+New affected coverage: Core checks cover per-app identity resolution, first-match
+ordering, executable and package identities, invalid rule normalization,
+persistence, onboarding state, word count, atomic replacement and rejected atomic
+replacement. The Windows suite covers the Esc hook owning its own armed listener
+thread, disarm without a suppressing hook, disposal, and a microphone stop that
+stalls past its bounded wait while preserving the audio captured before the stall.
+
+No real microphone, owner profile, clipboard, target application, Discord session
+or global input was used. The 0.5.0 README captures are offscreen WPF renders from
+the professional polish fixture. Exact installed package identity, live version,
+build ID, hash receipt and preservation readback are recorded in the project
+evidence packet after the guarded activation. Physical key, microphone,
+target-composer, real-call and screen-reader acceptance remain owner checks and
+are not claimed here.
+
 ## 0.4.0 Parakeet and English-first model choice, October 13
 
 Core regression gate: 277 checks. The maintained real Windows speech fixture

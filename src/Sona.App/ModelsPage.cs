@@ -96,6 +96,7 @@ public partial class MainWindow
             AutomationProperties.SetAutomationId(shell, "ModelRow-" + model.Id);
             AutomationProperties.SetName(shell, model.Name + ", " + (active ? "active for next use, " : "") + (loaded ? "loaded in memory, " : "not loaded in memory, ") + (installed ? "installed" : "not installed")); ModelCards.Children.Add(shell);
         }
+        RefreshOnboarding();
     }
 
     private static string ModelState(LocalModel model, bool installed, bool active, bool loaded, bool downloading) => downloading

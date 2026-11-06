@@ -142,6 +142,8 @@ instance without a microphone, global input or actual Discord connection.
 uses `SONA_DATA`; normal clients must omit that test-only override.
 
 The settings interface also accepts `liveTranscription` (boolean, default false).
+
+Per-app modes (`AppModes`) and first-run welcome dismissal (`OnboardingDismissed`) are native UI settings in 0.5.0 and are intentionally absent from this bounded patch surface. They remain in preferences.json and survive CLI-driven saves.
 Status includes the running module `buildId` and `preferencesLoad` result. These
 contain no transcript or filesystem path. Live text remains local to the UI.
 

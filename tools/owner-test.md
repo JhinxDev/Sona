@@ -1,5 +1,28 @@
 # Owner-started Sona test
 
+## Short 0.5.0 onboarding and per-app modes check
+
+Read the version/build in Settings → About first. This is the owner's own
+gesture-based acceptance, not an unattended test.
+
+1. **Welcome card.** Use a spare profile only if you want to see it again
+   (`SONA_DATA` set to a new directory, `--test-ui` keeps the microphone closed).
+   A real new profile shows Welcome to Sona with the actual local-model line,
+   working model and settings actions and a Dismiss button that stays dismissed
+   after a normal restart. An existing profile must never show the card.
+2. **Modes.** Open Modes, add a rule for an app you use (for example `Codex` with
+   Verbatim and Casual), Save preferences, then dictate a short sentence there.
+   The finished status should say the style and tone were applied for that app.
+   Dictate into an unmatched app and confirm the default mode is used. Remove the
+   rule and save when finished.
+3. **Esc during preparation.** Start a hands-free recording and press Esc while
+   the pill still says Preparing. Recording must not start. Repeat a few times,
+   including while the app window is busy. This exercises the dedicated Esc
+   hook path; physical timing is the point of the check.
+4. **Stalled stop is not expected in normal use.** Only report this if a
+   dictation ends with the "microphone did not confirm its stop" note: keep the
+   produced draft and the exact device/driver name.
+
 ## Short 0.4.4 Homepage check
 
 Read the version/build in Settings → About first. This candidate explains the

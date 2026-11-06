@@ -1,5 +1,22 @@
 # README image provenance
 
+## 0.5.0 welcome and per-app modes captures
+
+`sona-welcome-050.png` and `sona-modes-050.png` were captured November 6, 2026
+from the 0.5.0 source candidate. Both are 1.25x offscreen WPF client renders at
+1000 x 700 DIP from the maintained `--professional-polish-fixture`: an isolated
+fresh `SONA_DATA` profile, no live microphone, no clipboard, no target app and no
+global input. The fixture selects Amethyst through the real appearance control.
+The welcome card is the actual first-run path for a new profile; the modes image
+shows one synthetic per-app rule added through the real Modes controls. Exact
+candidate head and package identity are recorded in [verification](../VERIFICATION.md).
+
+- `sona-welcome-050.png` SHA-256: `1ebe64b3e3a4de12bb78df4aa08ea9a134c8fe6145cbca2ead9c98970db1ed33`
+- `sona-modes-050.png` SHA-256: `0277bcaa53cd402032fa3c953a6d9b8df1c52c4b0bea6bbe05e64737d45f3552`
+
+The earlier 0.4.2 captures below remain historical evidence for unchanged
+interface areas.
+
 The original `sona-home-042.png`, `sona-models-042.png`,
 `sona-settings-042.png` and `sona-capsule-042.png` images were captured October 15, 2026 from Sona 0.4.2,
 build `aa8b429e480b`, source `05f838c87641507d7eb7f81e755559de7bd3627f`.

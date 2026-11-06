@@ -45,6 +45,12 @@ $taskEnterEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-enter-delivery-
 if ($LASTEXITCODE -ne 0) { throw 'Isolated Enter delivery regressions failed' }
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --completed-paste-fixture
 if ($LASTEXITCODE -ne 0) { throw 'Completed-paste verification regressions failed' }
+$taskPolishEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-professional-polish-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --professional-polish-fixture $taskPolishEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Professional polish fixture failed' }
+$taskSetupEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-professional-setup-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --professional-polish-setup-fixture $taskSetupEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Setup guidance fixture failed' }
 & (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
 if (!$?) { throw 'Updater status regressions failed' }
 & (Join-Path $taskRepo 'tools\owned-startup-checks.ps1')

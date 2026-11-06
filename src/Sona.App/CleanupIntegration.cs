@@ -79,19 +79,22 @@ public partial class MainWindow
         catch (Exception ex) when (ex is IOException or TimeoutException or System.ComponentModel.Win32Exception) { CleanupResult.Text = "Cleanup model could not load. Choose CPU / RAM or check the installed GPU backend."; }
         finally { preferencesApplying = false; if (!shutdownPending) RefreshCleanupStatus(); }
     }
-    private async Task<PolishedText> PolishAsync(string original, CancellationToken token, string? appName = null)
+    private async Task<PolishedText> PolishAsync(string original, CancellationToken token, string? appName = null, Preferences? settings = null)
     {
         token.ThrowIfCancellationRequested();
-        var fallback = TextPipeline.Apply(original, preferences);
-        var snippet = preferences.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
-        if (!preferences.CleanupEnabled || preferences.Style == "Verbatim" || snippet) return new(fallback, false);
-        if (CleanupPolicy.SkipModel(original, preferences)) { CleanupResult.Text = "Auto: this short sentence is already formatted. Basic cleanup was used."; return new(fallback, false); }
+        // A per-app mode supplies a session-scoped copy; ordinary dictation uses the
+        // committed preferences exactly as before.
+        var active = settings ?? preferences;
+        var fallback = TextPipeline.Apply(original, active);
+        var snippet = active.Snippets.Any(s => s.Trigger.Trim().Equals(original.Trim().TrimEnd('.', '!', '?'), StringComparison.OrdinalIgnoreCase));
+        if (!active.CleanupEnabled || active.Style == "Verbatim" || snippet) return new(fallback, false);
+        if (CleanupPolicy.SkipModel(original, active)) { CleanupResult.Text = "Auto: this short sentence is already formatted. Basic cleanup was used."; return new(fallback, false); }
         if (arguments.Contains("--test-ui") && CleanupForTests != null) return new(await WithModelProgressAsync(() => CleanupForTests(original, token), ModelPurpose.Cleanup, token), true);
-        if (!cleanupModel.AvailableFor(preferences)) { CleanupResult.Text = "Local cleanup is not ready. Basic cleanup was used."; return new(fallback, false); }
+        if (!cleanupModel.AvailableFor(active)) { CleanupResult.Text = "Local cleanup is not ready. Basic cleanup was used."; return new(fallback, false); }
         Status.Text = "Polishing your draft"; StatusDetail.Text = "Cleaning up locally. Esc still cancels."; overlay.Update("Polishing", "Esc cancels");
         try
         {
-            var result = await CleanupProcessor.RunAsync(original, preferences, appName ?? Insertion.AppName(target), (prompt, ct) => WithModelProgressAsync(() => cleanupModel.RunAsync(prompt, preferences, ct), ModelPurpose.Cleanup, ct), token);
+            var result = await CleanupProcessor.RunAsync(original, active, appName ?? Insertion.AppName(target), (prompt, ct) => WithModelProgressAsync(() => cleanupModel.RunAsync(prompt, preferences, ct), ModelPurpose.Cleanup, ct), token);
             CleanupResult.Text = result.Outcome switch
             {
                 "polished" => "Text polished locally. Use original restores the transcript.",

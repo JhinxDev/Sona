@@ -63,6 +63,8 @@ if (args.Length == 1 && args[0] == "--speech-preflight-checks")
 }
 if (args.Length == 4 && args[0] == "--desktop-launch-parent") { DesktopLaunchParent.Run(args[1], args[2], args[3]); return; }
 if (args.Length == 2 && args[0] == "--layout-polish-fixture") { Console.WriteLine(JsonSerializer.Serialize(LayoutPolishFixture.Run(args[1]))); return; }
+if (args.Length == 2 && args[0] == "--professional-polish-fixture") { Console.WriteLine(JsonSerializer.Serialize(ProfessionalPolishFixture.RunFresh(args[1]))); return; }
+if (args.Length == 2 && args[0] == "--professional-polish-setup-fixture") { Console.WriteLine(JsonSerializer.Serialize(ProfessionalPolishFixture.RunSetup(args[1]))); return; }
 if (args.Length == 2 && args[0] == "--closed-discord-start-fixture") { Console.WriteLine(JsonSerializer.Serialize(DiscordClosedStartFixture.Run(args[1]))); return; }
 if (args.Length == 1 && args[0] == "--discord-closed-checks") { Console.WriteLine($"{await DiscordClosedChecks.RunAsync()} closed Discord checks passed."); return; }
 if (args.Length == 3 && args[0] == "--recording-audio-fixture") { BoundedProcess.ContainApplication(); Console.WriteLine(JsonSerializer.Serialize(RecordingAudioFixture.Run(args[1], args[2]))); return; }
@@ -260,6 +262,26 @@ if (!shortcutTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Sho
 if (shortcutFailure != null) throw new Exception("Native shortcut listener test failed", shortcutFailure);
 Check(shortcutStarted, "Dedicated native keyboard hook and message timer initialize without a microphone");
 Check(shortcutStopped && shortcutCallbacks == 0, "Shortcut reset and disposal stop the listener without starting capture or sending input");
+Exception? escapeFailure = null; var escapeOwnThread = false; var escapeArmed = false; var escapeDisarmed = false; var escapeDisposed = false;
+var escapeTest = new Thread(() =>
+{
+    try
+    {
+        using var guard = new EscapeGuard(() => { });
+        var listener = guard.ListenerThreadId;
+        escapeOwnThread = listener != 0 && listener != Environment.CurrentManagedThreadId && guard.ListenerAlive;
+        guard.Arm(true); escapeArmed = guard.Hooked && guard.Armed;
+        guard.Arm(false); escapeDisarmed = !guard.Hooked && !guard.Armed;
+        guard.Dispose(); escapeDisposed = !guard.ListenerAlive;
+    }
+    catch (Exception ex) { escapeFailure = ex; }
+}) { IsBackground = true };
+escapeTest.SetApartmentState(ApartmentState.STA); escapeTest.Start();
+if (!escapeTest.Join(TimeSpan.FromSeconds(6))) throw new TimeoutException("Escape guard lifecycle test exceeded six seconds");
+if (escapeFailure != null) throw new Exception("Escape guard lifecycle test failed", escapeFailure);
+Check(escapeOwnThread && escapeArmed, "Esc cancellation hook runs armed on its own listener thread");
+Check(escapeDisarmed, "Esc cancellation disarms without leaving a suppressing hook");
+Check(escapeDisposed, "Esc cancellation guard disposes its listener cleanly");
 Exception? preparationFailure = null; bool replacementBlocked = false, cancelledBeforeCapture = false, handsFreeTestSafe = false, themeMaterialSafe = false, themeStartupIntercepted = false;
 var themeMaterialFailureDetails = new List<string>();
 var preparationRoot = Path.Combine(Path.GetTempPath(), "sona-preparation-test-" + Guid.NewGuid().ToString("N"));
@@ -324,6 +346,16 @@ using (var recorder = new Recorder(_ => capture))
     var reports = 0; recorder.UnexpectedStop += _ => reports++; recorder.Start(-1); capture.Emit(new byte[32000]);
     try { await recorder.StopAsync(); throw new Exception("Silence was accepted"); } catch (IOException ex) when (ex.Message.Contains("silent", StringComparison.Ordinal)) { }
     Check(reports == 0 && capture.Disposed, "Intentional silent stop fails safely and releases device");
+}
+capture = new() { WithholdStop = true };
+using (var recorder = new Recorder(_ => capture))
+{
+    recorder.Start(-1);
+    var pcm = new byte[32000]; for (var i = 0; i < pcm.Length; i += 2) { pcm[i] = 0; pcm[i + 1] = 8; }
+    capture.Emit(pcm);
+    var stalled = await recorder.StopAsync();
+    Check(recorder.StopTimedOut && stalled.Length > pcm.Length && capture.Disposed, "Stalled microphone stop preserves captured audio after its bounded wait");
+    Array.Clear(stalled);
 }
 capture = new();
 using (var recorder = new Recorder(_ => capture))
@@ -396,12 +428,13 @@ sealed class TestClock : TimeProvider
 sealed class FakeCapture : IWaveIn
 {
     public WaveFormat WaveFormat { get; set; } = new(16000, 16, 1);
+    public bool WithholdStop { get; set; }
     public event EventHandler<WaveInEventArgs>? DataAvailable;
     public event EventHandler<StoppedEventArgs>? RecordingStopped;
     public bool Disposed { get; private set; }
     public bool Started { get; private set; }
     public void StartRecording() { Started = true; }
-    public void StopRecording() => RecordingStopped?.Invoke(this, new StoppedEventArgs());
+    public void StopRecording() { if (!WithholdStop) RecordingStopped?.Invoke(this, new StoppedEventArgs()); }
     public void Emit(byte[] pcm) => DataAvailable?.Invoke(this, new WaveInEventArgs(pcm, pcm.Length));
     public void Disconnect(Exception? cause) => RecordingStopped?.Invoke(this, new StoppedEventArgs(cause));
     public void Dispose() => Disposed = true;

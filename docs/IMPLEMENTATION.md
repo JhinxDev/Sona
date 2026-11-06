@@ -12,7 +12,18 @@ The primary owner integrates the app changes and a scoped independent review. Ex
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current source candidate identity is Sona 0.4.10; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.5.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+
+0.5.0 adds native per-app modes (ordered app identity to draft style and cleanup
+tone rules applied only to the captured session) and first-run Home guidance with
+a dismissible welcome card and a model setup callout. Both are native UI settings;
+the bounded CLI/MCP patch surface is unchanged. Word count uses shared Core logic.
+The reliability wave moves Esc to its own listener thread, keeps audio captured
+before a stalled microphone stop, tolerates a failed optional live preview, resets
+a stranded session after an unexpected stop fault, guards Quit finalizers, limits
+startup Run registration to installed builds and flushes atomic local state writes.
+The consolidated gate runs the two new isolated native fixtures
+(`--professional-polish-fixture`, `--professional-polish-setup-fixture`).
 
 Parakeet qualification uses `Sona.WindowsTests --speech-fixture <corpus> <fresh
 JSON> <pinned CUDA ZIP> <pinned CPU ZIP>` and `--speech-memory-fixture <fresh JSON>`.

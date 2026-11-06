@@ -44,6 +44,42 @@ public sealed partial class Insertion : IDisposable
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "Captured app"; }
     }
+    /// <summary>
+    /// Bounded identity strings for the captured destination app, used only for
+    /// local per-app mode matching. Never reads a window title or field text.
+    /// </summary>
+    public static IReadOnlyList<string> AppIdentities(DraftTarget? target)
+    {
+        if (target == null) return [];
+        var identities = new List<string>(6);
+        void AddProcess(int processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                identities.Add(process.ProcessName);
+                string? executable = null;
+                try { executable = process.MainModule?.FileName; }
+                catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException) { }
+                if (executable == null) return;
+                identities.Add(ActiveApplicationObserver.FriendlyName(process.ProcessName, executable));
+                identities.Add(Path.GetFileName(executable));
+                var package = PackageIdentity(executable);
+                if (package != null) identities.Add(package);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        }
+        AddProcess(target.ProcessId);
+        if (target.OwnerProcessId != target.ProcessId) AddProcess(target.OwnerProcessId);
+        return identities.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+    private static string? PackageIdentity(string executable)
+    {
+        var windowsApps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps") + Path.DirectorySeparatorChar;
+        return executable.StartsWith(windowsApps, StringComparison.OrdinalIgnoreCase)
+            ? executable[windowsApps.Length..].Split(Path.DirectorySeparatorChar)[0]
+            : null;
+    }
     internal Func<(nint Window, int Owner)>? ForegroundForTests { get; set; }
     // Gesture ownership is scoped to this exact window. Field/epoch checks still
     // authorize output independently, after the complete result is available.

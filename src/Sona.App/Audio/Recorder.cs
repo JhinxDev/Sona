@@ -75,10 +75,15 @@ public sealed class Recorder : IDisposable
             return wav.ToArray();
         }
     }
+    public bool StopTimedOut { get; private set; }
     public async Task<byte[]> StopAsync()
     {
         IWaveIn? capture; lock (gate) { ObjectDisposedException.ThrowIf(disposed, this); stopRequested = true; capture = input; }
+        // A device that never acknowledges the stop must not throw away audio that
+        // was already captured. After the bounded wait, use the captured PCM and
+        // tell the caller that the stop was not clean.
         try { capture?.StopRecording(); await stopped.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+        catch (TimeoutException) { StopTimedOut = true; }
         finally { capture?.Dispose(); lock (gate) { if (ReferenceEquals(input, capture)) input = null; } }
         byte[] pcm; lock (gate) pcm = data.ToArray();
         try

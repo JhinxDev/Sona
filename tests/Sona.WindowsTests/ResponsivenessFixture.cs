@@ -99,7 +99,7 @@ internal static class ResponsivenessFixture
                     await Task.Delay(40);
                     Check(prefs.CleanupMode=="Auto" && Preferences.Load(Path.Combine(output,"profile","preferences.json")).CleanupMode=="Auto","Native Save activates and persists Auto cleanup immediately");
                     var cleanupCalls=0;window.CleanupForTests=(text,_)=>{cleanupCalls++;return Task.FromResult(text);};
-                    await (Task)typeof(MainWindow).GetMethod("PolishAsync",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,["Please open the draft.",CancellationToken.None,null])!;
+                    await (Task)typeof(MainWindow).GetMethod("PolishAsync",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,["Please open the draft.",CancellationToken.None,null,null])!;
                     Check(cleanupCalls==0,"Saved Auto mode changes the live cleanup decision without restart");
                     typeof(MainWindow).GetMethod("RefreshCleanupChoices",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
                     var nextMode=prefs.CleanupMode=="Auto"?"Always":"Auto";

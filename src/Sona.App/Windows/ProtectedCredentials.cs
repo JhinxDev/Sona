@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Sona.Core;
 namespace Sona.App.Windows;
 
 internal sealed class DiscordCredentials
@@ -28,10 +29,8 @@ internal sealed class ProtectedCredentials(string path)
         var plain = JsonSerializer.SerializeToUtf8Bytes(credentials);
         try
         {
-            var encrypted = Crypt(plain, true); Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try { File.WriteAllBytes(temporary, encrypted); File.Move(temporary, path, true); }
-            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            var encrypted = Crypt(plain, true);
+            AtomicFile.WriteAllBytes(path, encrypted);
         }
         finally { CryptographicOperations.ZeroMemory(plain); }
     }

@@ -49,6 +49,10 @@ public sealed class Preferences
     public List<string> Terms { get; set; } = [];
     public List<Replacement> Vocabulary { get; set; } = [new("codex", "Codex"), new("jhinx", "Jhinx"), new("github", "GitHub"), new("next cloud", "Nextcloud"), new("power shell", "PowerShell")];
     public List<Snippet> Snippets { get; set; } = [new("review my changes", "Review the current changes for correctness, accessibility, and regressions. Preserve unrelated work.")];
+    // Native-only professional settings. The CLI/MCP settings view deliberately keeps
+    // its existing bounded surface; these are managed in the Sona UI.
+    public List<AppMode> AppModes { get; set; } = [];
+    public bool OnboardingDismissed { get; set; }
     public static Preferences Load(string path) => LoadWithStatus(path).Value;
     public static PreferencesLoadResult LoadWithStatus(string path)
     {
@@ -97,6 +101,16 @@ public sealed class Preferences
         Terms = (Terms ?? []).Where(x => !string.IsNullOrWhiteSpace(x) && x.Length <= 120).Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToList();
         Vocabulary = (Vocabulary ?? new Preferences().Vocabulary).Where(x => x != null && !string.IsNullOrWhiteSpace(x.Spoken) && !string.IsNullOrWhiteSpace(x.Written) && x.Spoken.Length <= 120 && x.Written.Length <= 120).DistinctBy(x => x.Spoken, StringComparer.OrdinalIgnoreCase).Take(200).ToList();
         Snippets = (Snippets ?? new Preferences().Snippets).Where(x => x != null && !string.IsNullOrWhiteSpace(x.Trigger) && !string.IsNullOrWhiteSpace(x.Expansion) && x.Trigger.Length <= 120 && x.Expansion.Length <= 4000).DistinctBy(x => x.Trigger, StringComparer.OrdinalIgnoreCase).Take(200).ToList();
+        // Ordered rules: first valid rule per app wins and invalid styles/tones fall back
+        // to their defaults instead of silently disabling the whole override.
+        AppModes = (AppModes ?? []).Where(x => x != null && Sona.Core.AppModes.ValidName(x.App))
+            .Select(x => x with
+            {
+                App = x.App.Trim(),
+                Style = Sona.Core.AppModes.ValidStyle(x.Style) ? x.Style : "Clean",
+                Tone = Sona.Core.AppModes.ValidTone(x.Tone) ? x.Tone : "formal"
+            })
+            .DistinctBy(x => x.App, StringComparer.OrdinalIgnoreCase).Take(Sona.Core.AppModes.Maximum).ToList();
     }
     public void Save(string path)
     {
@@ -114,18 +128,7 @@ public sealed class Preferences
                 throw new IOException(RecoveryMessage, ex);
             }
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            var temporary = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try
-            {
-                File.WriteAllText(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-                File.Move(temporary, fullPath, true);
-            }
-            finally
-            {
-                // Remove only this write's incomplete candidate; never the saved profile.
-                try { File.Delete(temporary); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            }
+            AtomicFile.WriteAllText(fullPath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
         }
     }
 }

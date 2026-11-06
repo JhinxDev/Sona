@@ -86,10 +86,11 @@ public partial class MainWindow : Window
         RefreshEditors(); RestoreTransferredDraft();
         RefreshModelCards();
         InitializeAppearance(); InitializeCleanup();
+        InitializeAppModes(); InitializeOnboarding();
         overlay.QuickCleanupRequested += CycleQuickCleanup; RefreshQuickCleanup();
         overlay.ReviewRequested += OpenDraftFromOverlay; overlay.StopRequested += StartStop; overlay.CancelRequested += RequestCancel;
         barPreview.Tick += (_, _) => { barPreview.Stop(); if (recorder == null && !processing && !insertionTestHolding) overlay.Hide(); };
-        if (!transcriber.Available) { Status.Text = "Local engine not installed"; StatusDetail.Text = "Run setup-runtime.ps1 before recording."; }
+        if (!transcriber.Available) { Status.Text = "Finish setting up Sona"; StatusDetail.Text = "The local speech runtime is not installed. See Build and run in the README, then choose a model in Dictation Models."; }
         SourceInitialized += (_, _) => InitializeRuntime();
         timer.Tick += (_, _) => RecordingTick();
         SystemEvents.PowerModeChanged += PowerChanged;
@@ -198,6 +199,7 @@ public partial class MainWindow : Window
         // Own preparation before the first asynchronous readiness wait. A late
         // capture cannot install a destination into a cancelled or newer session.
         target = null; recordingCapture = null; destinationContext.End();
+        ResetSessionMode();
         barPreview.Stop();
         RetainCurrentDraft(); historySelection = null;
         preparedInsertionTest = insertionTestHolding = false;
@@ -217,6 +219,7 @@ public partial class MainWindow : Window
             captureToken.ThrowIfCancellationRequested();
             if (!Admitted()) throw new OperationCanceledException(captureToken);
             recordingCapture = acquired; target = acquired.Target;
+            ResolveSessionMode(target);
             activeApplication?.Refresh(); destinationContext.Begin(target, Insertion.AppName(target), target != null && activeApplication?.Current?.Window == target.Window && activeApplication.Current.ProcessId == target.OwnerProcessId ? activeApplication.Current.Icon : null);
             overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
             // Let WPF paint feedback before waiting for call protection or the cue.
@@ -282,21 +285,29 @@ public partial class MainWindow : Window
         {
             Status.Text = "Making your draft"; StatusDetail.Text = "Transcribing locally. Esc still cancels."; overlay.Update("Transcribing", "Esc cancels");
             var wav = await active.StopAsync();
+            var stopTimedOut = active.StopTimedOut;
             // Capture can reach its PCM bound on the last callback while Stop is entering.
             if (active.LimitReached) { retainOnly = recordingLimitReached = true; submitOnComplete = false; pendingSubmission.Begin(false); }
             active.Dispose();
             await ReleaseOwnProtectionAsync();
-            // Drain the one in-flight preview before final recognition. No partial
-            // requests queue behind the final request; cancellation stops both.
-            try { await liveOperation; cancellation!.Token.ThrowIfCancellationRequested(); }
-            catch { Array.Clear(wav); throw; }
+            // Drain the one in-flight preview before final recognition. A failed or
+            // stalled optional preview must never discard recorded audio; final
+            // recognition is authoritative and still runs.
+            try
+            {
+                if (!liveOperation.IsCompleted) await liveOperation.WaitAsync(TimeSpan.FromSeconds(4), cancellation!.Token);
+                cancellation!.Token.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (TimeoutException) { _ = liveOperation.ContinueWith(task => _ = task.Exception, TaskScheduler.Default); }
+            catch (Exception) { _ = liveOperation.Exception; }
             string original;
             if (previewOriginal != null && previewAudioBytes == active.CapturedBytes)
             { original = previewOriginal; Array.Clear(wav); }
             else original = await RecognizeAsync(wav, cancellation!.Token);
             if (current.State == SessionState.Cancelled || !ReferenceEquals(current, session)) return;
             ShowFinalRaw(original);
-            var cleanupResult = await PolishAsync(original, cancellation!.Token);
+            var cleanupResult = await PolishAsync(original, cancellation!.Token, settings: sessionDeliveryPreferences);
             cancellation.Token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(current, session) || current.State == SessionState.Cancelled) return;
             submitOnComplete |= pendingSubmission.IsRequested;
@@ -321,12 +332,22 @@ public partial class MainWindow : Window
                 Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
             }
             else { Status.Text = "Draft ready"; StatusDetail.Text = (retainOnly ? "The five-minute recording limit was reached. Your draft is ready for review; nothing was pasted or sent." : liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
+            if (stopTimedOut) StatusDetail.Text = "The microphone did not confirm its stop; audio captured before the stall was used. " + StatusDetail.Text;
+            DescribeSessionMode();
             if (!retainOnly && !cancellation!.IsCancellationRequested && (preferences.AutoInsert || submitOnComplete) && liveDraft?.ManuallyEdited != true &&
                 (current.State == SessionState.Ready || pasteAttempted && (!insertion.LastPasteConfirmed || submitOnComplete && !insertion.LastSubmissionAccepted)))
                 RecoverClipboard(current.Draft, recoverySequence, pasteAttempted, recordingCapture?.Status);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
-        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
+        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or InvalidOperationException or NAudio.MmException or TimeoutException) { current.Fail(ex.Message); Status.Text = "Your draft was left untouched"; StatusDetail.Text = ex.Message; }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Never strand the session in a recording/transcribing state after an
+            // unexpected stop-path fault: the user must be able to dictate again.
+            current.Fail(ex.Message);
+            Status.Text = "The draft could not be finished";
+            StatusDetail.Text = "Nothing was inserted. Your session was reset, so try recording again. " + ex.Message;
+        }
         finally
         {
             ObserveDelivery(current, retainOnly, pasteAttempted, stoppedByEnter);
@@ -398,6 +419,7 @@ public partial class MainWindow : Window
     {
         if (windowClosed) return;
         barPreview.Stop();
+        ResetSessionMode();
         preparedInsertionTest = insertionTestHolding = false;
         destinationContext.End();
         try { cancellation?.Cancel(); } catch (ObjectDisposedException) { }
@@ -423,17 +445,17 @@ public partial class MainWindow : Window
         });
     }
     public void ReportError(string detail) { Cancel(); Status.Text = "Something needs attention"; StatusDetail.Text = detail; }
-    private void Render(DictationSession current) { reviewBaseline = CleanedSuggestion.Text.Length > 0 ? CleanedSuggestion.Text : current.Draft; CorrectionSuggestions.ItemsSource = null; rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; }
+    private void Render(DictationSession current) { reviewBaseline = CleanedSuggestion.Text.Length > 0 ? CleanedSuggestion.Text : current.Draft; CorrectionSuggestions.ItemsSource = null; rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; UpdateDraftStats(); }
     private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else operation = BeginRecordingAsync(); }
     private void Draft_Changed(object sender, TextChangedEventArgs e) { if (!rendering)
         {
             session?.Edit(Draft.Text);
             if (liveDraft != null && session?.State is SessionState.Recording or SessionState.Transcribing)
             { liveDraft.Edit(Draft.Text); DraftStage.Text = "Your edits protected"; }
-        } if (CopyButton != null) CopyButton.IsEnabled = !string.IsNullOrWhiteSpace(Draft.Text); }
+        } if (CopyButton != null) CopyButton.IsEnabled = !string.IsNullOrWhiteSpace(Draft.Text); UpdateDraftStats(); }
     private void Copy_Click(object sender, RoutedEventArgs e) { try { Clipboard.SetText(Draft.Text); StatusDetail.Text = "Draft copied at your request."; } catch (System.Runtime.InteropServices.COMException) { StatusDetail.Text = "The clipboard is busy. Try again."; } }
     private void Original_Click(object sender, RoutedEventArgs e) { Draft.Text = Original.Text; }
-    private void Clear_Click(object sender, RoutedEventArgs e) { Cancel(); ResetLiveReview(); session = null; historySelection = null; Draft.Clear(); Original.Clear(); Status.Text = "Ready to dictate"; StatusDetail.Text = "Your draft was cleared. History is still available."; }
+    private void Clear_Click(object sender, RoutedEventArgs e) { Cancel(); ResetLiveReview(); session = null; historySelection = null; Draft.Clear(); Original.Clear(); UpdateDraftStats(); Status.Text = "Ready to dictate"; StatusDetail.Text = "Your draft was cleared. History is still available."; }
     private void ShowShortcutNotice(string status, string detail) { Status.Text = status; StatusDetail.Text = detail; ShortcutStatus.Text = detail; barPreview.Stop(); overlay.Update(status, detail); overlay.ShowFor(0); barPreview.Start(); }
     private void Vocabulary_Click(object sender, RoutedEventArgs e) { if (processing || recorder != null) { VocabularyResult.Text = "Finish or cancel the current dictation before saving."; return; } try { SaveVocabulary(VocabularyRules.Parse(Vocabulary.Text)); VocabularyResult.Text = "Vocabulary saved on this device."; } catch (Exception ex) when (ex is FormatException or IOException) { VocabularyResult.Text = ex.Message; } }
     private void Snippets_Click(object sender, RoutedEventArgs e) { if (processing || recorder != null) { SnippetResult.Text = "Finish or cancel the current dictation before saving."; return; } try { SaveSnippets(SnippetRules.Parse(Snippets.Text)); SnippetResult.Text = "Snippets saved on this device."; } catch (Exception ex) when (ex is FormatException or IOException) { SnippetResult.Text = ex.Message; } }
@@ -464,6 +486,8 @@ public partial class MainWindow : Window
             preferences.LiveTranscription = next.LiveTranscription; preferences.AutoInsert = next.AutoInsert; preferences.CopyToClipboard = next.CopyToClipboard; preferences.CopyOnInsertionFailure = next.CopyOnInsertionFailure; preferences.CheckForUpdates = next.CheckForUpdates; preferences.CloseToTray = next.CloseToTray; preferences.Startup = next.Startup;
             preferences.ShortcutMode = next.ShortcutMode; preferences.KeepHistory = next.KeepHistory; preferences.Theme = next.Theme; preferences.RecordingDisplay = next.RecordingDisplay; preferences.ModelIdleMinutes = next.ModelIdleMinutes;
             preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupMode = next.CleanupMode; preferences.CleanupTone = next.CleanupTone; preferences.CleanupEngine = next.CleanupEngine; preferences.CleanupIdleMinutes = next.CleanupIdleMinutes;
+            preferences.AppModes = next.AppModes; preferences.OnboardingDismissed = next.OnboardingDismissed;
+            ResetAppModes();
             ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
             RefreshModelCards(); modelPreparation = WarmAllSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();
@@ -505,6 +529,16 @@ public partial class MainWindow : Window
     private async Task QuitAsync()
     {
         if (shutdownPending) return;
+        try { await QuitCoreAsync(); }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // A faulted finalizer must never leave the window disabled with no way
+            // out. Surface the fault and keep the committed draft/settings intact.
+            ShowCleanupFailure("Sona needs another try to quit", "Your draft and settings were preserved. " + ex.Message + " Try Quit again.");
+        }
+    }
+    private async Task QuitCoreAsync()
+    {
         shutdownPending = true; IsEnabled = false; Cancel();
         modelLifetime.Cancel(); modelIdleTimer.Stop();
         try { await DrainForQuitAsync(liveOperation); }
@@ -533,12 +567,24 @@ public partial class MainWindow : Window
         try { await modelStore.RetryCleanupAsync(); await ParakeetAssets.RetryCleanupAsync().WaitAsync(TimeSpan.FromSeconds(7)); }
         catch (IOException) { ShowCleanupFailure("Partial model download needs cleanup", "A model file is still locked. Try Quit again shortly."); return; }
         catch (TimeoutException) { ShowCleanupFailure("Parakeet setup needs cleanup", "Try Quit again after the runtime files finish releasing."); return; }
-        if (agentServer != null) { await agentServer.DisposeAsync(); agentServer = null; }
+        if (agentServer != null)
+        {
+            try { await agentServer.DisposeAsync(); }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException) { /* Quit continues; the pipe closes with the process. */ }
+            agentServer = null;
+        }
         if (protection != null)
         {
-            try { await DrainForQuitAsync(protectionReleaseOperation); using var restoreDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(7)); await protection.RestoreForQuitAsync(restoreDeadline.Token); }
-            catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException) { ShowCleanupFailure("Discord restoration needs attention", "Sona could not confirm restoration. Reconnect Discord or pause protection, then try Quit again."); return; }
-            protectionTimer.Stop(); protectionHotkey?.Dispose(); await protection.DisposeAsync(); protection = null;
+            try
+            {
+                await DrainForQuitAsync(protectionReleaseOperation);
+                using var restoreDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+                await protection.RestoreForQuitAsync(restoreDeadline.Token);
+                protectionTimer.Stop(); protectionHotkey?.Dispose();
+                await protection.DisposeAsync(); protection = null;
+            }
+            catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException or InvalidOperationException or KeyNotFoundException or ObjectDisposedException or System.Text.Json.JsonException)
+            { ShowCleanupFailure("Discord restoration needs attention", "Sona could not confirm restoration. Reconnect Discord or pause protection, then try Quit again."); return; }
         }
         quitting = true; Close(); Application.Current.Shutdown();
     }

@@ -1,3 +1,37 @@
+## November 6 professional polish and reliability, 0.5.0
+
+The 0.5.0 source candidate adds per-app modes, first-run Home guidance, a draft
+word count and the reliability repairs described in
+[the daily-use audit](DAILY-USE-AUDIT.md). The consolidated `tools/build.ps1` gate
+builds App, Agent and both test projects in Release with zero warnings and errors,
+then runs 414 Core checks, 53 Windows checks, the capture-policy and capture-status
+fixtures, capture-readiness and retained-notice fixtures, both History retention
+fixtures, the protection switch fixture, the responsiveness fixture, the Enter
+delivery fixture, completed-paste checks, the two new professional polish fixtures
+(17 and 4 checks), session readiness, owned startup readiness and the dependency
+audit.
+
+New maintained coverage:
+
+- `--professional-polish-fixture` runs the actual MainWindow from a fresh isolated
+  profile: welcome card visibility and copy against the real model state, both
+  navigation actions, live word count, dismissal persistence, per-app rule
+  add/save/removal state, the unsaved preferences bar, session resolution from an
+  actual captured process identity, session reset and setup callout suppression.
+  It renders the two documented 0.5.0 captures with the real appearance control.
+- `--professional-polish-setup-fixture` runs a loaded profile with `SONA_RUNTIME`
+  pointed at an empty directory: no welcome card, visible setup callout with the
+  runtime-specific explanation and a working Dictation Models action.
+- Default Windows checks add Esc-guard lifecycle (armed on its own listener
+  thread, disarmed without a suppressing hook, disposed cleanly) and a stalled
+  microphone stop that reuses captured audio after the bounded wait.
+- Core checks add app identity resolution, normalization and persistence,
+  onboarding state, word count and atomic-file rejection/safety.
+
+No real microphone, owner profile, clipboard, target app, Discord session or
+global input was used. The captures are offscreen WPF renders. Physical key,
+microphone, target-composer and call acceptance remain owner checks.
+
 ## October 23 model-loading feedback, 0.4.11
 
 The new isolated native fixture passed 36 checks. It covers actual gated speech
