@@ -1,5 +1,15 @@
 # Owner-started Sona test
 
+## Short 0.5.1 deafened Discord check
+
+Keep your Discord deafen on. Focus an editable field and use your normal Ctrl +
+Windows dictation. The recording pill must stay, a draft must appear, and your
+Discord must stay deafened. Sona must not mute or un-mute you in this state.
+
+Then undeafen and dictate once more: Sona should mute you for the recording and
+restore your microphone afterward. If a failure appears, report its exact status
+text; it now names the next step.
+
 ## Short 0.5.0 onboarding and per-app modes check
 
 Read the version/build in Settings → About first. This is the owner's own

@@ -7,7 +7,7 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Early preview: 0.5.0.** Build from source below. There is no published binary
+**Early preview: 0.5.1.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -18,6 +18,18 @@ shows Sona 0.4.2 with actual app captures and a prerecorded local recognition
 demonstration. The recording display replays measured speech and transcript
 events; the receiving field illustrates insertion. It includes AI-assisted
 narration, music and background art. [Capture details](docs/images/README.md).
+
+## New in 0.5.1
+
+- **Dictation works while Discord is deafened.** Discord turns the microphone off
+  when you deafen and refuses a separate mute command. Sona now treats a deafened
+  call as microphone protection, keeps your deafen choice untouched, and records
+  normally instead of stopping with "Discord did not acknowledge microphone
+  protection."
+- **More forgiving Discord acknowledgements.** If Discord answers with stale voice
+  settings, Sona verifies the real state and retries once. A real failure now
+  explains the next step: undeafen, reconnect in Settings, or turn call
+  protection off to dictate.
 
 ## New in 0.5.0
 
@@ -97,7 +109,8 @@ identity. Voice, audio and transcripts stay on this PC.
   pause, clear and per-row delete. Saving history is opt-in, capped at 200 text
   entries, and stores no audio. Explicitly saved drafts stay separate.
 - **Discord call protection** (optional). Mute your microphone while Sona or a
-  watched app records, and optionally silence incoming audio. Sona ships no
+  watched app records, and optionally silence incoming audio. A call where you
+  are already deafened counts as protected and is left untouched. Sona ships no
   shared credentials; you connect your own Discord application.
 - **Workspace fit.** Eight light/dark glass themes, Inter typography, Panel or
   Capsule recording displays, a microphone picker and local WAV transcription.

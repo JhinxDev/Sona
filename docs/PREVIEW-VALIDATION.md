@@ -1,3 +1,23 @@
+## November 7 Discord deafened support, 0.5.1
+
+The reported "pill pops up and goes away" failure was reproduced from state: the
+user was deafened in a Discord voice channel, and Discord refused the separate
+mute command Sona waits for. Direct authorized local RPC inspection showed
+`SET_VOICE_SETTINGS mute=true` returning the unchanged state twice while the same
+command succeeded on a clean connection; Discord couples deafen and mute, and an
+un-mute can clear the deafen. Sona now treats a deafened call as microphone
+protection, sends no voice command, and never un-mutes while the user's own deafen
+is active.
+
+The frozen candidate passed the consolidated gate (421 Core, 55 Windows,
+protection 19, completed paste 25, professional polish 17, setup guidance 4 and
+the remaining maintained fixtures, no vulnerable packages). The five new Core
+checks cover deafened acquisition and release, stale acknowledgements and retry,
+persistent-refusal guidance and preserving manual deafen. The two new Windows
+checks exercise the same behavior through the fake Discord transport. No real
+microphone or global input was used; the user's Discord deafen state was restored
+and confirmed after diagnosis.
+
 ## November 6 professional polish and reliability, 0.5.0
 
 The 0.5.0 source candidate adds per-app modes, first-run Home guidance, a draft

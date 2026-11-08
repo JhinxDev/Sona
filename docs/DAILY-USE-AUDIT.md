@@ -69,6 +69,22 @@ observation does not establish physical Ctrl+Windows or live-microphone acceptan
 Builds, simulated boundaries, file replays and personal target-app acceptance
 remain separate. [Verification receipts and commands](PREVIEW-VALIDATION.md).
 
+## November 7, 0.5.1 deafened Discord repair
+
+An owner-reported failure ("the pill pops up and goes away" on every Ctrl + Win)
+traced to Discord call protection: the owner was deafened in a voice channel,
+Discord refused the separate mute command, and Sona aborted the recording. Direct
+local RPC inspection showed the mute command returning the unchanged state while
+the user was deafened; Discord couples deafen and mute, and a mute restore can
+clear the user's deafen choice.
+
+Sona now treats a deafened call as already having the microphone off: it records
+without sending a mute or deafen command and leaves the user's deafen untouched.
+Unacknowledged writes are confirmed against the actual Discord state and retried
+once before failing, and a real failure explains the undeafen, reconnect and
+disable options. Core and fake-transport regressions cover the path. Physical
+microphone and real-call acceptance remain owner checks.
+
 ## November 6, 0.5.0 reliability repairs
 
 An independent read-only source review of 0.4.11 found no critical defect but four

@@ -54,6 +54,40 @@ internal static class ProtectionSettingsChecks
         var beforeOverride = heldVoice.Changes.Count; readResult.TrySetResult(heldVoice.State); await retryTask;
         Check(!heldVoice.State.Muted && !heldVoice.State.Deafened && heldVoice.Changes.Count == beforeOverride,
             "A manual unmute during the awaited retry read cancels further protection commands");
+        var deafenedVoice = new FakeVoice { State = new(true, false, true) };
+        var deafenedController = new MicProtection(deafenedVoice);
+        await deafenedController.ConfigureAsync(false, 0, default);
+        await deafenedController.SetSourcesAsync(["deafened-recording"], default);
+        Check(deafenedVoice.State.Deafened && !deafenedVoice.State.Muted && deafenedVoice.Changes.Count == 0 && !deafenedController.OwnsChanges,
+            "A deafened Discord already has the microphone off; Sona protects without sending a mute or deafen change");
+        await deafenedController.SetSourcesAsync([], default);
+        Check(deafenedVoice.State.Deafened && deafenedVoice.Changes.Count == 0,
+            "Protection release leaves the user's deafen choice untouched");
+        var staleVoice = new FakeVoice { StaleMuteAckCount = 1 };
+        var staleController = new MicProtection(staleVoice);
+        await staleController.ConfigureAsync(false, 0, default);
+        await staleController.SetSourcesAsync(["stale-ack"], default);
+        Check(staleVoice.State.Muted && staleController.OwnsChanges,
+            "An unconfirmed first mute is accepted after confirming the actual Discord state");
+        await staleController.SetSourcesAsync([], default);
+        Check(!staleVoice.State.Muted && !staleController.OwnsChanges,
+            "A state-confirmed mute is restored on release");
+        var refusedVoice = new FakeVoice { RejectProtect = true };
+        var refusedController = new MicProtection(refusedVoice);
+        await refusedController.ConfigureAsync(false, 0, default);
+        Exception? refusal = null;
+        try { await refusedController.SetSourcesAsync(["refused"], default); } catch (IOException ex) { refusal = ex; }
+        Check(refusal != null && refusal.Message.Contains("Undeafen", StringComparison.OrdinalIgnoreCase) && refusedController.Status.Contains("retry", StringComparison.OrdinalIgnoreCase),
+            "A persistently unconfirmed mute fails with undeafen and reconnect guidance");
+        var deafenDuringVoice = new FakeVoice(); var deafenDuringController = new MicProtection(deafenDuringVoice);
+        await deafenDuringController.ConfigureAsync(false, 0, default);
+        await deafenDuringController.SetSourcesAsync(["during"], default);
+        Check(deafenDuringVoice.State.Muted && deafenDuringController.OwnsChanges, "Mute-only protection acquires before the user deafens");
+        deafenDuringVoice.Observe(true, true);
+        var changesBeforeRelease = deafenDuringVoice.Changes.Count;
+        await deafenDuringController.SetSourcesAsync([], default);
+        Check(deafenDuringVoice.State.Muted && deafenDuringVoice.State.Deafened && deafenDuringVoice.Changes.Count == changesBeforeRelease && !deafenDuringController.OwnsChanges,
+            "Release while the user is deafened never sends an un-mute that would clear their deafen");
         return checks.ToArray();
     }
 }

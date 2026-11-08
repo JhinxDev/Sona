@@ -1,5 +1,25 @@
 # Discord connection and call protection
 
+## Deafened calls, 0.5.1
+
+Deafening in Discord already turns your microphone off and silences incoming
+audio. Discord refuses a separate mute command in that state, and an un-mute can
+clear the user's own deafen. Sona therefore treats a deafened call as already
+protected: dictation starts normally, no voice command is sent, and your deafen
+choice is preserved. The recording display and status show that protection is
+active through the existing deafen.
+
+When you are not deafened, Sona still mutes you for the recording. If Discord
+replies with stale voice settings, Sona verifies the actual state and retries once
+before failing. A real failure reports: "Discord did not confirm the microphone
+mute. Undeafen Discord or reconnect in Settings, Discord; or turn call protection
+off to dictate."
+
+This is local Discord RPC behavior observed on Discord desktop build `1.0.9267`
+with the user's own authorized application. It is not a claim about every Discord
+version or about real-call audio quality.
+
+
 Open **Settings → Discord** to connect, disconnect, or change call protection.
 The connection status is green only when Sona has an authenticated connection.
 Connection state and the saved **Mute Discord while dictating** preference are

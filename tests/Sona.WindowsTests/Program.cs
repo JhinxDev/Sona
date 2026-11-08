@@ -188,7 +188,7 @@ fixtureVault.Save(new DiscordCredentials { ClientId = "123456789", ClientSecret 
 Check(fixtureVault.Load().ClientSecret == "fixture-secret-only" && !System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(credentialTestPath)).Contains("fixture-secret-only"), "Discord fixture setup round trips through current-user Windows encryption");
 var fakePipePrefix = "sona-test-discord-" + Guid.NewGuid().ToString("N") + "-";
 using var fakeServerStop = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-var fakeSubscriptions = new List<string>(); var fakeState = new Sona.Core.VoiceState(true, false, false); int fakeCommands = 0;
+var fakeSubscriptions = new List<string>(); var fakeState = new Sona.Core.VoiceState(true, false, false); int fakeCommands = 0; int fakeVoiceWrites = 0;
 using var fakePipe = new System.IO.Pipes.NamedPipeServerStream(fakePipePrefix + "0", System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous | System.IO.Pipes.PipeOptions.CurrentUserOnly);
 async Task<(int Opcode, JsonElement Data)> ReadFakeFrame()
 {
@@ -219,6 +219,7 @@ var fakeServerTask = Task.Run(async () =>
             else if (command == "SET_VOICE_SETTINGS")
             {
                 var a = frame.Data.GetProperty("args");
+                fakeVoiceWrites++;
                 if (a.TryGetProperty("mute", out var mute)) fakeState = fakeState with { Muted = mute.GetBoolean() };
                 if (a.TryGetProperty("deaf", out var deaf)) fakeState = fakeState with { Deafened = deaf.GetBoolean() };
                 data = new { mute = fakeState.Muted, deaf = fakeState.Deafened };
@@ -242,6 +243,18 @@ await using (var service = new ProtectionService(fixtureVault, fakePipePrefix, _
     Check(fakeState.Muted && fakeState.Deafened, "Ending Sona recording retains protection while a watched app remains active");
     fixtureSources.Clear(); await service.EndOwnRecordingAsync(fakeServerStop.Token);
     Check(!fakeState.Muted && !fakeState.Deafened && !service.OwnsChanges, "Recording cleanup restores owned voice changes after the final source ends");
+    // Deafened Discord already has the microphone off. Sona must not send a mute
+    // or deafen command: Discord refuses mute while deafened, and an un-mute can
+    // clear the user's own deafen choice.
+    fixtureSources.Add("fixture-external-app");
+    await service.ConfigureAsync(new Sona.Core.Preferences { ProtectionEnabled = true, ProtectionReleaseDelayMs = 0, SilenceIncoming = false }, fakeServerStop.Token);
+    fakeState = fakeState with { Muted = false, Deafened = true };
+    var writesBeforeDeafened = fakeVoiceWrites;
+    await service.BeginOwnRecordingAsync(fakeServerStop.Token);
+    Check(service.Status.Contains("deafened", StringComparison.OrdinalIgnoreCase) && fakeVoiceWrites == writesBeforeDeafened && fakeState.Deafened && !fakeState.Muted, "A deafened Discord protects the microphone without sending voice commands");
+    await service.EndOwnRecordingAsync(fakeServerStop.Token);
+    Check(fakeState.Deafened && !fakeState.Muted && fakeVoiceWrites == writesBeforeDeafened, "Leaving a deafened recording preserves the user's deafen choice");
+    fixtureSources.Clear(); fakeState = fakeState with { Deafened = false };
     await service.RestoreForQuitAsync(fakeServerStop.Token);
 }
 fakeServerStop.Cancel(); await fakeServerTask; File.Delete(credentialTestPath); Directory.Delete(Path.GetDirectoryName(credentialTestPath)!);

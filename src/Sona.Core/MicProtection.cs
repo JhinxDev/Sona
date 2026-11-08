@@ -152,27 +152,52 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
             ApplyObservations();
             if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
             if (!state.InCall) { acquisitionPending = false; Status = "No Discord call"; return; }
+            // A deafened Discord already has the microphone off and incoming audio
+            // silenced. Discord refuses the mute command in that state and can clear
+            // the user's deafen on an un-mute, so keep the user's choice untouched.
+            if (state.Deafened) { acquisitionPending = false; Status = "Protecting recording (Discord deafened)"; return; }
             if (!state.Muted)
             {
                 ownMute = false;
                 muteOwnedAfter = transport.ObservationVersion;
-                if (!await transport.SetMuteAsync(true, cancellation)) throw new IOException("Discord did not acknowledge microphone protection.");
-                ownMute = true;
-                ApplyObservations();
-                if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
+                if (!await ConfirmMuteAsync(cancellation)) throw new IOException("Discord did not confirm the microphone mute. Undeafen Discord or reconnect in Settings, Discord; or turn call protection off to dictate.");
+                if (ownMute) { ApplyObservations(); if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; } }
             }
             if (deafen && !state.Deafened)
             {
                 ownDeafen = false;
                 deafenOwnedAfter = transport.ObservationVersion;
-                if (!await transport.SetDeafenAsync(true, cancellation)) throw new IOException("Discord did not acknowledge incoming audio silencing.");
-                ownDeafen = true;
-                ApplyObservations();
-                if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; }
+                if (!await ConfirmDeafenAsync(cancellation)) throw new IOException("Discord did not confirm incoming-audio silencing. Reconnect in Settings, Discord; or turn silence incoming off to dictate.");
+                if (ownDeafen) { ApplyObservations(); if (manualOverrideVersion != overrideVersion) { acquisitionPending = false; return; } }
             }
             acquisitionPending = false; Status = "Protecting recording";
         }
         catch { acquisitionPending = true; Status = "Discord protection needs retry"; throw; }
+    }
+    // Discord can answer the first voice write of a session with the pre-change
+    // settings. Confirm the real state, retry once exactly as a user action would,
+    // and only then fail. Ownership is granted only for a state Sona actually set.
+    private async Task<bool> ConfirmMuteAsync(CancellationToken cancellation)
+    {
+        if (await transport.SetMuteAsync(true, cancellation)) { ownMute = true; return true; }
+        var state = await transport.ReadAsync(cancellation); ApplyObservations();
+        if (state.Muted) { ownMute = true; return true; }
+        await Task.Delay(120, cancellation);
+        if (await transport.SetMuteAsync(true, cancellation)) { ownMute = true; return true; }
+        state = await transport.ReadAsync(cancellation); ApplyObservations();
+        ownMute = state.Muted;
+        return state.Muted;
+    }
+    private async Task<bool> ConfirmDeafenAsync(CancellationToken cancellation)
+    {
+        if (await transport.SetDeafenAsync(true, cancellation)) { ownDeafen = true; return true; }
+        var state = await transport.ReadAsync(cancellation); ApplyObservations();
+        if (state.Deafened) { ownDeafen = true; return true; }
+        await Task.Delay(120, cancellation);
+        if (await transport.SetDeafenAsync(true, cancellation)) { ownDeafen = true; return true; }
+        state = await transport.ReadAsync(cancellation); ApplyObservations();
+        ownDeafen = state.Deafened;
+        return state.Deafened;
     }
     private async Task ReleaseAsync(CancellationToken cancellation)
     {
@@ -182,6 +207,14 @@ public sealed class MicProtection(IVoiceProtectionTransport transport)
             if (!OwnsChanges) { restorationPending = false; Status = paused ? "Paused" : "Ready"; return; }
             var state = await transport.ReadAsync(cancellation);
             ApplyObservations();
+            // Never un-mute while the user's own deafen is active: Discord couples
+            // the two and an un-mute would clear their deafen choice. A deafen Sona
+            // still owns is restored normally below.
+            if (state.Deafened && !ownDeafen)
+            {
+                ownMute = false; ownDeafen = false;
+                Status = paused ? "Paused" : "Ready"; restorationPending = false; return;
+            }
             if (!state.Deafened) ownDeafen = false;
             if (!state.Muted) ownMute = false;
             if (ownDeafen)

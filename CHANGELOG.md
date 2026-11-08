@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1 - Discord deafened support
+
+- Fix: dictation now starts when Discord is deafened. Discord already has the
+  microphone off when you are deafened and refuses a separate mute command, so
+  Sona now treats a deafened call as microphone protection and leaves your deafen
+  choice untouched. Previously the protection preparation aborted the recording
+  with "Discord did not acknowledge microphone protection."
+- Harden the mute and deafen acknowledgements: if Discord replies with stale
+  voice settings, Sona confirms the actual state and retries once before failing.
+  Missing confirmation now explains the undeafen, reconnect and disable options.
+- Never send an un-mute while your own deafen is active, so protection release
+  cannot clear your deafen.
+- New regressions cover the deafened path in Core and in the fake Discord
+  transport fixture.
+
 ## 0.5.0 - per-app modes and first-run guidance
 
 - Add ordered **per-app modes**. A captured app identity can select its own draft

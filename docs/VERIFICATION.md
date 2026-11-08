@@ -1,5 +1,35 @@
 # Candidate verification
 
+## 0.5.1 Discord deafened support, November 7
+
+The 0.5.1 source candidate fixes the reported failure where Ctrl + Windows showed
+the recording pill and immediately cancelled with "Discord did not acknowledge
+microphone protection." Direct local Discord RPC inspection established the
+environment: with the user deafened in a Discord voice channel, `SET_VOICE_SETTINGS`
+`mute=true` returned the unchanged `mute=false` state twice, while the same
+command succeeded on a clean connection. Discord explicitly couples deafen and
+mute, and a mute restore can clear the user's deafen choice. Sona now treats a
+deafened Discord as already having the microphone off: it records without sending
+voice commands and never un-mutes while the user's own deafen is active.
+
+Verification for the frozen candidate:
+
+- Release builds of Sona.App and Sona.Agent: zero warnings, zero errors.
+- Sona.Tests: **421 checks passed** (was 414). New Core cases cover the deafened
+  acquisition path without voice commands, preserving the user's deafen on
+  release, stale-ack confirmation and single retry, persistent-refusal guidance,
+  and refusing an un-mute that would clear the user's deafen.
+- Sona.WindowsTests default suite: **55 checks passed** (was 53). New fake Discord
+  transport cases prove a deafened call protects the microphone without sending
+  mute or deafen commands and leaves the deafen choice untouched.
+- Consolidated `tools/build.ps1` gate passed end to end with the maintained
+  fixture set and no known vulnerable packages.
+- No real microphone, owner profile or global input was used by the automated
+  checks. Discord voice state was read over the application's own authorized local
+  RPC for diagnosis only; the user's deafen state was restored and confirmed.
+
+Physical microphone and real-call acceptance remain owner checks.
+
 ## 0.5.0 professional polish and reliability, November 6
 
 The consolidated local gate in `tools/build.ps1` passed end to end on the release
