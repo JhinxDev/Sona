@@ -26,11 +26,27 @@ Verification:
 ### Live activation, November 8
 
 Guarded `tools/upgrade.ps1 -PreserveSessionHistory` installed the exact package
-`artifacts/0.5.3-<head>` and launched it. Live readback confirmed the app and agent
-report 0.5.3, all installed hashes match, the draft was preserved, both residency
-settings remained at Keep until quit, and startup warming loaded the branded
-speech and text-polish workers with measured cold-load times reported by the agent
-status.
+`artifacts/0.5.3-582164c2` (source head
+`582164c28afb69bf0e2383f7450dc62dc0bd2ff0`, 36 files) and launched it. Live
+readback at 02:1x Toronto:
+
+- Running `C:\Users\qazws\AppData\Local\Programs\Sona\0.5.3-582164c2\Sona.exe`,
+  PID `83732`, file version 0.5.3.0, product version
+  `0.5.3+582164c28afb69bf0e2383f7450dc62dc0bd2ff0`; the agent reports 0.5.3 and
+  all 36 installed hashes match. The draft was preserved and 14 session-only
+  History records were transferred.
+- Both residency settings survived as **Keep until quit**
+  (`ModelIdleMinutes = 0`, `CleanupIdleMinutes = 0`). Startup warming loaded both
+  workers and the app kept them resident: **Sona Speech Engine** PID 32960
+  (Whisper Large v3 Turbo, measured cold load **1.5 s**) and **Sona Text Polish**
+  PID 86304 (Spokenly Cleanup 1, measured cold load **2.4 s**). The agent status
+  reported those measured values through `speechLastLoadSeconds` and
+  `cleanupLastLoadSeconds`, which are the same real stopwatch values the model
+  pages display.
+- The loading copy itself is covered by the 40-check model-loading fixture: exact
+  model name, actual stage, measured seconds, no hint on warm runs, and the
+  recording-path hint. No microphone or global input was used by the automated
+  checks. Physical microphone acceptance remains an owner check.
 
 ## 0.5.2 recognizable worker names, November 7
 
