@@ -16,9 +16,11 @@ rehearsed end to end: self-contained app and CLI, pinned Whisper CPU engine
 verified against the runtime manifest, installation receipt, Start Menu shortcut,
 silent install and uninstall, with profile data preserved and no microphone or
 global input. See [verification](VERIFICATION.md#windows-installer-rehearsal-november-8)
-and [installation guide](INSTALL.md). The artifact is unsigned and no hosted
-binary release was published; macOS is not supported by this native Windows
-codebase.
+and [installation guide](INSTALL.md). The installer was then published as
+pre-release [`v0.5.3`](https://github.com/JhinxDev/Sona/releases/tag/v0.5.3) on the
+public repository; a fresh public download was hashed and matched the published
+asset digest. The artifact is unsigned, and macOS is not supported by this native
+Windows codebase.
 
 ## November 7 recognizable worker names, 0.5.2
 

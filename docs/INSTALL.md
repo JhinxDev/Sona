@@ -4,6 +4,14 @@ Sona has a per-user Windows x64 installer. It does not need administrator rights
 and it does not need a separate .NET installation: the app is self-contained and
 the CLI ships beside it. The installer is part of the early, unsigned preview.
 
+## Download
+
+Get the current installer from
+[GitHub Releases](https://github.com/JhinxDev/Sona/releases). For the 0.5.3 early
+preview the file is `Sona-Setup-0.5.3.exe`, 52.6 MB, SHA256
+`c0997819f9ced1dd1b01b73a1e95a96cdc7b8b1b459178bbab11d575137d466f`. The release is
+marked **Pre-release** and is not code-signed.
+
 ## Requirements
 
 - Windows 11 x64 (verified). Windows 10 x64 is not formally verified yet.

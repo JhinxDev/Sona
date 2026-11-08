@@ -75,8 +75,26 @@ end to end without touching the owner installation:
   profile data outside the app folder.
 - The rehearsal used an isolated app id, install folder and `SONA_DATA` profile;
   it did not start the microphone, send input or alter the owner installation or
-  Discord state. Publishing a hosted binary release and code signing remain
-  separate, unauthorized actions.
+  Discord state. The owner then explicitly authorized publishing the binary
+  release.
+
+### Published release, November 8
+
+- Public release: <https://github.com/JhinxDev/Sona/releases/tag/v0.5.3>, marked
+  **Pre-release** because it is unsigned.
+- Annotated tag `v0.5.3` peels to `c7d508e2c4e1944a3ee3872c59818e593c4693b5`, the
+  exact app source used to build the installer; the tag itself is public.
+- Assets: `Sona-Setup-0.5.3.exe` (55,188,916 bytes, API digest
+  `sha256:c0997819f9ced1dd1b01b73a1e95a96cdc7b8b1b459178bbab11d575137d466f`) and
+  `SHA256SUMS.txt` (88 bytes).
+- Unauthenticated verification after publication: the release page returns HTTP
+  200, a fresh download through the public asset URL hashes to the published
+  digest, and `SHA256SUMS.txt` contains the same value. The release body, install
+  steps, checksum, limitations and macOS note render on the public page. Because
+  the only release is a pre-release, `/releases/latest` correctly has no stable
+  release; the Releases page and direct tag URL work.
+- Code signing remains open: no certificate is attached, so SmartScreen warnings
+  are expected by design.
 
 ## 0.5.2 recognizable worker names, November 7
 

@@ -7,11 +7,11 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Early preview: 0.5.3.** Windows x64 only. A per-user Windows installer can be
-built with the maintained tooling; it is unsigned and there is no hosted binary
-release yet. See [installing Sona](docs/INSTALL.md). Build-from-source instructions
-are below. Feedback, bug reports, contributions and feature suggestions are
-welcome.
+**Early preview: 0.5.3.** Windows x64 only. Download the current
+per-user installer from [Releases](https://github.com/JhinxDev/Sona/releases); it
+is unsigned, so SmartScreen warns. See [installing Sona](docs/INSTALL.md) for
+first-run model steps and uninstall behavior. Build-from-source instructions are
+below. Feedback, bug reports, contributions and feature suggestions are welcome.
 
 [![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
 
@@ -23,7 +23,9 @@ narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-A per-user installer is built from this source tree; see
+Download the current per-user installer from
+[Releases](https://github.com/JhinxDev/Sona/releases), or build it from this source
+tree with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
 self-contained (no separate .NET install), needs no administrator rights, and
@@ -256,8 +258,8 @@ also crashed in a mixed English/French resident sequence.
 
 ## Known limitations
 
-- Windows x64 only. A per-user installer can be built with the maintained
-  tooling, but it is not code-signed and there is no hosted binary release yet.
+- Windows x64 only. A per-user installer is published on the Releases page, but
+  it is not code-signed yet and the release is marked as an early pre-release.
 - No macOS or Linux build. The native app depends on WPF and Windows-only capture,
   hotkey, insertion and model-runtime APIs; a port would be a separate project.
 - Automatic insertion while a browser suggestion or list item has accessibility
@@ -272,8 +274,8 @@ also crashed in a mixed English/French resident sequence.
 
 ## Roadmap
 
-Planned work, not current behavior: code-signed installer and hosted release with
-checksums, a portable build, a guided first-run flow with microphone test, voice
+Planned work, not current behavior: code signing, a stable installer release and
+portable build with checksums, a guided first-run flow with microphone test, voice
 command mode for editing selected text, saved-draft export and reprocessing, a
 local diagnostics page, and broader language coverage. No cloud model, account or
 telemetry plans.
