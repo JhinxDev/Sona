@@ -22,11 +22,23 @@ fixture set and no known vulnerable packages.
 ### Live activation, November 7
 
 Guarded `tools/upgrade.ps1 -PreserveSessionHistory` installed the exact package
-`artifacts/0.5.2-<head>` and launched it. Live readback confirmed the app and agent
-report 0.5.2, all installed hashes match, the draft was preserved, and the worker
-processes now appear as "Sona Speech Engine" and "Sona Text Polish" with their
-raw upstream files still present and unmodified. No microphone or global input was
-used by the automated checks; a startup warm produced the branded workers.
+`artifacts/0.5.2-8d4ba984` (source head
+`8d4ba984d1fff0fbc169b7a3a97e982f8e3c82e6`, 36 files) and launched it. Live
+readback at 20:5x Toronto:
+
+- Running `C:\Users\qazws\AppData\Local\Programs\Sona\0.5.2-8d4ba984\Sona.exe`,
+  PID `29732`, file version 0.5.2.0, product version
+  `0.5.2+8d4ba984d1fff0fbc169b7a3a97e982f8e3c82e6`; the agent reports 0.5.2 and
+  all 36 installed hashes match. The draft was preserved and 6 session-only
+  History records were transferred.
+- Startup warming produced **Sona Speech Engine** (PID 37544,
+  `whisper-cuda\Release\Sona Speech Engine.exe`, 253 MB) and **Sona Text Polish**
+  (PID 77340, `%LOCALAPPDATA%\Murmur\workers\Sona Text Polish.exe`, 1032 MB), both
+  children of Sona. No `whisper-server.exe` or `llama-server.exe` process
+  remained. The agent reports the same two worker PIDs, and the upstream originals
+  remain present and unmodified for their integrity checks.
+- No microphone or global input was used by the automated checks. Physical
+  microphone and real-call acceptance remain owner checks.
 
 ## 0.5.1 Discord deafened support, November 7
 
