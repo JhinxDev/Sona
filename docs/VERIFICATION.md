@@ -30,6 +30,32 @@ Verification for the frozen candidate:
 
 Physical microphone and real-call acceptance remain owner checks.
 
+### Live activation, November 7
+
+The guarded `tools/upgrade.ps1 -PreserveSessionHistory` path installed the exact
+package `artifacts/0.5.1-4275cc58` (source head
+`4275cc58f785efbbc1c8b222ca9879ebe45ba5e0`, 36 files) and launched it through the
+Explorer-owned desktop bootstrap. Live readback:
+
+- Running `C:\Users\qazws\AppData\Local\Programs\Sona\0.5.1-4275cc58\Sona.exe`,
+  PID `67104`, file version 0.5.1.0, product version
+  `0.5.1+4275cc58f785efbbc1c8b222ca9879ebe45ba5e0`; the agent reports 0.5.1.
+- All 36 installed files match the package receipt; the draft was preserved by the
+  upgraded encrypted checkpoint.
+- The owner's Discord deafen was confirmed still `deaf=True`; Sona did not change
+  it. While the owner tested dictation, the live app reached `recording` with
+  protection status **"Protecting recording (Discord deafened)"**, which is the
+  repaired path working on the real target. Protection returned to `Ready` with
+  no owned voice changes after the stop.
+- Preference values were preserved (OLED, Hold, Auto cleanup, Enter-to-send,
+  clipboard recovery, watched apps, vocabulary and snippets). The file's byte
+  hash changed only because the Disconnect/Connect recovery cycle saved the new
+  default fields; logical settings matched.
+- That first post-upgrade attempt ended with "The recording was silent. Check your
+  microphone selection." and the draft stayed in Sona because focus changed during
+  the attempt. That is a separate input/focus condition, not the protection
+  failure. Physical microphone and real-call acceptance remain owner checks.
+
 ## 0.5.0 professional polish and reliability, November 6
 
 The consolidated local gate in `tools/build.ps1` passed end to end on the release
