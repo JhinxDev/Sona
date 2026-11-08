@@ -53,9 +53,11 @@ public partial class MainWindow
     }
     private void RefreshCleanupStatus()
     {
+        var resident = preferences.CleanupIdleMinutes == 0 ? " · stays loaded until you quit" : "";
+        var measured = cleanupModel.LastLoadSeconds is double seconds ? $" · last load {seconds:0.0} s" : "";
         CleanupMemory.Text = cleanupModel.CleanupPending ? "Cleanup memory is still releasing. Try Unload cleanup model."
-            : cleanupModel.LoadedBackend == "GPU" ? $"Loaded on GPU / VRAM · NVIDIA CUDA · {cleanupModel.ModelVramMiB:0} MiB model weights"
-            : cleanupModel.LoadedBackend == "CPU" ? "Loaded on CPU / system RAM"
+            : cleanupModel.LoadedBackend == "GPU" ? $"Loaded on GPU / VRAM · NVIDIA CUDA · {cleanupModel.ModelVramMiB:0} MiB model weights" + measured + resident
+            : cleanupModel.LoadedBackend == "CPU" ? "Loaded on CPU / system RAM" + measured + resident
             : cleanupModel.AvailableFor(preferences) ? "Installed · not loaded in memory"
             : "Set up the selected backend to download the local model and runtime.";
     }

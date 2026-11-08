@@ -35,10 +35,10 @@ internal static class ModelLoadingFixture
                     try
                     {
                         overlay.SetDisplay(display);
-                        overlay.Update("Loading model", "Speech model into memory · Esc cancels");
+                        overlay.Update("Loading model", ModelLoadingText.Hint(ModelLoadStage.Loading, "Whisper Large v3 Turbo", 2.4));
                         var shell = (Border)overlay.FindName("Shell"); Layout(shell, overlay.Width);
                         Check(((ProgressBar)overlay.FindName(display + "Busy")).Visibility == Visibility.Visible, display + " loading has a real busy indicator");
-                        Check(((TextBlock)overlay.FindName(display + "Hint")).Text.Contains("memory"), display + " explains the first-use wait");
+                        Check(((TextBlock)overlay.FindName(display + "Hint")).Text.Contains("Whisper Large v3 Turbo") && ((TextBlock)overlay.FindName(display + "Hint")).Text.Contains("2.4 s"), display + " explains the first-use wait with the real model and measured seconds");
                         var label = (TextBlock)overlay.FindName(display + "Label");
                         var desired = new FormattedText(label.Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(label.FontFamily, label.FontStyle, label.FontWeight, label.FontStretch), label.FontSize, Brushes.White, 1);
                         Check(label.ActualWidth >= desired.Width, display + " loading title is fully readable");
@@ -48,6 +48,10 @@ internal static class ModelLoadingFixture
                     }
                     finally { overlay.Close(); }
                 }
+                Check(ModelLoadingText.Hint(ModelLoadStage.Loading, "Whisper Large v3 Turbo", 2.36) == "Loading Whisper Large v3 Turbo · 2.4 s · Esc cancels", "Loading copy names the real model and measured seconds exactly");
+                Check(ModelLoadingText.Hint(ModelLoadStage.Verifying, "Spokenly Cleanup 1", 0.52) == "Checking Spokenly Cleanup 1 files · 0.5 s · Esc cancels", "Verification copy uses the exact stage, model and measured time");
+                Check(ModelLoadingText.Status(ModelPurpose.Speech, ModelLoadStage.Loading, "Whisper Large v3 Turbo") == "Loading Whisper Large v3 Turbo", "Home status names the model instead of a generic speech label");
+                Check(ModelLoadingText.Hint(ModelLoadStage.None, "anything", 1) == "" && ModelLoadingText.ModelName(ModelPurpose.Cleanup, new Preferences()) == "Spokenly Cleanup 1", "Warm runs add no hint and cleanup reports its real model name");
                 Check(typeof(ResidentModel).GetProperty("LoadStage") != null, "Speech loader exposes actual preparation state");
                 Check(typeof(CleanupModel).GetProperty("LoadStage") != null, "Cleanup loader exposes actual preparation state");
                 await CheckLoadersAsync(Check);
@@ -108,9 +112,9 @@ internal static class ModelLoadingFixture
         check(await window.BeginForTestsAsync(), "Loading fixture admits only fake capture"); input.Emit(pcm);
         var stopping = window.StopForTestsAsync();
         await Wait(() => label.Text == "Checking model");
-        check(label.Text == "Checking model" && hint.Text.Contains("speech"), "Final recognition shows the actual verification wait");
+        check(label.Text == "Checking model" && hint.Text.StartsWith("Checking ") && hint.Text.Contains("Esc cancels"), "Final recognition shows the actual verification wait");
         stage = ModelLoadStage.Loading; await Wait(() => label.Text == "Loading model");
-        check(label.Text == "Loading model" && hint.Text.Contains("Speech"), "Speech loading into memory has distinct copy");
+        check(label.Text == "Loading model" && hint.Text.StartsWith("Loading ") && hint.Text.Contains(" s ·"), "Speech loading into memory names the model and shows measured seconds");
         Layout((Border)overlay.FindName("Shell"), overlay.Width); Save((Border)overlay.FindName("Shell"), Path.Combine(output, "flow-speech-loading.png"));
         check(window.SessionForTests == SessionState.Transcribing && !stopping.IsCompleted, "Loading never completes or delivers a partial draft");
         stage = ModelLoadStage.None; await Wait(() => label.Text == "Transcribing");
@@ -118,7 +122,7 @@ internal static class ModelLoadingFixture
         purpose = ModelPurpose.Cleanup; stage = ModelLoadStage.Loading;
         recognized.SetResult("Please keep all the wording in this complete test draft.");
         await Wait(() => label.Text == "Loading model" && hint.Text.Contains("Cleanup"));
-        check(label.Text == "Loading model" && hint.Text.Contains("Cleanup"), "Cleanup loading has its own actual model identity");
+        check(label.Text == "Loading model" && hint.Text.StartsWith("Loading Spokenly Cleanup 1 · "), "Cleanup loading names its exact model and measured wait");
         stage = ModelLoadStage.None; await Wait(() => label.Text == "Polishing");
         check(label.Text == "Polishing", "Ready cleanup resumes polishing without a fake loading delay");
         polished.SetResult("Please keep the complete test draft."); await stopping;
@@ -140,7 +144,7 @@ internal static class ModelLoadingFixture
         prefs.LiveTranscription = true;
         input = new(); await window.BeginForTestsAsync();
         typeof(MainWindow).GetMethod("RecordingTick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
-        check(label.Text == "Recording" && hint.Visibility == Visibility.Visible && hint.Text.Contains("memory") && ((Button)overlay.FindName("CapsuleStop")).Visibility == Visibility.Visible, "Live-preview loading keeps recording controls and shows a secondary memory hint");
+        check(label.Text == "Recording" && hint.Visibility == Visibility.Visible && hint.Text.StartsWith("Loading ") && hint.Text.Contains("Esc cancels") && ((Button)overlay.FindName("CapsuleStop")).Visibility == Visibility.Visible, "Live-preview loading keeps recording controls and names the model being loaded");
         check(((TextBlock)overlay.FindName("CapsuleTime")).Text.Length > 0, "Live-preview loading preserves elapsed recording time");
         Layout((Border)overlay.FindName("Shell"), overlay.Width); Save((Border)overlay.FindName("Shell"), Path.Combine(output, "recording-with-loading.png"));
         window.CancelForTests(); await Task.Delay(40);

@@ -28,8 +28,14 @@ internal sealed class CleanupModel
     private int idleMinutes = 10;
     private int cudaOffload, cudaBuffer;
     private double modelVramMiB = double.NaN;
+    /// <summary>Applies a changed idle preference immediately without reloading.</summary>
+    public void UpdateIdleMinutes(int minutes) => idleMinutes = Math.Clamp(minutes, 0, 240);
+
     private int loadStage;
+    private long loadStartedAt;
     public ModelLoadStage LoadStage => (ModelLoadStage)Volatile.Read(ref loadStage);
+    // Measured duration of the most recent real cold load. Null until one happens.
+    public double? LastLoadSeconds { get; private set; }
     public CleanupModel(TimeProvider? clock = null, Func<string, CancellationToken, Task<bool>>? verifyAssets = null)
     {
         this.clock = clock ?? TimeProvider.System;
@@ -113,6 +119,8 @@ internal sealed class CleanupModel
         if (CleanupPending) throw new IOException("Cleanup memory is still releasing. Retry Unload now.");
         if (worker != null && loadedBackend == backend && !worker.Process.HasExited) { lastUse = clock.GetTimestamp(); return; }
         await ReleaseAsync().ConfigureAwait(false);
+        loadStartedAt = clock.GetTimestamp();
+        LastLoadSeconds = null;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token); deadline.CancelAfter(TimeSpan.FromSeconds(45));
         try
         {
@@ -160,6 +168,7 @@ internal sealed class CleanupModel
                 await Task.Delay(80, deadline.Token).ConfigureAwait(false);
             }
             token.ThrowIfCancellationRequested(); Volatile.Write(ref loadedBackend, backend); lastUse = clock.GetTimestamp();
+            LastLoadSeconds = Math.Max(0, clock.GetElapsedTime(loadStartedAt).TotalSeconds);
         }
         catch (Exception ex)
         {

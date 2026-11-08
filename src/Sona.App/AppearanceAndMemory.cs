@@ -34,7 +34,11 @@ public partial class MainWindow
     }
     private void RefreshResidentStatus()
     {
-        ResidentStatus.Text = transcriber.ResidentCleanupPending ? "Model memory is still releasing. Use Unload now to retry." : transcriber.LoadedModel is { } id ? ModelCatalog.Get(id).Name + " is loaded in memory." : "No model loaded. Your downloaded models remain on disk.";
+        ResidentStatus.Text = transcriber.ResidentCleanupPending ? "Model memory is still releasing. Use Unload now to retry."
+            : transcriber.LoadedModel is { } id ? ModelCatalog.Get(id).Name + " is loaded in memory."
+                + (transcriber.LastLoadSeconds is double loadedSeconds ? $" Last load took {loadedSeconds:0.0} s." : "")
+                + (preferences.ModelIdleMinutes == 0 ? " Keeps this model loaded until you quit Sona." : "")
+            : "No model loaded. Your downloaded models remain on disk.";
         var selected = Audio.Transcriber.SelectedModel(preferences);
         if (selected != transcriber.LoadedModel) ResidentStatus.Text += " " + ModelCatalog.Get(selected).Name + " is selected for the next dictation.";
     }

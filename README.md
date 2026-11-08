@@ -7,7 +7,7 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Early preview: 0.5.2.** Build from source below. There is no published binary
+**Early preview: 0.5.3.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -18,6 +18,24 @@ shows Sona 0.4.2 with actual app captures and a prerecorded local recognition
 demonstration. The recording display replays measured speech and transcript
 events; the receiving field illustrates insertion. It includes AI-assisted
 narration, music and background art. [Capture details](docs/images/README.md).
+
+## New in 0.5.3
+
+- **Loading feedback is real.** When a model genuinely loads, Sona names it and
+  shows the actual stage and measured time, for example
+  "Checking Whisper Large v3 Turbo files · 1.2 s · Esc cancels" then
+  "Loading Whisper Large v3 Turbo · 2.8 s · Esc cancels". Warm dictation shows no
+  preparation text, and a completed cold load reports its measured duration.
+- **Measured load times on the model pages.** Dictation Models and Text cleanup
+  show the last real load time. With **Keep until quit** selected they also say
+  the model stays loaded until Sona quits.
+- **Keep both models resident.** **Unload after inactivity → Keep until quit** is
+  available for the speech model (Dictation Models) and the text-polish model
+  (Text cleanup). Dictation then starts without a reload wait; Quit still releases
+  both workers.
+- **Residency settings save reliably.** Changing the Dictation Models idle choice
+  while a model is warming now saves and applies immediately instead of being
+  rejected.
 
 ## New in 0.5.2
 

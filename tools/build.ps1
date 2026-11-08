@@ -51,6 +51,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Professional polish fixture failed' }
 $taskSetupEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-professional-setup-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --professional-polish-setup-fixture $taskSetupEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Setup guidance fixture failed' }
+$taskLoadingEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-model-loading-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --model-loading-fixture $taskLoadingEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Model loading feedback regressions failed' }
 & (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
 if (!$?) { throw 'Updater status regressions failed' }
 & (Join-Path $taskRepo 'tools\owned-startup-checks.ps1')

@@ -1,3 +1,14 @@
+## November 8 truthful model-loading information, 0.5.3
+
+The 0.5.3 candidate makes every loading message come from the real loader state
+and a real stopwatch: the model's catalog name, the actual verification or memory
+stage and measured seconds. Warm runs stay silent, and a completed cold load
+reports its measured duration once. Loader timing is exposed to the model pages
+and agent status, and Keep until quit is now set for both workers on the owner
+profile. The model-loading fixture passed 40 checks with no failures, and the
+consolidated gate including that fixture passed. No microphone or global input was
+used.
+
 ## November 7 recognizable worker names, 0.5.2
 
 The 0.5.2 candidate brands the background workers for Task Manager and Process

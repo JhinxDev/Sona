@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows.Threading;
 using Sona.App.Audio;
 using Sona.Core;
@@ -9,19 +10,52 @@ internal enum ModelPurpose { Speech, Cleanup }
 public partial class MainWindow
 {
     internal Func<ModelPurpose, ModelLoadStage>? ModelLoadStageForTests { get; set; }
+    // Real stopwatch tracking per purpose. A note is produced only when a genuine
+    // cold load completed, and it is cleared when the next load starts or a new
+    // dictation session begins.
+    private readonly long[] loadStartedAt = new long[2];
+    private readonly string?[] loadReadyNote = new string?[2];
+    private readonly bool[] loadReadyTaken = new bool[2];
+
     private ModelLoadStage GetModelLoadStage(ModelPurpose purpose) => arguments.Contains("--test-ui") && ModelLoadStageForTests != null
         ? ModelLoadStageForTests(purpose) : purpose == ModelPurpose.Speech ? transcriber.LoadStage : cleanupModel.LoadStage;
 
-    private static string? LoadingHint(ModelPurpose purpose, ModelLoadStage stage)
+    private double TrackModelLoad(ModelPurpose purpose, ModelLoadStage stage)
     {
-        var name = purpose == ModelPurpose.Speech ? "Speech" : "Cleanup";
-        return stage switch
+        var index = (int)purpose;
+        var now = Stopwatch.GetTimestamp();
+        if (stage != ModelLoadStage.None)
         {
-            ModelLoadStage.Verifying => $"Checking {name.ToLowerInvariant()} model · Esc cancels",
-            ModelLoadStage.Loading => $"{name} model into memory · Esc cancels",
-            _ => null
-        };
+            if (loadStartedAt[index] == 0) loadStartedAt[index] = now;
+            loadReadyNote[index] = null; loadReadyTaken[index] = false;
+            return Stopwatch.GetElapsedTime(loadStartedAt[index]).TotalSeconds;
+        }
+        if (loadStartedAt[index] != 0)
+        {
+            var seconds = Stopwatch.GetElapsedTime(loadStartedAt[index]).TotalSeconds;
+            loadStartedAt[index] = 0;
+            loadReadyNote[index] = ModelLoadingText.Ready(ModelLoadingText.ModelName(purpose, preferences), seconds);
+            loadReadyTaken[index] = false;
+        }
+        return 0;
     }
+
+    /// <summary>Returns the measured completion note once, so it never repeats.</summary>
+    private string? TakeLoadReadyNote(ModelPurpose purpose)
+    {
+        var index = (int)purpose;
+        if (loadReadyNote[index] is not { } note || loadReadyTaken[index]) return null;
+        loadReadyTaken[index] = true;
+        return note;
+    }
+
+    private void ResetModelLoadTracking()
+    {
+        Array.Clear(loadStartedAt); Array.Clear(loadReadyNote); Array.Clear(loadReadyTaken);
+    }
+
+    private string? LoadingHint(ModelPurpose purpose, ModelLoadStage stage, double elapsedSeconds) =>
+        stage == ModelLoadStage.None ? null : ModelLoadingText.Hint(stage, ModelLoadingText.ModelName(purpose, preferences), elapsedSeconds);
 
     private async Task<T> WithModelProgressAsync<T>(Func<Task<T>> run, ModelPurpose purpose, CancellationToken token)
     {
@@ -33,20 +67,26 @@ public partial class MainWindow
             if (token.IsCancellationRequested || shutdownPending || windowClosed || owner == null ||
                 !ReferenceEquals(owner, session) || owner.State != SessionState.Transcribing || !processing) return;
             var stage = GetModelLoadStage(purpose);
+            var elapsed = TrackModelLoad(purpose, stage);
+            var modelName = ModelLoadingText.ModelName(purpose, preferences);
             var label = stage == ModelLoadStage.Verifying ? "Checking model" : stage == ModelLoadStage.Loading ? "Loading model"
                 : purpose == ModelPurpose.Speech ? "Transcribing" : "Polishing";
-            var hint = LoadingHint(purpose, stage) ?? "Esc cancels";
-            Status.Text = stage != ModelLoadStage.None ? (stage == ModelLoadStage.Verifying ? "Checking " : "Loading ") + (purpose == ModelPurpose.Speech ? "speech model" : "cleanup model")
-                : purpose == ModelPurpose.Speech ? "Making your draft" : "Polishing your draft";
-            StatusDetail.Text = hint;
-            overlay.Update(label, hint);
+            string detail;
+            if (stage != ModelLoadStage.None) detail = ModelLoadingText.Hint(stage, modelName, elapsed);
+            else if (TakeLoadReadyNote(purpose) is { } note) detail = note + " · Esc cancels";
+            else detail = "Esc cancels";
+            Status.Text = ModelLoadingText.Status(purpose, stage, modelName);
+            StatusDetail.Text = detail;
+            overlay.Update(label, detail);
         }
         var progress = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(80) };
         progress.Tick += (_, _) => Refresh();
         try
         {
             var work = run(); Refresh(); progress.Start();
-            return await work;
+            var result = await work;
+            Refresh();
+            return result;
         }
         finally { progress.Stop(); }
     }

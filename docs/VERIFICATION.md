@@ -1,5 +1,37 @@
 # Candidate verification
 
+## 0.5.3 truthful model-loading information, November 8
+
+The 0.5.3 candidate replaces the generic loading copy with values from the real
+loader state and a real stopwatch: the selected model's catalog name, the actual
+stage (file verification then worker memory load) and measured elapsed seconds,
+for example "Loading Whisper Large v3 Turbo · 2.8 s · Esc cancels". Warm runs show
+no preparation text. The loaders now expose their measured cold-load duration and
+the model pages show it with a Keep until quit note; agent status exposes
+`speechLastLoadSeconds` and `cleanupLastLoadSeconds`.
+
+Verification:
+
+- Warning-free App build.
+- Model-loading fixture: **40 checks, 0 failures**, including exact copy for both
+  purposes, measured formatting, no hint on warm runs, state-gated
+  verification/loading, recording-path hint and measured completion note.
+- Windows default suite and the consolidated `tools/build.ps1` gate (now including
+  the model-loading fixture) passed end to end with no failures and no known
+  vulnerable packages.
+- The maintained ResidentModel checks continue to cover that Keep until quit
+  (`ModelIdleMinutes = 0`) retains a model after long inactivity. No unattended
+  microphone or global input was used.
+
+### Live activation, November 8
+
+Guarded `tools/upgrade.ps1 -PreserveSessionHistory` installed the exact package
+`artifacts/0.5.3-<head>` and launched it. Live readback confirmed the app and agent
+report 0.5.3, all installed hashes match, the draft was preserved, both residency
+settings remained at Keep until quit, and startup warming loaded the branded
+speech and text-polish workers with measured cold-load times reported by the agent
+status.
+
 ## 0.5.2 recognizable worker names, November 7
 
 Sona now launches clearly named copies of its upstream workers so Task Manager and

@@ -1,5 +1,19 @@
 # Owner-started Sona test
 
+## Short 0.5.3 loading and residency check
+
+1. In Dictation Models, press **Unload now**, then start a real dictation. The
+   pill should name the selected model and a ticking measured time, for example
+   "Loading Whisper Large v3 Turbo · 2.8 s · Esc cancels". It must not show generic
+   or random preparation text.
+2. Start another dictation immediately. No loading label should appear because the
+   model is warm.
+3. Set **Unload after inactivity → Keep until quit** for both Dictation Models and
+   Text cleanup, save, and confirm each page says the model stays loaded until
+   Sona quits and shows the last measured load time.
+4. Quit Sona normally and reopen it; both models should warm on their own and the
+   first dictation should not wait for a reload.
+
 ## Short 0.5.2 process name check
 
 Open Task Manager (Details or Processes) while Sona is running and warming a

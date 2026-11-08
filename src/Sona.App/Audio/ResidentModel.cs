@@ -27,8 +27,14 @@ internal sealed class ResidentModel
     private int usedCuda;
     private int processId;
     private bool cleanupPending;
+    /// <summary>Applies a changed idle preference immediately without reloading.</summary>
+    public void UpdateIdleMinutes(int minutes) => idleMinutes = Math.Clamp(minutes, 0, 240);
+
     private int loadStage;
+    private long loadStartedAt;
     public ModelLoadStage LoadStage => (ModelLoadStage)Volatile.Read(ref loadStage);
+    // Measured duration of the most recent real cold load. Null until one happens.
+    public double? LastLoadSeconds { get; private set; }
     private bool parakeet;
     private string? apiKey;
     public bool CleanupPending => Volatile.Read(ref cleanupPending);
@@ -125,6 +131,8 @@ internal sealed class ResidentModel
         var nextKey = model + (cuda ? ":cuda" : ":cpu");
         if (worker != null && key == nextKey && !worker.Process.HasExited) { lastUse = clock.GetTimestamp(); return; }
         await ReleaseAsync().ConfigureAwait(false);
+        loadStartedAt = clock.GetTimestamp();
+        LastLoadSeconds = null;
         // Verification is part of startup, including automatic warming after launch.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(startupTimeout);
         try
@@ -202,6 +210,7 @@ internal sealed class ResidentModel
             }
             else if (cuda && Volatile.Read(ref usedCuda) == 0) throw new IOException("The resident engine did not confirm CUDA. Select CPU or repair its runtime.");
             deadline.Token.ThrowIfCancellationRequested(); key = nextKey; Volatile.Write(ref loaded, model); lastUse = clock.GetTimestamp();
+            LastLoadSeconds = Math.Max(0, clock.GetElapsedTime(loadStartedAt).TotalSeconds);
         }
         catch (Exception ex)
         {

@@ -1,3 +1,25 @@
+## November 8 accurate model-loading copy, 0.5.3
+
+The 0.4.11 loading states keep their geometry, busy indicator, reduced-motion
+fallback and 80 ms sampling. Their copy is now exact and measured. The model's own
+catalog name is shown (for example "Whisper Large v3 Turbo" or "Spokenly
+Cleanup 1"), the stage is the real loader stage ("Checking ... files" while
+integrity verification runs, "Loading ..." while the contained worker starts and
+answers health checks), and the elapsed value is a real stopwatch reading printed
+with one decimal and "s". The overlay hint form is
+"Loading Whisper Large v3 Turbo · 2.8 s · Esc cancels"; the Home status uses
+"Loading Whisper Large v3 Turbo" without a generic "speech model" placeholder.
+Warm runs produce no loading label or hint at all. When a genuine cold load
+completes, one measured note ("... loaded in 4.0 s") is added for that session and
+is cleared when a new dictation starts or another load begins.
+
+Dictation Models and Text cleanup keep their existing memory rows. Their status
+line now appends the measured "Last load took X s" and, when Keep until quit is
+selected, "Keeps this model loaded until you quit Sona". No percentage, spinner
+duration or copy is invented, and no layout, palette or control geometry changed.
+The Dictation Models idle choice follows the same rule: it saves and applies even
+while a model is warming, with an explicit "stays loaded until you quit" result.
+
 ## November 6 professional polish, 0.5.0
 
 Home adds two mutually exclusive onboarding surfaces inside the existing scroll

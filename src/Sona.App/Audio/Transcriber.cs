@@ -8,6 +8,8 @@ public sealed class Transcriber
 {
     private readonly ResidentModel resident = new();
     public string? LoadedModel => resident.LoadedModel;
+    public double? LastLoadSeconds => resident.LastLoadSeconds;
+    public void UpdateModelIdle(int minutes) => resident.UpdateIdleMinutes(minutes);
     internal ModelLoadStage LoadStage => resident.LoadStage;
     public bool ResidentCleanupPending => resident.CleanupPending;
     public int? ResidentProcessId => resident.ProcessId;

@@ -109,10 +109,11 @@ public partial class MainWindow
     private void ModelIdleChanged(object sender, SelectionChangedEventArgs e)
     {
         if (restoringIdleChoice || ModelIdleChoice.SelectedItem is not ComboBoxItem item || !int.TryParse((string)item.Tag, out var minutes) || minutes == preferences.ModelIdleMinutes) return;
-        if (SettingsBusy) { RestoreModelIdle(); ModelResult.Text = "Finish the current operation before changing memory preference."; return; }
+        // Memory residency is a simple saved preference; a warm operation must not reject it.
+        if (shutdownPending || processing || recorder != null || preparing || session?.State == SessionState.Recording) { RestoreModelIdle(); ModelResult.Text = "Finish or cancel the current dictation before changing the memory preference."; return; }
         var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
         next.ModelIdleMinutes = minutes;
-        try { next.Save(preferencesPath); preferences.ModelIdleMinutes = minutes; ModelResult.Text = "Memory preference saved. Applies at the next model use."; }
+        try { next.Save(preferencesPath); preferences.ModelIdleMinutes = minutes; transcriber.UpdateModelIdle(minutes); ModelResult.Text = minutes == 0 ? "Saved. This model stays loaded until you quit Sona." : $"Saved. The model unloads after {minutes} minutes idle."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         { RestoreModelIdle(); ModelResult.Text = "Memory preference could not be saved. Previous choice retained."; }
         RefreshSettingsActions();

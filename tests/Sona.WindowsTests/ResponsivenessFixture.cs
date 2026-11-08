@@ -98,6 +98,15 @@ internal static class ResponsivenessFixture
                     typeof(MainWindow).GetMethod("Preferences_Click",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[window,new RoutedEventArgs()]);
                     await Task.Delay(40);
                     Check(prefs.CleanupMode=="Auto" && Preferences.Load(Path.Combine(output,"profile","preferences.json")).CleanupMode=="Auto","Native Save activates and persists Auto cleanup immediately");
+                    // Memory residency must save during a warm operation instead of being rejected.
+                    var idleChoice=(ComboBox)window.FindName("ModelIdleChoice");
+                    var applying=(System.Reflection.FieldInfo)typeof(MainWindow).GetField("preferencesApplying",BindingFlags.Instance|BindingFlags.NonPublic)!;
+                    applying.SetValue(window,true);
+                    idleChoice.SelectedItem=idleChoice.Items.Cast<ComboBoxItem>().Single(x=>(string)x.Tag=="0");
+                    await Task.Delay(30);
+                    applying.SetValue(window,false);
+                    Check(prefs.ModelIdleMinutes==0 && Preferences.Load(Path.Combine(output,"profile","preferences.json")).ModelIdleMinutes==0,"Keep until quit memory preference saves during a warm operation and persists");
+                    Check(((TextBlock)window.FindName("ModelResult")).Text.Contains("stays loaded"),"Saved memory preference explains that the model stays loaded");
                     var cleanupCalls=0;window.CleanupForTests=(text,_)=>{cleanupCalls++;return Task.FromResult(text);};
                     await (Task)typeof(MainWindow).GetMethod("PolishAsync",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,["Please open the draft.",CancellationToken.None,null,null])!;
                     Check(cleanupCalls==0,"Saved Auto mode changes the live cleanup decision without restart");

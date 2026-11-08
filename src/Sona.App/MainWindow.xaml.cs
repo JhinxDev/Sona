@@ -200,6 +200,7 @@ public partial class MainWindow : Window
         // capture cannot install a destination into a cancelled or newer session.
         target = null; recordingCapture = null; destinationContext.End();
         ResetSessionMode();
+        ResetModelLoadTracking();
         barPreview.Stop();
         RetainCurrentDraft(); historySelection = null;
         preparedInsertionTest = insertionTestHolding = false;
@@ -266,8 +267,14 @@ public partial class MainWindow : Window
         { submitOnComplete = false; operation = StopAsync(retainOnly: true); return; }
         var remaining = RecordingLimits.MaximumSeconds - active.Elapsed;
         var hint = remaining <= 30 ? $"{Math.Ceiling(remaining):0}s left · limit keeps a draft · Esc cancels" : "Esc to cancel";
-        var stage = preferences.LiveTranscription ? GetModelLoadStage(ModelPurpose.Speech) : ModelLoadStage.None;
-        overlay.Update("Listening", LoadingHint(ModelPurpose.Speech, stage) ?? hint, active.Elapsed, active.Level, showRecordingHint: stage != ModelLoadStage.None); active.CheckHealth();
+        var loadStage = preferences.LiveTranscription ? GetModelLoadStage(ModelPurpose.Speech) : ModelLoadStage.None;
+        var loadHint = LoadingHint(ModelPurpose.Speech, loadStage, TrackModelLoad(ModelPurpose.Speech, loadStage));
+        overlay.Update("Listening", loadHint ?? hint, active.Elapsed, active.Level, showRecordingHint: loadStage != ModelLoadStage.None);
+        // Report a completed cold load once with its measured duration, then keep
+        // the destination guidance for the rest of the recording.
+        if (loadStage == ModelLoadStage.None && TakeLoadReadyNote(ModelPurpose.Speech) is { } ready)
+            StatusDetail.Text = ready + " · " + (string.IsNullOrEmpty(StatusDetail.Text) ? "Esc cancels" : StatusDetail.Text);
+        active.CheckHealth();
     }
     private async Task StopAsync(bool retainOnly = false)
     {
@@ -489,6 +496,7 @@ public partial class MainWindow : Window
             preferences.AppModes = next.AppModes; preferences.OnboardingDismissed = next.OnboardingDismissed;
             ResetAppModes();
             ThemeManager.Apply(preferences.Theme); overlay.SetDisplay(preferences.RecordingDisplay);
+            transcriber.UpdateModelIdle(preferences.ModelIdleMinutes); cleanupModel.UpdateIdleMinutes(preferences.CleanupIdleMinutes);
             RefreshModelCards(); modelPreparation = WarmAllSelectedAsync();
             Volatile.Write(ref shortcutToggleMode, preferences.ShortcutMode == "Toggle" ? 1 : 0); hotkeys?.ResetBaseline();
             if (!priorKeepHistory && preferences.KeepHistory)

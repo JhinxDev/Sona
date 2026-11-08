@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.3 - real model-loading information and always-resident models
+
+- Loading feedback is now exact instead of generic. While a model really loads,
+  Sona names the actual model ("Whisper Large v3 Turbo", "Spokenly Cleanup 1"),
+  the actual stage ("Checking ... files" then "Loading ...") and the measured
+  elapsed seconds, for example "Loading Whisper Large v3 Turbo · 2.8 s · Esc
+  cancels". Warm runs show no preparation text at all. A completed cold load adds
+  one measured note with its real duration.
+- The engine loaders measure the real cold-load duration. Models and Text cleanup
+  now show "Last load took X s" and, when Keep until quit is selected, "Keeps this
+  model loaded until you quit Sona". The agent status exposes the measured
+  `speechLastLoadSeconds` and `cleanupLastLoadSeconds` for diagnostics.
+- Keep until quit now works for both workers. This pass sets the live profile to
+  keep the speech model and the text-polish model resident, so dictation does not
+  wait for a reload after an idle period; normal Quit still releases them.
+- **Memory residency preference now saves during warm-up.** Choosing Keep until
+  quit (or another idle time) in Dictation Models while a model is warming is no
+  longer rejected: it saves, applies immediately and explains that the model stays
+  loaded. Two maintained checks cover the warm-time save and its copy.
+- New regressions: the model-loading fixture checks the exact copy, measurement
+  formatting, no hint on warm runs and the recording-path hint, 40 checks total.
+
 ## 0.5.2 - recognizable background workers
 
 - Windows Task Manager and Process Explorer now show **Sona Speech Engine** for the
