@@ -61,8 +61,8 @@ end to end without touching the owner installation:
   separate .NET runtime), pinned Whisper CPU engine from whisper.cpp `b5454`
   verified against every hash in `tools/runtime-manifest.json`, notices and
   licenses. Model weights are deliberately downloaded in-app.
-- Artifact: `Sona-Setup-0.5.3.exe`, 52.6 MB (55,188,919 bytes), SHA256
-  `c71aa3b9236bea26f375ac34e7fda567c6564e82ffe1cf2a845fea92ca18aa0d`, built from
+- Artifact: `Sona-Setup-0.5.3.exe`, 52.6 MB (55,188,916 bytes), SHA256
+  `c0997819f9ced1dd1b01b73a1e95a96cdc7b8b1b459178bbab11d575137d466f`, built from
   source head `c7d508e2c4e1944a3ee3872c59818e593c4693b5`; unsigned preview, so
   SmartScreen warns by design.
 - Rehearsal: isolated silent install into a temporary folder, then **23 checks,
