@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.2 - recognizable background workers
+
+- Windows Task Manager and Process Explorer now show **Sona Speech Engine** for the
+  speech worker and **Sona Text Polish** for the optional local cleanup worker,
+  instead of the upstream `whisper-server.exe` and `llama-server.exe` names (and
+  **Sona Transcription** for the one-shot WAV worker). Sona launches byte-identical
+  copies under those names; the hash-pinned originals stay in place and keep their
+  integrity checks. Cleanup's copy lives outside the hash-verified runtime
+  directory, and its working directory keeps the adjacent ggml/CUDA libraries on
+  the loader path.
+- Copies refresh automatically when an engine is updated, and a read-only or
+  missing runtime falls back to the original binary rather than failing dictation.
+
 ## 0.5.1 - Discord deafened support
 
 - Fix: dictation now starts when Discord is deafened. Discord already has the

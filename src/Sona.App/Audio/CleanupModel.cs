@@ -122,7 +122,11 @@ internal sealed class CleanupModel
             var socket = new TcpListener(IPAddress.Loopback, 0); socket.Start(); var port = ((IPEndPoint)socket.LocalEndpoint).Port; socket.Stop();
             endpoint = new Uri($"http://127.0.0.1:{port}/");
             capability = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var info = new ProcessStartInfo(Path.Combine(directory, "llama-server.exe")) { WorkingDirectory = directory };
+            // The branded copy lives outside the hash-verified cleanup runtime
+            // directory; its working directory keeps the adjacent ggml/CUDA DLLs on
+            // the loader search path.
+            var executable = WorkerBranding.PathFor(Path.Combine(directory, "llama-server.exe"), Path.Combine(AppPaths.DataRoot, "workers"));
+            var info = new ProcessStartInfo(executable) { WorkingDirectory = directory };
             foreach (var arg in new[] { "-m", CleanupAssets.ModelPath, "-c", "4096", "-np", "1", "-t", "6", "-tb", "6", "-ngl", backend == "GPU" ? "99" : "0", "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--api-key", capability, "--log-verbosity", backend == "GPU" ? "4" : "3" }) info.ArgumentList.Add(arg);
             Volatile.Write(ref cudaOffload, 0); Volatile.Write(ref cudaBuffer, 0);
             Volatile.Write(ref modelVramMiB, double.NaN);

@@ -7,7 +7,7 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Early preview: 0.5.1.** Build from source below. There is no published binary
+**Early preview: 0.5.2.** Build from source below. There is no published binary
 download yet. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
@@ -18,6 +18,17 @@ shows Sona 0.4.2 with actual app captures and a prerecorded local recognition
 demonstration. The recording display replays measured speech and transcript
 events; the receiving field illustrates insertion. It includes AI-assisted
 narration, music and background art. [Capture details](docs/images/README.md).
+
+## New in 0.5.2
+
+Task Manager and Process Explorer now make Sona's background workers obvious:
+**Sona Speech Engine** is the speech model process and **Sona Text Polish** is the
+optional local cleanup model process, instead of upstream names such as
+`whisper-server.exe` and `llama-server.exe`. The one-shot WAV worker appears as
+**Sona Transcription**. These are byte-identical copies of the verified engines,
+launched under clear names; the pinned originals remain untouched and keep their
+integrity checks. Task Manager will show the new names after the workers next
+start.
 
 ## New in 0.5.1
 
@@ -114,6 +125,8 @@ identity. Voice, audio and transcripts stay on this PC.
   shared credentials; you connect your own Discord application.
 - **Workspace fit.** Eight light/dark glass themes, Inter typography, Panel or
   Capsule recording displays, a microphone picker and local WAV transcription.
+- **Recognizable background workers.** Task Manager shows **Sona Speech Engine**,
+  **Sona Transcription** and **Sona Text Polish** rather than upstream binary names.
 - **Connect your tools.** A JSON CLI and stdio MCP interface expose status,
   validated settings, models and call protection, with no remote microphone
   control.

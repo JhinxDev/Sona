@@ -1,5 +1,33 @@
 # Candidate verification
 
+## 0.5.2 recognizable worker names, November 7
+
+Sona now launches clearly named copies of its upstream workers so Task Manager and
+Process Explorer show **Sona Speech Engine** (`whisper-server.exe`),
+**Sona Transcription** (`whisper-cli.exe`) and **Sona Text Polish**
+(`llama-server.exe`). The copies are byte-identical to the verified upstream
+binaries. Speech copies stay in their own runtime directory; the cleanup copy is
+stored under the current-user data directory because the cleanup runtime verifier
+requires its directory file set to match the pinned manifest exactly. The cleanup
+launch keeps the runtime directory as its working directory so the adjacent
+ggml/CUDA DLLs remain on the loader search path. Copies refresh when an engine
+changes, and a read-only or missing runtime falls back to the original binary.
+
+Verification: warning-free App build; Windows default suite **60 checks** (was 55)
+including five new branding checks (copy name and bytes, reuse without duplicate,
+refresh after an engine change, cleanup copy outside the verified directory,
+unknown names unchanged). The consolidated gate passed end to end with the full
+fixture set and no known vulnerable packages.
+
+### Live activation, November 7
+
+Guarded `tools/upgrade.ps1 -PreserveSessionHistory` installed the exact package
+`artifacts/0.5.2-<head>` and launched it. Live readback confirmed the app and agent
+report 0.5.2, all installed hashes match, the draft was preserved, and the worker
+processes now appear as "Sona Speech Engine" and "Sona Text Polish" with their
+raw upstream files still present and unmodified. No microphone or global input was
+used by the automated checks; a startup warm produced the branded workers.
+
 ## 0.5.1 Discord deafened support, November 7
 
 The 0.5.1 source candidate fixes the reported failure where Ctrl + Windows showed

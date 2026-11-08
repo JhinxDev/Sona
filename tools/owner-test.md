@@ -1,5 +1,12 @@
 # Owner-started Sona test
 
+## Short 0.5.2 process name check
+
+Open Task Manager (Details or Processes) while Sona is running and warming a
+model. The background workers should read **Sona Speech Engine** and **Sona Text
+Polish**, not `whisper-server.exe` or `llama-server.exe`. Ending those processes
+from Task Manager is still wrong; use Sona's Unload actions or quit Sona.
+
 ## Short 0.5.1 deafened Discord check
 
 Keep your Discord deafen on. Focus an editable field and use your normal Ctrl +

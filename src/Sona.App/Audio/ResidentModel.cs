@@ -133,7 +133,7 @@ internal sealed class ResidentModel
             var verified = await verifyModel(model, deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();
             if (!verified) throw new IOException("Install and verify the selected local model first.");
-            var executable = isParakeet ? ParakeetAssets.Executable(cuda) : Path.Combine(Transcriber.RuntimeRoot, cuda ? "whisper-cuda" : "whisper", "Release", "whisper-server.exe");
+            var executable = isParakeet ? ParakeetAssets.Executable(cuda) : WorkerBranding.PathFor(Path.Combine(Transcriber.RuntimeRoot, cuda ? "whisper-cuda" : "whisper", "Release", "whisper-server.exe"));
             if (!File.Exists(executable)) throw new IOException("The resident local engine is missing. Repair the local runtime.");
             if (isParakeet && !await ParakeetAssets.VerifyAsync(cuda, deadline.Token).ConfigureAwait(false)) throw new IOException("The Parakeet runtime failed integrity verification. Existing files were preserved.");
             deadline.Token.ThrowIfCancellationRequested();

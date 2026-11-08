@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Sona.App;
 using Sona.App.Audio;
 using Sona.App.Windows;
 using NAudio.Wave;
@@ -429,6 +430,26 @@ try
 }
 finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
 CleanupModelChecks.Pure(Check);
+var brandRoot = Path.Combine(Path.GetTempPath(), "sona-brand-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(brandRoot);
+try
+{
+    var fakeSpeech = Path.Combine(brandRoot, "whisper-server.exe"); File.WriteAllBytes(fakeSpeech, [1, 2, 3, 4]);
+    var brandedSpeech = WorkerBranding.PathFor(fakeSpeech);
+    Check(Path.GetFileName(brandedSpeech) == "Sona Speech Engine.exe" && File.ReadAllBytes(brandedSpeech).SequenceEqual(new byte[] { 1, 2, 3, 4 }), "Worker branding launches an identically named Sona speech engine copy");
+    WorkerBranding.PathFor(fakeSpeech);
+    Check(Directory.GetFiles(brandRoot).Length == 2, "Worker branding reuses an unchanged engine copy instead of duplicating it");
+    File.WriteAllBytes(fakeSpeech, [9, 9, 9, 9, 9]);
+    File.SetLastWriteTimeUtc(fakeSpeech, DateTime.UtcNow.AddMinutes(1));
+    var refreshed = WorkerBranding.PathFor(fakeSpeech);
+    Check(File.ReadAllBytes(refreshed).SequenceEqual(new byte[] { 9, 9, 9, 9, 9 }), "Worker branding refreshes its copy when the upstream engine changes");
+    var fakeCleanup = Path.Combine(brandRoot, "llama-server.exe"); File.WriteAllBytes(fakeCleanup, [7, 7]);
+    var cleanupWorkers = Path.Combine(brandRoot, "workers");
+    var brandedCleanup = WorkerBranding.PathFor(fakeCleanup, cleanupWorkers);
+    Check(Path.GetFileName(brandedCleanup) == "Sona Text Polish.exe" && Path.GetDirectoryName(brandedCleanup) == cleanupWorkers, "Cleanup worker branding stays outside the hash-verified runtime directory");
+    var unknown = Path.Combine(brandRoot, "mystery-worker.exe"); File.WriteAllBytes(unknown, [5]);
+    Check(WorkerBranding.PathFor(unknown) == unknown, "Unknown worker names keep their upstream path");
+}
+finally { Directory.Delete(brandRoot, true); }
 Console.WriteLine(JsonSerializer.Serialize(new { Passed = passed.Count, Checks = passed, MicrophoneOpened = false, GlobalInputSent = false }));
 
 sealed class TestClock : TimeProvider

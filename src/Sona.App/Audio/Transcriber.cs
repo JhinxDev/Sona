@@ -50,7 +50,7 @@ public sealed class Transcriber
             await File.WriteAllTextAsync(Path.Combine(work, "owner.marker"), AppPaths.ScratchMarker, cancellation).ConfigureAwait(false);
             var audio = Path.Combine(work, "audio.wav");
             await File.WriteAllBytesAsync(audio, wav, cancellation).ConfigureAwait(false);
-            var info = new ProcessStartInfo(Path.Combine(RuntimeRoot, useCuda ? "whisper-cuda" : "whisper", "Release", "whisper-cli.exe"));
+            var info = new ProcessStartInfo(WorkerBranding.PathFor(Path.Combine(RuntimeRoot, useCuda ? "whisper-cuda" : "whisper", "Release", "whisper-cli.exe")));
             var args = new[] { "-m", Models.PathFor(modelId), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", useCuda ? "5" : "1", "-bo", useCuda ? "5" : "1", "-nf", "-sns", "-oj", "-of", Path.Combine(work, "result") };
             foreach (var arg in args) info.ArgumentList.Add(arg);
             if (!useCuda) info.ArgumentList.Add("-ng");

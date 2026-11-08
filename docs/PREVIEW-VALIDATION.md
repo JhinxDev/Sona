@@ -1,3 +1,15 @@
+## November 7 recognizable worker names, 0.5.2
+
+The 0.5.2 candidate brands the background workers for Task Manager and Process
+Explorer without touching the verified engines: byte-identical copies are launched
+as **Sona Speech Engine**, **Sona Transcription** and **Sona Text Polish**. The
+cleanup copy lives outside the hash-verified runtime directory and runs with that
+directory as its working directory so its DLLs load. Windows checks grew to 60
+with coverage for the copy name and bytes, reuse, refresh and fallback, and the
+cleanup copy location. The full gate passed with no failures. No microphone or
+global input was used; startup warming produced the renamed workers for live
+readback.
+
 ## November 7 Discord deafened support, 0.5.1
 
 The reported "pill pops up and goes away" failure was reproduced from state: the
