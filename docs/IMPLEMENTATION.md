@@ -249,3 +249,36 @@ The new-session History completion opts into a bounded read-only status-availabi
 retry. Known recording/busy state or owned voice changes still refuses immediately;
 ordinary transfer checks never wait. `tools/session-readiness-checks.ps1` covers
 ready, transient, exhausted, busy, owned-voice and default nonretry cases.
+
+## Windows installer distribution, 0.5.3
+
+The per-user installer is a distribution wrapper around an accepted app build; it
+does not change the app, its source, or the live-upgrade contract above. Build it
+with `tools/installer/build-installer.ps1` (append `-Rehearsal` to install a
+throwaway copy, verify it and uninstall it before producing the real artifact).
+The payload is a self-contained `win-x64` publish of `Sona.App` plus
+`Sona.Agent` in the same folder, so installed users need no separate .NET
+runtime. The pinned Whisper CPU engine from whisper.cpp `b5454` is downloaded by
+the build, verified against every file hash in `tools/runtime-manifest.json`, and
+installed to `%LOCALAPPDATA%\Sona\runtime\whisper\Release` only when the optional
+engine task is selected. Model weights are intentionally not bundled; Sona's
+existing in-app model download keeps the app's asset and license boundaries.
+
+The installer is Inno Setup 7 (`installer/Sona.iss`), per-user
+(`PrivilegesRequired=lowest`) with no elevation. It writes
+`installation.json` with the exact executable `Path` and lowercase `SHA256` that
+`Windows/Startup.cs` already requires for owned startup registration. This is what
+keeps an installed build eligible for the in-app startup toggle. The receipt also
+carries the app version and source head; it is not a package receipt and is not
+used by the guarded live-upgrade tooling.
+
+Uninstall removes the app, its shortcuts, its uninstall registration and the
+engine files the installer placed under the runtime root. It preserves the user
+profile, drafts, history and downloaded model weights under
+`%LOCALAPPDATA%\Sona` (or a legacy `%LOCALAPPDATA%\Murmur` profile). A newer
+installer upgrades in place; Sona itself does not auto-install updates. CUDA
+remains a separate developer setup step. The installer is unsigned in the current
+preview: code signing and a hosted binary release are separate actions that need
+explicit authorization. The rehearsal uses an isolated app id, install folder and
+`SONA_DATA` profile, verifies receipt/files/engine pinning/app and CLI start and
+silent uninstall, and never touches the owner installation.

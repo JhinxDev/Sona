@@ -48,6 +48,36 @@ readback at 02:1x Toronto:
   recording-path hint. No microphone or global input was used by the automated
   checks. Physical microphone acceptance remains an owner check.
 
+### Windows installer rehearsal, November 8
+
+A per-user installer was added from the same accepted 0.5.3 source and rehearsed
+end to end without touching the owner installation:
+
+- Maintained tooling: `installer/Sona.iss`,
+  `tools/installer/build-installer.ps1`,
+  `tools/installer/rehearse-installer.ps1`; guide at
+  [docs/INSTALL.md](INSTALL.md).
+- Payload: self-contained win-x64 publish of Sona and `sona-agent.exe` (no
+  separate .NET runtime), pinned Whisper CPU engine from whisper.cpp `b5454`
+  verified against every hash in `tools/runtime-manifest.json`, notices and
+  licenses. Model weights are deliberately downloaded in-app.
+- Artifact: `Sona-Setup-0.5.3.exe`, 52.6 MB (55,188,919 bytes), SHA256
+  `c71aa3b9236bea26f375ac34e7fda567c6564e82ffe1cf2a845fea92ca18aa0d`, built from
+  source head `c7d508e2c4e1944a3ee3872c59818e593c4693b5`; unsigned preview, so
+  SmartScreen warns by design.
+- Rehearsal: isolated silent install into a temporary folder, then **23 checks,
+  0 failures**: installed app and CLI files, subscription notices and licenses,
+  `installation.json` with the exact `Path` and lowercase `SHA256` the startup
+  ownership check expects, installed engine hashes matching the runtime manifest,
+  Start Menu shortcut, self-contained app start, CLI start without a separate
+  .NET runtime, normal window close, and silent uninstall removing the app,
+  shortcut, uninstall registration and installer-owned engine while preserving
+  profile data outside the app folder.
+- The rehearsal used an isolated app id, install folder and `SONA_DATA` profile;
+  it did not start the microphone, send input or alter the owner installation or
+  Discord state. Publishing a hosted binary release and code signing remain
+  separate, unauthorized actions.
+
 ## 0.5.2 recognizable worker names, November 7
 
 Sona now launches clearly named copies of its upstream workers so Task Manager and

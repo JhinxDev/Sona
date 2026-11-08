@@ -7,8 +7,10 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Early preview: 0.5.3.** Build from source below. There is no published binary
-download yet. Feedback, bug reports, contributions and feature suggestions are
+**Early preview: 0.5.3.** Windows x64 only. A per-user Windows installer can be
+built with the maintained tooling; it is unsigned and there is no hosted binary
+release yet. See [installing Sona](docs/INSTALL.md). Build-from-source instructions
+are below. Feedback, bug reports, contributions and feature suggestions are
 welcome.
 
 [![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
@@ -18,6 +20,17 @@ shows Sona 0.4.2 with actual app captures and a prerecorded local recognition
 demonstration. The recording display replays measured speech and transcript
 events; the receiving field illustrates insertion. It includes AI-assisted
 narration, music and background art. [Capture details](docs/images/README.md).
+
+## Install on Windows
+
+A per-user installer is built from this source tree; see
+[installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
+uninstall behavior and the unsigned-preview warning. The installer is
+self-contained (no separate .NET install), needs no administrator rights, and
+bundles the pinned Whisper CPU engine; model weights are downloaded inside Sona
+from the Dictation Models page. There is no macOS or Linux build: the app uses WPF
+and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
+platform would be a separate native app rather than a repackage.
 
 ## New in 0.5.3
 
@@ -151,9 +164,10 @@ identity. Voice, audio and transcripts stay on this PC.
 
 ## Build and run
 
-You need Windows x64 and PowerShell. The native UI is verified on Windows 11 x64.
-A microphone is needed for live dictation. macOS and Linux desktop ports are not
-available yet. Initial SDK, NuGet, engine and model downloads need internet
+You need Windows x64 and PowerShell for the source build below; the installer needs
+neither. The native UI is verified on Windows 11 x64. A microphone is needed for
+live dictation. macOS and Linux are not supported: this codebase is WPF and Win32
+native. Initial SDK, NuGet, engine and model downloads need internet
 access. The setup script provisions the pinned .NET 8 SDK, Whisper CPU engine and
 Small model into a directory you choose.
 
@@ -196,7 +210,8 @@ save preferences. See [cleanup setup](docs/LOCAL-CLEANUP.md) and
 
 ## CLI and MCP
 
-With Sona running, use the CLI built above:
+With an installed Sona, `sona-agent.exe` is beside `Sona.exe`. With a source build,
+use the CLI built above:
 
 ```powershell
 $sonaAgent = '.\src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
@@ -241,8 +256,10 @@ also crashed in a mixed English/French resident sequence.
 
 ## Known limitations
 
-- Windows x64 only, built from source; there is no signed installer or published
-  binary yet.
+- Windows x64 only. A per-user installer can be built with the maintained
+  tooling, but it is not code-signed and there is no hosted binary release yet.
+- No macOS or Linux build. The native app depends on WPF and Windows-only capture,
+  hotkey, insertion and model-runtime APIs; a port would be a separate project.
 - Automatic insertion while a browser suggestion or list item has accessibility
   focus is unsupported. Sona keeps the draft and offers copy/paste guidance.
 - Recordings are bounded to five minutes and speech requests to 90 seconds. A
@@ -255,10 +272,10 @@ also crashed in a mixed English/French resident sequence.
 
 ## Roadmap
 
-Planned work, not current behavior: signed x64 installer and portable release
-with checksums, a guided first-run flow with microphone test, voice command mode
-for editing selected text, saved-draft export and reprocessing, a local
-diagnostics page, and broader language coverage. No cloud model, account or
+Planned work, not current behavior: code-signed installer and hosted release with
+checksums, a portable build, a guided first-run flow with microphone test, voice
+command mode for editing selected text, saved-draft export and reprocessing, a
+local diagnostics page, and broader language coverage. No cloud model, account or
 telemetry plans.
 
 ## Contributing
@@ -277,8 +294,9 @@ For the maintained regression checks, from the same PowerShell session:
 ```
 
 `tools/build.ps1` runs the consolidated local gate: warning-free Release builds,
-414 Core checks, 53 Windows checks, isolated native fixtures (including the new
-professional polish and setup guidance fixtures) and the updater checks. The
+421 Core checks, 60 Windows checks, isolated native fixtures (including
+model-loading, professional polish, setup guidance and residency checks) and the
+updater checks. The
 owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2 build on
 October 15, 2026. That is one target-app smoke test; the automated checks do not
 establish broad microphone, other-app or live-call acceptance.

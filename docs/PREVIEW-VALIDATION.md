@@ -9,6 +9,17 @@ profile. The model-loading fixture passed 40 checks with no failures, and the
 consolidated gate including that fixture passed. No microphone or global input was
 used.
 
+## November 8 Windows installer, 0.5.3
+
+A per-user Windows installer was built from the same accepted 0.5.3 source and
+rehearsed end to end: self-contained app and CLI, pinned Whisper CPU engine
+verified against the runtime manifest, installation receipt, Start Menu shortcut,
+silent install and uninstall, with profile data preserved and no microphone or
+global input. See [verification](VERIFICATION.md#windows-installer-rehearsal-november-8)
+and [installation guide](INSTALL.md). The artifact is unsigned and no hosted
+binary release was published; macOS is not supported by this native Windows
+codebase.
+
 ## November 7 recognizable worker names, 0.5.2
 
 The 0.5.2 candidate brands the background workers for Task Manager and Process
