@@ -7,13 +7,12 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.5.3/Sona-Setup-0.5.3.exe)**
+**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.5.6/Sona-Setup-0.5.6.exe)**
 
-The published Windows installer is **v0.5.3** (unsigned early preview, 52.6 MiB).
-[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.5.3) ·
-[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.5.3/SHA256SUMS.txt)
+The published Windows installer is **v0.5.6**, an unsigned early preview.
+[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.5.6) ·
+[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.5.6/SHA256SUMS.txt)
 
-The source branch includes newer delivery fixes through **0.5.6**.
 See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
 instructions. Build-from-source instructions are below.
 
@@ -27,7 +26,7 @@ narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.5.3),
+Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.5.6),
 or compile the current source with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
