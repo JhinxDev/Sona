@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.4 - safer paste verification and clearer recovery
+
+- Verify a completed paste through the same field's document text when the
+  value text is missing or unchanged. Require a complete change in a single
+  representation and recheck that representation before Enter.
+- Give manual paste guidance when no paste was requested. Show a check-first
+  warning for unverified pastes even with clipboard recovery disabled.
+- Keep the most recent delivery issue in text-free, in-memory agent status
+  until another delivery issue or a restart.
+
 ## 0.5.3 - real model-loading information and always-resident models
 
 - Loading feedback is now exact instead of generic. While a model really loads,

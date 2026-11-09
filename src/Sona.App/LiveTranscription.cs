@@ -131,9 +131,10 @@ public partial class MainWindow
         overlay.UpdateTranscript("", "");
         var notice = RetainedDraftNotice.Select(recordingLimitReached,
             lastDelivery?.ClipboardRecovery ?? fallbackCopied,
-            lastDelivery?.PasteAttempted ?? false,
+            lastDelivery?.PasteRequested ?? false,
             lastDelivery?.PasteConfirmed ?? false,
-            lastDelivery?.SendAccepted ?? false);
+            lastDelivery?.SendAccepted ?? false,
+            lastDelivery?.Outcome);
         overlay.UpdateRetainedNotice(notice.Title, notice.Hint);
         overlay.SetReviewAction(true); overlay.ShowFor(target?.Window ?? 0);
         barPreview.Interval = TimeSpan.FromSeconds(12); barPreview.Start();

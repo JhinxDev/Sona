@@ -1,5 +1,15 @@
 # Sona agent interface
 
+0.5.4 adds nullable lastRetainedDelivery, the latest automatic delivery issue.
+It survives successful dictations in the same process and is cleared on exit.
+Both observations include pasteRequested (Sona invoked the paste transport),
+pasteReadback (not requested, gesture rejected, cancelled, focus changed,
+unavailable, unchanged, mismatch, or which representation verified the draft),
+and the original capture's control type and attempt count when available.
+The existing pasteAttempted flag still identifies selection of the paste route,
+even when its safety checks prevented the paste gesture. All fields are text-free
+with respect to the user's draft, composer, and clipboard.
+
 0.4.9 adds nullable `lastDelivery` to `status`: the last completed stop's outcome,
 stop/send intent, initial capture status, captured/final focus epochs and
 destination-change, paste-attempt, confirmed-paste, accepted-send and clipboard-

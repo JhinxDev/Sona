@@ -35,10 +35,15 @@ internal static class EnterDeliveryFixture
                     var operation=typeof(MainWindow).GetField("operation",BindingFlags.Instance|BindingFlags.NonPublic)!;
                     var pending=(PendingSubmission)typeof(MainWindow).GetField("pendingSubmission",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
                     var context=(RecordingDestinationContext)typeof(MainWindow).GetField("destinationContext",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+                    var settings=(Preferences)typeof(MainWindow).GetField("preferences",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+                    bool ShowsNotice(string title) =>
+                        ((FrameworkElement)window.OverlayForTests.FindName("NoticeDisplay")).Visibility == Visibility.Visible &&
+                        ((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("NoticeTitle")).Text == title;
                     var pcm=new byte[64000];for(var i=1;i<pcm.Length;i+=2)pcm[i]=8;
-                    foreach(var change in new[]{"epoch","field","unavailable","departure-return","between-hook-and-ui","valid","pasted-send-held","pasted-focus-changed"}){
+                    foreach(var change in new[]{"epoch","field","unavailable","departure-return","between-hook-and-ui","unconfirmed-no-backup","valid","pasted-send-held","pasted-focus-changed"}){
                         current=original;foreground=(original.Window,original.OwnerProcessId);copied="";input=new Capture();
-                        var paste=new FakeDelivery{HoldAfterPaste=change=="pasted-send-held"};insertion.PasteTransportForTests=paste;window.ClipboardSequenceForTests=()=>paste.Sequence;
+                        settings.CopyOnInsertionFailure = change != "unconfirmed-no-backup";
+                        var paste=new FakeDelivery{HoldAfterPaste=change=="pasted-send-held", Unreadable=change=="unconfirmed-no-backup"};insertion.PasteTransportForTests=paste;window.ClipboardSequenceForTests=()=>paste.Sequence;
                         if(change=="pasted-focus-changed")paste.AfterPastedRead=()=>{current=original with{FocusEpoch=1};context.Observe(new ActiveApplication(original.Window,original.OwnerProcessId,"Original",1));};
                         var recognition=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                         window.RecognitionForTests=(_,token)=>recognition.Task.WaitAsync(token);
@@ -63,8 +68,22 @@ internal static class EnterDeliveryFixture
                             Check(paste.Pastes==1&&paste.Enters==0&&insertion.LastPasteConfirmed,"Full paste is distinct from withheld send");
                             Check(((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("CapsuleLabel")).Text=="Draft pasted"&& !((System.Windows.Controls.TextBlock)window.FindName("StatusDetail")).Text.Contains("Ctrl+V")&& !((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("CapsuleHint")).Text.Contains("Ctrl+V"),"Confirmed pasted draft never tells the owner to paste it a second time");
                         }
-                        else if(change=="valid")Check(paste.Pastes==1&&paste.Enters==1&&paste.Payload=="The complete final fixture draft.","Unchanged field receives one complete draft and one send");
-                        else Check(paste.Pastes==0&&paste.Enters==0&&window.SessionForTests==SessionState.Ready,"Changed or unavailable destination retains complete text with zero output: "+change);
+                        else if(change=="unconfirmed-no-backup")
+                        {
+                            Check(paste.Pastes==1&&paste.Enters==0&&ShowsNotice("Check the chat"),"Unconfirmed paste warns even when clipboard recovery is off");
+                            Check(paste.Clipboard=="fixture prior clipboard","A warning does not require leaving the draft on the clipboard");
+                        }
+                        else if(change=="valid")
+                        {
+                            Check(paste.Pastes==1&&paste.Enters==1&&paste.Payload=="The complete final fixture draft.","Unchanged field receives one complete draft and one send");
+                            var lastIssue=typeof(MainWindow).GetField("lastRetainedDelivery",BindingFlags.Instance|BindingFlags.NonPublic)?.GetValue(window);
+                            Check(JsonSerializer.Serialize(lastIssue).Contains("PasteUnconfirmed"),"A successful send preserves the previous failed delivery classification");
+                        }
+                        else
+                        {
+                            Check(paste.Pastes==0&&paste.Enters==0&&window.SessionForTests==SessionState.Ready,"Changed or unavailable destination retains complete text with zero output: "+change);
+                            Check(ShowsNotice("Draft copied"),"A refusal before any paste gives copy guidance without a duplicate-paste warning: "+change);
+                        }
                     }
                     current=original;foreground=(67890,original.OwnerProcessId);
                     Check(admission?.Invoke(window,null) is false,"Different foreground HWND leaves native Enter alone");
@@ -100,7 +119,8 @@ internal static class EnterDeliveryFixture
         public object SaveClipboard()=>Clipboard;public uint SetClipboard(string text){Clipboard=Payload=text;return ++Sequence;}public uint ClipboardSequence=>Sequence;
         public void RestoreClipboard(object? previous){Clipboard=(string?)previous??"";Sequence++;}
         public bool Paste(){Pastes++;return true;}public bool Enter(){Enters++;return true;}public bool HoldAfterPaste{get;set;}public bool EnterHeld=>HoldAfterPaste&&Pastes>0;
-        public Action? AfterPastedRead{get;set;}public string? ReadText(DraftTarget target){if(Pastes>0)AfterPastedRead?.Invoke();return Pastes>0?Payload:"";}public Task Delay(int milliseconds)=>Task.CompletedTask;
+        public bool Unreadable{get;set;}
+        public Action? AfterPastedRead{get;set;}public string? ReadText(DraftTarget target){if(Pastes>0)AfterPastedRead?.Invoke();return Unreadable?null:Pastes>0?Payload:"";}public Task Delay(int milliseconds)=>Task.CompletedTask;
     }
     private sealed class Capture:IWaveIn{
         public bool Started,Disposed;public WaveFormat WaveFormat{get;set;}=new(16000,16,1);public event EventHandler<WaveInEventArgs>? DataAvailable;public event EventHandler<StoppedEventArgs>? RecordingStopped;

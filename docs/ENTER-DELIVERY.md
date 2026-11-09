@@ -1,4 +1,31 @@
-# Enter completion and full-draft delivery, 0.4.9
+# Enter completion and full-draft delivery
+
+## 0.5.4 paste verification and recovery
+
+Hold-to-talk finishes when you release Ctrl+Windows. To finish and send with
+Enter, double-tap Ctrl+Windows to start hands-free and press Enter while Sona
+is listening in the focused composer. Enable Enter-to-send in Audio & typing.
+Sona sends only after it can verify the full paste in the original field.
+
+Windows editors can expose both a value and a document text view. Sona records
+a baseline for each view it can read. It verifies the exact draft against the
+same view after one paste. If the value is unchanged or unavailable, the document
+view can supply independent proof. A changed value that disagrees with the
+complete paste withholds Enter. The final check rereads the proving view and
+still requires the same field, focus epoch, released keys and clipboard sequence.
+
+- **Draft copied** means Sona retained a recovery copy without requesting a
+  paste. Focus the intended field before using Ctrl+V.
+- **Check the chat** means Sona requested a paste and could not confirm it. Look
+  at the field first. Paste manually only if the draft is missing.
+- **Draft pasted** means Sona verified the text but did not confirm a requested
+  send. Check the field before pressing Enter again.
+
+The agent keeps the most recent delivery issue across successful dictations.
+The snapshot adds readback classification without retaining any text. It is
+cleared when Sona exits. See [agent status](AGENT-INTERFACE.md).
+
+## 0.4.9 completion and focus handling
 
 The owner reported Enter leaving transcription active, with partial text in the
 composer, while Ctrl+Windows later completed a retained draft. Source inspection

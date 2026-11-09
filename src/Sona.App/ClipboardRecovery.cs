@@ -17,14 +17,21 @@ public partial class MainWindow
             StatusDetail.Text += " The complete draft was pasted. Check the original composer before retrying.";
             return;
         }
-        if (usedPaste && insertion.LastDraftOnClipboard && ClipboardSequence() == insertion.LastDraftClipboardSequence) { fallbackCopied = true; StatusDetail.Text += " The finished draft stays on the clipboard for Ctrl+V. Check the composer before pasting again."; return; }
+        var pasteRequested = usedPaste && insertion.LastPasteRequested;
+        var guidance = pasteRequested ? " Check the composer before pasting again." : " Press Ctrl+V in the intended field.";
+        if (usedPaste && insertion.LastDraftOnClipboard && ClipboardSequence() == insertion.LastDraftClipboardSequence)
+        {
+            fallbackCopied = true;
+            StatusDetail.Text += " The finished draft stays on the clipboard." + guidance;
+            return;
+        }
         // A deliberate newer owner copy wins over automatic recovery.
         if (ClipboardSequence() != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }
         try
         {
             if (arguments.Contains("--test-ui")) { if (ClipboardForTests == null) return; ClipboardForTests(text); }
             else Clipboard.SetText(text);
-            fallbackCopied = true; StatusDetail.Text += " Finished text copied to the normal clipboard. Check the composer, then press Ctrl+V if needed.";
+            fallbackCopied = true; StatusDetail.Text += " Finished text copied to the normal clipboard." + guidance;
         }
         catch (Exception ex) when (ex is ExternalException or InvalidOperationException) { StatusDetail.Text += " Clipboard is busy. Use Copy draft to retry."; }
     }

@@ -14,19 +14,25 @@ internal interface ICompletedDraftTransport
     bool Enter();
     bool EnterHeld { get; }
     string? ReadText(DraftTarget target);
+    string? ReadDocumentText(DraftTarget target) => null;
     Task Delay(int milliseconds);
 }
+
+internal enum PasteReadback { NotRequested, GestureRejected, Cancelled, FocusChanged, Unavailable, Unchanged, Mismatch, ValueConfirmed, DocumentConfirmed }
 
 public sealed partial class Insertion
 {
     internal bool LastSubmissionAccepted { get; private set; }
     internal bool LastPasteConfirmed { get; private set; }
+    internal PasteReadback LastPasteReadback { get; private set; }
+    internal bool LastPasteRequested => LastPasteReadback != PasteReadback.NotRequested;
     internal bool LastDraftOnClipboard { get; private set; }
     internal uint LastDraftClipboardSequence { get; private set; }
     internal ICompletedDraftTransport? PasteTransportForTests { get; set; }
     public async Task<(bool Inserted, string Detail)> PasteAsync(DraftTarget? target, string text, bool submit, CancellationToken cancellation = default, bool keepOnFailure = false, uint? recoverySequence = null, Func<bool>? requestSubmission = null)
     {
         LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = false;
+        LastPasteReadback = PasteReadback.NotRequested;
         if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > 6000 || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
             return (false, "No supported draft or focused composer. Your text stays in Sona.");
         var transport = PasteTransportForTests ?? new NativeDraftTransport();
@@ -40,31 +46,63 @@ public sealed partial class Insertion
             allowRecovery = keepOnFailure && (!recoverySequence.HasValue || initialSequence == recoverySequence.Value);
             previous = transport.SaveClipboard();
             var before = transport.ReadText(target);
+            var documentBefore = transport.ReadDocumentText(target);
             cancellation.ThrowIfCancellationRequested();
             if (!Same(target, Capture()) || ModifiersDown() || transport.ClipboardSequence != initialSequence) return (false, "Focus, keys or clipboard changed before paste. Your draft stays in Sona.");
             sequence = transport.SetClipboard(text); changed = true;
             if (!Same(target, Capture()) || ModifiersDown() || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
                 return (false, "Paste cancelled because focus, keys or clipboard changed. Your draft stays in Sona.");
             // Exactly one paste gesture, never per-character typing or retries.
+            LastPasteReadback = PasteReadback.GestureRejected;
             if (!transport.Paste()) return (false, "Windows did not accept the full paste shortcut. Check the destination before retrying.");
             pasted = true;
             string? confirmedText = null;
+            LastPasteReadback = PasteReadback.Unavailable;
             for (var i = 0; i < 12; i++)
             {
                 await transport.Delay(100);
-                if (!Same(target, Capture()) || cancellation.IsCancellationRequested) break;
-                var after = transport.ReadText(target);
-                confirmed = before != null && after != null && ConfirmsCompleteInsertion(before, after, text);
-                if (confirmed) { confirmedText = NormalizePasted(after!); break; }
+                if (cancellation.IsCancellationRequested || !Same(target, Capture()))
+                {
+                    LastPasteReadback = cancellation.IsCancellationRequested ? PasteReadback.Cancelled : PasteReadback.FocusChanged;
+                    break;
+                }
+                var after = before == null ? null : transport.ReadText(target);
+                if (before != null && after != null && ConfirmsCompleteInsertion(before, after, text))
+                {
+                    confirmedText = NormalizePasted(after);
+                    LastPasteReadback = PasteReadback.ValueConfirmed;
+                    break;
+                }
+                // Some rich editors expose a stale value alongside a live document.
+                // Require independent proof from the same representation before and
+                // after paste. A changed, contradictory value still vetoes Enter.
+                if (TextChanged(before, after))
+                {
+                    LastPasteReadback = PasteReadback.Mismatch;
+                    continue;
+                }
+                var documentAfter = documentBefore == null ? null : transport.ReadDocumentText(target);
+                if (documentBefore != null && documentAfter != null && ConfirmsCompleteInsertion(documentBefore, documentAfter, text))
+                {
+                    confirmedText = NormalizePasted(documentAfter);
+                    LastPasteReadback = PasteReadback.DocumentConfirmed;
+                    break;
+                }
+                LastPasteReadback = TextChanged(documentBefore, documentAfter) ? PasteReadback.Mismatch
+                    : after != null || documentAfter != null ? PasteReadback.Unchanged : PasteReadback.Unavailable;
             }
+            confirmed = confirmedText != null;
             LastPasteConfirmed = confirmed;
             submit |= requestSubmission?.Invoke() == true;
             if (!submit) return (true, confirmed ? "Complete draft pasted once. Nothing was submitted." : "Paste requested once. Check the result; nothing was submitted.");
             if (!confirmed || cancellation.IsCancellationRequested || !Same(target, Capture()) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence)
                 return (true, "Paste requested, but sending was withheld because the full draft, focus or key state could not be confirmed. Review the composer and press Enter yourself.");
             // Re-read immediately before Return. No old or partial draft is sent.
-            var final = transport.ReadText(target);
-            if (final == null || NormalizePasted(final) != confirmedText || !Same(target, Capture()) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
+            var documentConfirmed = LastPasteReadback == PasteReadback.DocumentConfirmed;
+            var final = documentConfirmed ? transport.ReadDocumentText(target) : transport.ReadText(target);
+            var finalValue = documentConfirmed && before != null ? transport.ReadText(target) : null;
+            var conflictingValue = TextChanged(before, finalValue) && !ConfirmsCompleteInsertion(before!, finalValue!, text);
+            if (final == null || NormalizePasted(final) != confirmedText || conflictingValue || !Same(target, Capture()) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
                 return (true, "Composer verification changed. Nothing was submitted by Sona.");
             LastSubmissionAccepted = transport.Enter();
             return LastSubmissionAccepted ? (true, "Complete draft pasted, then Enter sent once to the same composer.") : (true, "Draft pasted. Windows did not confirm the complete Enter keystroke. Submission may have occurred; check the composer before retrying.");
@@ -108,6 +146,8 @@ public sealed partial class Insertion
         // paste, unrelated edits and ambiguous selection overlap cannot authorize Enter.
         return text.Length > 0 && after[start..newEnd] == text;
     }
+    private static bool TextChanged(string? before, string? after) =>
+        before != null && after != null && NormalizePasted(before) != NormalizePasted(after);
     private static string NormalizePasted(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
 
     private sealed class NativeDraftTransport : ICompletedDraftTransport
@@ -131,17 +171,18 @@ public sealed partial class Insertion
             }
             return sent == keys.Length;
         }
-        public string? ReadText(DraftTarget target)
+        public string? ReadText(DraftTarget target) => Read(target, ValuePattern.Pattern, pattern => ((ValuePattern)pattern).Current.Value);
+        public string? ReadDocumentText(DraftTarget target) => Read(target, TextPattern.Pattern, pattern => ((TextPattern)pattern).DocumentRange.GetText(24001));
+        private static string? Read(DraftTarget target, AutomationPattern pattern, Func<object, string?> getText)
         {
             try
             {
                 var element = AutomationElement.FocusedElement;
                 if (element == null || element.Current.IsPassword || element.Current.ProcessId != target.ProcessId || !element.GetRuntimeId().SequenceEqual(target.RuntimeId)) return null;
-                var text = element.TryGetCurrentPattern(ValuePattern.Pattern, out var value) ? ((ValuePattern)value).Current.Value
-                    : element.TryGetCurrentPattern(TextPattern.Pattern, out var document) ? ((TextPattern)document).DocumentRange.GetText(24001) : null;
+                var text = element.TryGetCurrentPattern(pattern, out var provider) ? getText(provider) : null;
                 return text?.Length <= 24000 ? text : null;
             }
-            catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException) { return null; }
+            catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException or UnauthorizedAccessException) { return null; }
         }
         [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     }

@@ -31,6 +31,23 @@ internal static class CompletedDraftPasteChecks
         transport = new() { UnsupportedReadback = true }; insertion.PasteTransportForTests = transport;
         result = await insertion.PasteAsync(target, "hello", true);
         Check(result.Inserted && transport.Pastes == 1 && transport.Enters == 0, "No accessibility readback means paste only, never send");
+        transport = new() { StaleValue = true, DocumentBefore = "before", DocumentAfter = "beforehello" };
+        insertion.PasteTransportForTests = transport;
+        result = await insertion.PasteAsync(target, "hello", true);
+        Check(result.Inserted && transport.Pastes == 1 && transport.Enters == 1 && insertion.LastPasteConfirmed,
+            "A stale ValuePattern can use exact before, after and final proof from the same TextPattern");
+        transport = new() { UnsupportedReadback = true, DocumentAfter = "beforehello" };
+        insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "hello", true);
+        Check(transport.Pastes == 1 && transport.Enters == 0, "Never mix the value baseline with a document read after paste");
+        transport = new() { StaleValue = true, DocumentBefore = "before", DocumentAfter = "beforehello", DocumentFinal = "beforehell" };
+        insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "hello", true);
+        Check(transport.Pastes == 1 && transport.Enters == 0, "Changed document text at the final guard withholds Enter");
+        transport = new() { Partial = true, DocumentBefore = "before", DocumentAfter = "beforehello" };
+        insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "hello", true);
+        Check(transport.Pastes == 1 && transport.Enters == 0, "A changed value that disagrees with the document cannot authorize Enter");
         transport = new() { Partial = true }; insertion.PasteTransportForTests = transport;
         await insertion.PasteAsync(target, "complete message", true);
         Check(transport.Enters == 0 && transport.Pastes == 1, "Partial destination content cannot submit or trigger a second paste");
@@ -82,7 +99,9 @@ internal static class CompletedDraftPasteChecks
     private sealed class FakePaste : ICompletedDraftTransport
     {
         public int Saves, Pastes, Enters, Restores; public uint Sequence = 1;
-        public string Payload = ""; public bool UnsupportedReadback, Partial;
+        public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue;
+        public string? DocumentBefore, DocumentAfter, DocumentFinal;
+        private int documentReadsAfterPaste;
         public Action? AfterPaste, BeforePasteRead;
         public object SaveClipboard() { Saves++; return "private prior formats"; }
         public uint SetClipboard(string text) { Payload = text; return ++Sequence; }
@@ -91,7 +110,9 @@ internal static class CompletedDraftPasteChecks
         public bool Paste() { Pastes++; AfterPaste?.Invoke(); return true; }
         public bool Enter() { Enters++; return true; }
         public bool EnterHeld => false;
-        public string? ReadText(DraftTarget target) { if (Pastes == 0) BeforePasteRead?.Invoke(); return UnsupportedReadback ? null : Pastes == 0 ? "before" : Partial ? "partial" : Payload; }
+        public string? ReadText(DraftTarget target) { if (Pastes == 0) BeforePasteRead?.Invoke(); return UnsupportedReadback ? null : Pastes == 0 || StaleValue ? "before" : Partial ? "partial" : Payload; }
+        public string? ReadDocumentText(DraftTarget target) => Pastes == 0 ? DocumentBefore
+            : ++documentReadsAfterPaste == 1 ? DocumentAfter : DocumentFinal ?? DocumentAfter;
         public Task Delay(int milliseconds) => Task.CompletedTask;
     }
 }

@@ -1,3 +1,17 @@
+## November 9 paste verification and recovery, 0.5.4
+
+The installed 0.5.3 app reported two recent unconfirmed Codex paste requests
+with a captured editor and no focus-epoch change. Neither recorded an Enter
+send request. Those snapshots did not distinguish unavailable, unchanged or
+mismatched accessibility text. The exact cause of the owner's intermittent
+readback remains to be confirmed on the replacement build.
+
+The maintained fixtures reproduce stale value text alongside an exact document
+read, reject mixed before/after representations and contradictory changed values,
+and withhold Enter after a changed final read. They also cover no-paste copy
+guidance, warnings with clipboard recovery disabled and a text-free retained
+issue surviving a successful send. No real microphone or global keys are used.
+
 ## November 8 truthful model-loading information, 0.5.3
 
 The 0.5.3 candidate makes every loading message come from the real loader state

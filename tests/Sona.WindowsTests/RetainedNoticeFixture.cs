@@ -83,15 +83,17 @@ internal static class RetainedNoticeFixture
                     Check(select != null, "Retained notice wording has a delivery-fact policy");
                     if (select != null)
                     {
-                        Verify(false, true, false, false, false, "Draft copied", "Ctrl+V to paste.");
+                        Verify(false, true, false, false, false, "Draft copied", "Ctrl+V in the intended field.");
+                        Verify(false, true, false, false, false, "Draft copied", "Focus a text field, then Ctrl+V.", "NoCapturedField");
+                        Verify(false, true, false, false, false, "Draft copied", "Focus changed. Ctrl+V to paste.", "FocusChanged");
                         Verify(false, true, true, false, false, "Check the chat", "Check before pasting again.");
                         Verify(false, false, true, false, false, "Check the chat", "Check before pasting again.");
                         Verify(false, true, true, true, false, "Draft pasted", "Check the chat before sending.");
                         Verify(false, false, false, false, false, "Draft ready", "Open to review or copy.");
                         Verify(true, false, false, false, false, "Draft ready", "Recording limit reached.");
-                        void Verify(bool limit, bool recovery, bool attempted, bool confirmed, bool sent, string title, string hint)
+                        void Verify(bool limit, bool recovery, bool attempted, bool confirmed, bool sent, string title, string hint, string? outcome = null)
                         {
-                            var result = select.Invoke(null, [limit, recovery, attempted, confirmed, sent])!;
+                            var result = select.Invoke(null, [limit, recovery, attempted, confirmed, sent, outcome])!;
                             Check((string)result.GetType().GetProperty("Title")!.GetValue(result)! == title && (string)result.GetType().GetProperty("Hint")!.GetValue(result)! == hint, "Delivery facts select " + title + ": " + hint);
                         }
                     }

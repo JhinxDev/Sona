@@ -40,6 +40,9 @@ its existing single capture observation. It still contains no transcript, field
 text, labels, titles, clipboard contents or raw runtime IDs. Reading status never
 performs a focus capture or starts recording.
 
+For current notice wording and the difference between a delivery route and a
+paste request, see [0.5.4 paste verification](ENTER-DELIVERY.md#054-paste-verification-and-recovery).
+
 ## Verification and limits
 
 The maintained offscreen native fixtures cover readiness exhaustion and success

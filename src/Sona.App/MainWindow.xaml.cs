@@ -359,7 +359,10 @@ public partial class MainWindow : Window
         {
             ObserveDelivery(current, retainOnly, pasteAttempted, stoppedByEnter);
             pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
-            if ((current.State == SessionState.Ready || fallbackCopied || lastDelivery?.Outcome == "PasteConfirmedSendWithheld") && !shutdownPending && current.State is SessionState.Ready or SessionState.Inserted) ShowRetainedDraftNotice();
+            if (!shutdownPending && current.State is SessionState.Ready or SessionState.Inserted &&
+                (current.State == SessionState.Ready || fallbackCopied ||
+                 lastDelivery is { PasteRequested: true, PasteConfirmed: false } or { Outcome: "PasteConfirmedSendWithheld" }))
+                ShowRetainedDraftNotice();
             if (completedFeedback.HasValue && current.State is SessionState.Ready or SessionState.Inserted) _ = PlayFeedbackAsync(completedFeedback.Value);
         }
     }

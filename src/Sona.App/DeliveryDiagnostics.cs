@@ -6,11 +6,13 @@ namespace Sona.App;
 internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Outcome,
     bool StopAccepted, bool StoppedByEnter, bool SendRequested, string CaptureStatus,
     bool DestinationChanged, long CapturedFocusEpoch, long FinalFocusEpoch,
-    bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery);
+    bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
+    bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts);
 
 public partial class MainWindow
 {
     private DeliveryObservation? lastDelivery;
+    private DeliveryObservation? lastRetainedDelivery;
     private void ObserveDelivery(DictationSession current, bool retainOnly, bool pasteAttempted, bool stoppedByEnter)
     {
         var requested = submitOnComplete || pendingSubmission.IsRequested;
@@ -31,6 +33,11 @@ public partial class MainWindow
             recordingCapture?.Status.ToString() ?? "Unknown", destinationContext.DestinationChanged,
             target?.FocusEpoch ?? -1, insertion.FocusEpoch, pasteAttempted,
             pasteAttempted && insertion.LastPasteConfirmed,
-            pasteAttempted && insertion.LastSubmissionAccepted, fallbackCopied);
+            pasteAttempted && insertion.LastSubmissionAccepted, fallbackCopied,
+            pasteAttempted && insertion.LastPasteRequested, pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
+            recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts);
+        if ((preferences.AutoInsert || requested) && outcome is
+            ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld"))
+            lastRetainedDelivery = lastDelivery;
     }
 }
