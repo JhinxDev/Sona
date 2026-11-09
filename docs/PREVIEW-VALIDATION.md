@@ -1,3 +1,11 @@
+## November 9 composer rechecks, 0.5.5
+
+After the 0.5.4 live upgrade, the owner reproduced a paste warning in Codex.
+The agent recorded a paste request followed by failure to re-identify the field
+during readback with no focus-epoch change. A following Hold recording confirmed
+paste. Fixtures exercise a pre-paste availability gap, an interrupted readback,
+and continued rejection after a different editor or foreground window.
+
 ## November 9 paste verification and recovery, 0.5.4
 
 The installed 0.5.3 app reported two recent unconfirmed Codex paste requests

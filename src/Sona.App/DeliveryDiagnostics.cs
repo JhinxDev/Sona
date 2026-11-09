@@ -7,7 +7,8 @@ internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Out
     bool StopAccepted, bool StoppedByEnter, bool SendRequested, string CaptureStatus,
     bool DestinationChanged, long CapturedFocusEpoch, long FinalFocusEpoch,
     bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
-    bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts);
+    bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts,
+    string? PasteCaptureRejection, int PasteCaptureGaps);
 
 public partial class MainWindow
 {
@@ -35,7 +36,9 @@ public partial class MainWindow
             pasteAttempted && insertion.LastPasteConfirmed,
             pasteAttempted && insertion.LastSubmissionAccepted, fallbackCopied,
             pasteAttempted && insertion.LastPasteRequested, pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
-            recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts);
+            recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts,
+            pasteAttempted ? insertion.LastPasteCaptureRejection?.ToString() : null,
+            pasteAttempted ? insertion.LastPasteCaptureGaps : 0);
         if ((preferences.AutoInsert || requested) && outcome is
             ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld"))
             lastRetainedDelivery = lastDelivery;

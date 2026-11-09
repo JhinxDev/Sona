@@ -1,5 +1,16 @@
 # Enter completion and full-draft delivery
 
+## 0.5.5 temporary accessibility gaps
+
+A live Codex attempt requested paste but failed to re-identify the composer
+during readback despite an unchanged Windows focus epoch. A later hold attempt
+confirmed paste normally. Before staging the clipboard, Sona can now briefly
+recheck the exact original field when the accessibility provider is unavailable.
+After a paste, a temporary gap can use the existing verification window to check
+the same field again. A different editable field, changed foreground window or
+changed focus epoch ends the attempt. An interruption after paste can confirm
+the pasted draft but cannot authorize automatic Enter.
+
 ## 0.5.4 paste verification and recovery
 
 Hold-to-talk finishes when you release Ctrl+Windows. To finish and send with

@@ -1,6 +1,6 @@
 # Owner-started Sona test
 
-## Short 0.5.4 paste and Enter check
+## Short 0.5.5 paste and Enter check
 
 1. With an empty composer focused, hold Ctrl+Windows, dictate a short phrase and
    release. Expect one unsent draft. Repeat with another receiving app.

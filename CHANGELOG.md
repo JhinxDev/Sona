@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.5 - tolerate temporary composer readback gaps
+
+- Recheck a temporarily unavailable captured editor before staging the clipboard.
+  After one paste, allow the original field to become readable within the
+  existing verification budget. A different editable field or foreground window
+  ends the attempt, and an interruption after paste withholds automatic Enter.
+- Include capture rejection and gap information in text-free delivery status.
+
 ## 0.5.4 - safer paste verification and clearer recovery
 
 - Verify a completed paste through the same field's document text when the

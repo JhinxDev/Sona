@@ -51,6 +51,48 @@ internal static class CompletedDraftPasteChecks
         transport = new() { Partial = true }; insertion.PasteTransportForTests = transport;
         await insertion.PasteAsync(target, "complete message", true);
         Check(transport.Enters == 0 && transport.Pastes == 1, "Partial destination content cannot submit or trigger a second paste");
+        insertion.ForegroundForTests = () => (target.Window, target.OwnerProcessId);
+        current = null;
+        transport = new() { OnDelay = _ => current = target };
+        insertion.PasteTransportForTests = transport;
+        result = await insertion.PasteAsync(target, "hello", false);
+        Check(result.Inserted && transport.Pastes == 1 && insertion.LastPasteConfirmed, "A temporary pre-paste provider gap can recheck the exact original field");
+        foreach (var requestEnter in new[] { false, true })
+        {
+            var checksAfterPaste = 0;
+            transport = new()
+            {
+                AfterPaste = () => current = null,
+                OnDelay = _ => { if (++checksAfterPaste == 2) current = target; }
+            };
+            insertion.PasteTransportForTests = transport;
+            result = await insertion.PasteAsync(target, "hello", requestEnter);
+            Check(result.Inserted && transport.Pastes == 1 && insertion.LastPasteConfirmed && transport.Enters == 0,
+                "A post-paste provider gap can confirm the same field later without retrying paste or sending Enter");
+            current = target;
+        }
+        transport = new()
+        {
+            AfterPaste = () => current = target with { RuntimeId = [3] },
+            OnDelay = _ => { }
+        };
+        insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "hello", true);
+        Check(!insertion.LastPasteConfirmed && transport.Enters == 0, "A different editable field remains terminal even within the same foreground window");
+        current = target;
+        insertion.ForegroundForTests = () => ((nint)2, target.OwnerProcessId);
+        var foregroundPolls = 0;
+        transport = new()
+        {
+            AfterPaste = () => current = null,
+            OnDelay = _ => { if (++foregroundPolls == 2) current = target; }
+        };
+        insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "hello", true);
+        Check(!insertion.LastPasteConfirmed && transport.Enters == 0 && foregroundPolls == 1,
+            "An unavailable field in a changed foreground window ends verification immediately");
+        insertion.ForegroundForTests = null;
+        current = target;
         transport = new() { AfterPaste = () => current = target with { FocusEpoch = 1 } }; insertion.PasteTransportForTests = transport;
         await insertion.PasteAsync(target, "hello", true);
         Check(transport.Enters == 0, "Focus change after paste prevents Enter"); current = target;
@@ -103,6 +145,7 @@ internal static class CompletedDraftPasteChecks
         public string? DocumentBefore, DocumentAfter, DocumentFinal;
         private int documentReadsAfterPaste;
         public Action? AfterPaste, BeforePasteRead;
+        public Action<int>? OnDelay;
         public object SaveClipboard() { Saves++; return "private prior formats"; }
         public uint SetClipboard(string text) { Payload = text; return ++Sequence; }
         public uint ClipboardSequence => Sequence;
@@ -113,6 +156,6 @@ internal static class CompletedDraftPasteChecks
         public string? ReadText(DraftTarget target) { if (Pastes == 0) BeforePasteRead?.Invoke(); return UnsupportedReadback ? null : Pastes == 0 || StaleValue ? "before" : Partial ? "partial" : Payload; }
         public string? ReadDocumentText(DraftTarget target) => Pastes == 0 ? DocumentBefore
             : ++documentReadsAfterPaste == 1 ? DocumentAfter : DocumentFinal ?? DocumentAfter;
-        public Task Delay(int milliseconds) => Task.CompletedTask;
+        public Task Delay(int milliseconds) { OnDelay?.Invoke(milliseconds); return Task.CompletedTask; }
     }
 }

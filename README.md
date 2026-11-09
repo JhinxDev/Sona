@@ -7,7 +7,7 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Windows x64 early preview.** The source includes the 0.5.4 delivery fixes.
+**Windows x64 early preview.** The source includes the 0.5.5 delivery fixes.
 The published installer is 0.5.3. Download the
 per-user installer from [Releases](https://github.com/JhinxDev/Sona/releases); it
 is unsigned, so SmartScreen warns. See [installing Sona](docs/INSTALL.md) for
@@ -34,6 +34,13 @@ bundles the pinned Whisper CPU engine; model weights are downloaded inside Sona
 from the Dictation Models page. There is no macOS or Linux build: the app uses WPF
 and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
 platform would be a separate native app rather than a repackage.
+
+## New in 0.5.5
+
+Sona can briefly recheck the original composer when Windows accessibility
+cannot identify it. After one paste, the recheck can verify the complete draft
+in that field. If the field was temporarily unavailable during readback, review
+the confirmed draft and send it yourself. [Delivery behavior](docs/ENTER-DELIVERY.md)
 
 ## New in 0.5.4
 

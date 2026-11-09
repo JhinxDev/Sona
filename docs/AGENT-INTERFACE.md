@@ -1,5 +1,11 @@
 # Sona agent interface
 
+0.5.5 adds pasteCaptureRejection and pasteCaptureGaps to delivery status. They
+describe the most recent failed capture check on the paste route and the count
+of gaps that used a bounded recheck. A Ready rejection means Windows returned
+an editor that failed the exact original-field identity check. TargetUnavailable
+means the original field could not be re-identified during the readback window.
+
 0.5.4 adds nullable lastRetainedDelivery, the latest automatic delivery issue.
 It survives successful dictations in the same process and is cleared on exit.
 Both observations include pasteRequested (Sona invoked the paste transport),
