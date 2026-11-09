@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.6 - paste into deeply embedded editors
+
+- Use a hosted editor's exact native window ancestry to avoid rejecting the
+  foreground composer when the accessibility tree is deeply nested.
+- Clarify the warning after a paste whose result could not be verified.
+- Put the verified public installer and checksum links at the top of the
+  README and spell out hold-to-talk review and manual send.
+
 ## 0.5.5 - tolerate temporary composer readback gaps
 
 - Recheck a temporarily unavailable captured editor before staging the clipboard.

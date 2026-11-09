@@ -124,7 +124,9 @@ public sealed partial class Insertion
         {
             if (Automation.Compare(node, root)) return true;
             var handle = (nint)node.Current.NativeWindowHandle;
-            if (handle != 0 && GetAncestor(handle, 2) != window) return false;
+            // A native child already proves the exact window. Keep walking
+            // only while the automation provider has no native handle.
+            if (handle != 0) return GetAncestor(handle, 2) == window;
             node = TreeWalker.RawViewWalker.GetParent(node);
         }
         return false;

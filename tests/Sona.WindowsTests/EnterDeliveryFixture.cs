@@ -70,7 +70,7 @@ internal static class EnterDeliveryFixture
                         }
                         else if(change=="unconfirmed-no-backup")
                         {
-                            Check(paste.Pastes==1&&paste.Enters==0&&ShowsNotice("Check the chat"),"Unconfirmed paste warns even when clipboard recovery is off");
+                            Check(paste.Pastes==1&&paste.Enters==0&&ShowsNotice("Check the draft"),"Unconfirmed paste warns even when clipboard recovery is off");
                             Check(paste.Clipboard=="fixture prior clipboard","A warning does not require leaving the draft on the clipboard");
                         }
                         else if(change=="valid")

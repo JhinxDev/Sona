@@ -1,5 +1,23 @@
 # Enter completion and full-draft delivery
 
+## Hold and release
+
+Focus the field, hold Ctrl+Windows while you speak, then release. Sona pastes
+the finished draft once into the same compatible field. Read or edit it there
+and press Enter yourself when ready.
+
+If Sona shows **Check the draft**, look in the field first. Sona already
+requested a paste and couldn't confirm the result. If the field is empty,
+paste the recovery copy if enabled or open Sona to copy the draft. **Draft
+copied** means Sona skipped the paste and saved a recovery copy.
+
+## 0.5.6 embedded composers
+
+Windows can prove that a deeply embedded editor belongs to the foreground
+window through the native handle of its container. Sona accepts that exact
+window proof without waiting to reach the top of the accessibility tree.
+The captured field and focus checks still apply.
+
 ## 0.5.5 temporary accessibility gaps
 
 A live Codex attempt requested paste but failed to re-identify the composer

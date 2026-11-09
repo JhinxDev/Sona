@@ -7,12 +7,15 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**Windows x64 early preview.** The source includes the 0.5.5 delivery fixes.
-The published installer is 0.5.3. Download the
-per-user installer from [Releases](https://github.com/JhinxDev/Sona/releases); it
-is unsigned, so SmartScreen warns. See [installing Sona](docs/INSTALL.md) for
-first-run model steps and uninstall behavior. Build-from-source instructions are
-below. Feedback, bug reports, contributions and feature suggestions are welcome.
+**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.5.3/Sona-Setup-0.5.3.exe)**
+
+The published Windows installer is **v0.5.3** (unsigned early preview, 52.6 MiB).
+[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.5.3) ·
+[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.5.3/SHA256SUMS.txt)
+
+The source branch includes newer delivery fixes through **0.5.6**.
+See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
+instructions. Build-from-source instructions are below.
 
 [![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
 
@@ -24,9 +27,8 @@ narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-Download the current per-user installer from
-[Releases](https://github.com/JhinxDev/Sona/releases), or build it from this source
-tree with `tools/installer/build-installer.ps1`. See
+Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.5.3),
+or compile the current source with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
 self-contained (no separate .NET install), needs no administrator rights, and
@@ -34,6 +36,13 @@ bundles the pinned Whisper CPU engine; model weights are downloaded inside Sona
 from the Dictation Models page. There is no macOS or Linux build: the app uses WPF
 and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
 platform would be a separate native app rather than a repackage.
+
+## New in 0.5.6
+
+Sona can identify deeply embedded editors by the Windows handle of their
+container. This helps hold-to-talk paste into the active Codex composer.
+**Check the draft** asks you to look in the field when Sona has already
+requested a paste and cannot verify the result.
 
 ## New in 0.5.5
 
@@ -48,8 +57,8 @@ the confirmed draft and send it yourself. [Delivery behavior](docs/ENTER-DELIVER
   the first stays stale or is unavailable. Enter-to-send still requires the
   complete draft in the same focused field.
 - **Draft copied** means Sona kept the draft for manual paste without requesting
-  one. **Check the chat** means a paste was requested and the result could not
-  be verified. Check the field before pasting again. [Delivery behavior](docs/ENTER-DELIVERY.md)
+  one. If Sona requested a paste and could not verify the result, check the
+  field before pasting again. [Delivery behavior](docs/ENTER-DELIVERY.md)
 
 ## New in 0.5.3
 
@@ -139,9 +148,9 @@ identity. Voice, audio and transcripts stay on this PC.
 
 ## What works
 
-- **Hold Ctrl + Windows** to record, release to finish. Double-tap for hands-free
-  and tap once to stop. Esc cancels. Sona inserts into compatible text fields
-  while the original field keeps focus; by default you review and send yourself.
+- **Hold Ctrl + Windows** in a focused text field while you speak. Release to
+  paste the finished draft, then review and send it yourself. Double-tap for
+  hands-free dictation and tap once to stop. Esc cancels.
 - **Optional Enter-to-send.** During hands-free recording, Enter waits for the
   complete draft, pastes once, verifies the inserted text in the same composer,
   and only then submits. Focus, field identity and readback guard every step.

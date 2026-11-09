@@ -1,3 +1,12 @@
+## November 9 native window ancestry, 0.5.6
+
+A live Hold attempt rejected the focused Codex editor as outside the active
+window. A separate read-only probe found that the same window could be proved
+well before the top of the editor's deep accessibility tree. The new native
+fixture tests a 36-level embedded window and verifies rejection for a different
+top-level window owned by the same process. It uses hidden windows and sends no
+input. The physical Hold gesture remains a separate check.
+
 ## November 9 composer rechecks, 0.5.5
 
 After the 0.5.4 live upgrade, the owner reproduced a paste warning in Codex.

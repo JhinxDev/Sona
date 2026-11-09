@@ -8,7 +8,7 @@ internal sealed record RetainedDraftNotice(string Title, string Hint)
     {
         if (limitReached) return new("Draft ready", "Recording limit reached.");
         if (pasteConfirmed && !sendAccepted) return new("Draft pasted", "Check the chat before sending.");
-        if (pasteRequested && !pasteConfirmed) return new("Check the chat", "Check before pasting again.");
+        if (pasteRequested && !pasteConfirmed) return new("Check the draft", "Look before pasting again.");
         if (clipboardRecovery) return new("Draft copied", outcome switch
         {
             "NoCapturedField" => "Focus a text field, then Ctrl+V.",

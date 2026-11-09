@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Sona.App;
 using Sona.App.Windows;
@@ -28,6 +30,9 @@ internal static class CaptureStatusFixture
                 MainWindow? window = null;
                 try
                 {
+                    var nativeScope = await CheckEmbeddedWindowScope();
+                    Check(nativeScope.Own, "A deep native child proves membership in its exact top-level window");
+                    Check(!nativeScope.Other, "A deep native child cannot belong to another window in the same process");
                     var captures = 0; DraftTarget? target = new(101, 31001, [5, 6, 7], 4);
                     using var insertion = new Insertion(() => { captures++; return target; }, () => false, _ => throw new Exception("No input expected"));
                     window = new MainWindow(["--test-ui"], insertion);
@@ -76,5 +81,36 @@ internal static class CaptureStatusFixture
         var report = new { Version = AppVersion.Number, BuildId = AppVersion.BuildId, AppAssemblySha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(typeof(MainWindow).Assembly.Location))), Checks = checks, Failures = failures, WindowShown = false, MicrophoneOpened = false, GlobalInputSent = false, ProductionProfileUsed = false };
         File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         return report;
+    }
+
+    private static async Task<(bool Own, bool Other)> CheckEmbeddedWindowScope()
+    {
+        using var host = new HwndSource(new HwndSourceParameters("Sona isolated scope host") { WindowStyle = 0, Width = 1, Height = 1 });
+        using var other = new HwndSource(new HwndSourceParameters("Sona isolated scope comparison") { WindowStyle = 0, Width = 1, Height = 1 });
+        var children = new Stack<HwndSource>();
+        try
+        {
+            var parent = host.Handle;
+            for (var depth = 0; depth < 36; depth++)
+            {
+                var child = new HwndSource(new HwndSourceParameters("Sona isolated scope child")
+                {
+                    ParentWindow = parent, WindowStyle = 0x40000000, Width = 1, Height = 1
+                });
+                children.Push(child);
+                parent = child.Handle;
+            }
+            var expected = host.Handle;
+            var unrelated = other.Handle;
+            return await Task.Run(() =>
+            {
+                var embedded = AutomationElement.FromHandle(parent);
+                return (Insertion.ElementBelongsToWindow(embedded, expected), Insertion.ElementBelongsToWindow(embedded, unrelated));
+            }).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            while (children.TryPop(out var child)) child.Dispose();
+        }
     }
 }
