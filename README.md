@@ -36,6 +36,12 @@ from the Dictation Models page. There is no macOS or Linux build: the app uses W
 and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
 platform would be a separate native app rather than a repackage.
 
+## New in 0.5.7 source
+
+If you return to the original text field while dictating hands-free, press Enter
+there to finish. Sona rechecks the exact field, pastes the finished draft once,
+and sends after verifying the paste. [Enter-to-send behavior](docs/ENTER-DELIVERY.md)
+
 ## New in 0.5.6
 
 Sona can identify deeply embedded editors by the Windows handle of their

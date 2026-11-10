@@ -3,7 +3,7 @@
 ; receipt values are generated, not typed by hand.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.5.6"
+  #define MyAppVersion "0.5.7"
 #endif
 #ifndef MySourceHead
   #define MySourceHead "0000000000000000000000000000000000000000"

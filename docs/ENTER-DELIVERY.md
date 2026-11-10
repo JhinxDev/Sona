@@ -11,6 +11,18 @@ requested a paste and couldn't confirm the result. If the field is empty,
 paste the recovery copy if enabled or open Sona to copy the draft. **Draft
 copied** means Sona skipped the paste and saved a recovery copy.
 
+## 0.5.7 Enter after returning to the original composer
+
+If you switch away during hands-free dictation, return to the original text
+field before pressing Enter. Sona can then confirm the same window and editor
+and finish the requested paste and send. It checks the focus at the Enter
+gesture and requires the exact original field identity. A different field or a
+change after Enter leaves the draft available for recovery. Sona verifies the
+complete paste before sending.
+
+This recheck applies when Enter ends active hands-free recording. Releasing a
+Hold shortcut after a focus change preserves the draft for review.
+
 ## 0.5.6 embedded composers
 
 Windows can prove that a deeply embedded editor belongs to the foreground

@@ -24,14 +24,15 @@ internal static class EnterDeliveryFixture
                 try{
                     var original=new DraftTarget(12345,Environment.ProcessId,[1,2,3],0);DraftTarget? current=original;
                     (nint Window,int Owner) foreground=(original.Window,original.OwnerProcessId);
-                    using var insertion=new Insertion(()=>current,()=>false,_=>throw new Exception("Unicode input must never run"));
+                    Action? captureSideEffect = null;
+                    using var insertion=new Insertion(() => { captureSideEffect?.Invoke(); return current; },()=>false,_=>throw new Exception("Unicode input must never run"));
                     typeof(Insertion).GetProperty("ForegroundForTests",BindingFlags.Instance|BindingFlags.NonPublic)?.SetValue(insertion,(Func<(nint Window,int Owner)>)(()=>foreground));
                     window=new MainWindow(["--test-ui"],insertion);window.PreparationForTests=_=>Task.CompletedTask;
                     var input=new Capture();window.RecorderForTests=()=>new Recorder(_=>input);
                     var copied="";window.ClipboardForTests=text=>copied=text;
                     window.ClipboardSequenceForTests=()=>1;
                     var finish=typeof(MainWindow).GetMethod("FinishAndSendShortcut",BindingFlags.Instance|BindingFlags.NonPublic)!;
-                    var admission=typeof(MainWindow).GetMethod("CanFinishAndSendShortcut",BindingFlags.Instance|BindingFlags.NonPublic);
+                    var admission=typeof(MainWindow).GetMethod("ReadSubmitFocusEpoch",BindingFlags.Instance|BindingFlags.NonPublic);
                     var operation=typeof(MainWindow).GetField("operation",BindingFlags.Instance|BindingFlags.NonPublic)!;
                     var pending=(PendingSubmission)typeof(MainWindow).GetField("pendingSubmission",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
                     var context=(RecordingDestinationContext)typeof(MainWindow).GetField("destinationContext",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
@@ -55,10 +56,10 @@ internal static class EnterDeliveryFixture
                             context.Observe(new ActiveApplication(67890,Environment.ProcessId,"Other",1));
                             context.Observe(new ActiveApplication(original.Window,original.OwnerProcessId,"Original",2));
                         }
-                        var canAdmit=admission?.Invoke(window,null) is true;
-                        Check(canAdmit,change+": exact foreground window admits Enter without granting insertion");
+                        var enterStamp = admission?.Invoke(window, null) as long?;
+                        Check(enterStamp.HasValue,change+": exact foreground window admits Enter without granting insertion");
                         if(change=="between-hook-and-ui")current=original with{FocusEpoch=1};
-                        finish.Invoke(window,null);await Task.Delay(10);
+                        finish.Invoke(window, [enterStamp ?? -1]);await Task.Delay(10);
                         Check(window.SessionForTests==SessionState.Transcribing&&input.Disposed,change+": Enter stops capture before recognition completes");
                         Check(paste.Pastes==0&&paste.Enters==0,change+": no partial result reaches the composer");
                         if(window.SessionForTests==SessionState.Recording){window.CancelForTests();await window.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);recognition.TrySetResult("Fixture final text.");continue;}
@@ -86,9 +87,9 @@ internal static class EnterDeliveryFixture
                         }
                     }
                     current=original;foreground=(67890,original.OwnerProcessId);
-                    Check(admission?.Invoke(window,null) is false,"Different foreground HWND leaves native Enter alone");
+                    Check(admission?.Invoke(window,null) == null,"Different foreground HWND leaves native Enter alone");
                     foreground=(original.Window,original.OwnerProcessId+1);
-                    Check(admission?.Invoke(window,null) is false,"Different HWND owner leaves native Enter alone");
+                    Check(admission?.Invoke(window,null) == null,"Different HWND owner leaves native Enter alone");
                     var gesture=new HoldGesture();gesture.Key(0xA2,true,0,toggle:true);var admitted=gesture.Key(0x5B,true,1,toggle:true);gesture.ConsumeToggle(admitted.Generation);gesture.Key(0x5B,false,2);gesture.Key(0xA2,false,3);
                     var enter=gesture.Key(13,true,4,finishOnEnter:true);
                     Check(enter.Suppress&&enter.Submit&&gesture.Key(13,true,5,finishOnEnter:false).Suppress&&gesture.Key(13,false,6,finishOnEnter:false).Suppress,"Consumed Enter repeats/up stay swallowed after destination movement");
@@ -96,13 +97,83 @@ internal static class EnterDeliveryFixture
                     var pendingRecognition=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                     window.RecognitionForTests=(_,token)=>pendingRecognition.Task.WaitAsync(token);await window.BeginForTestsAsync();input.Emit(pcm);
                     var pendingPaste=new FakeDelivery();insertion.PasteTransportForTests=pendingPaste;
-                    var stopping=window.StopForTestsAsync();finish.Invoke(window,null);
+                    var stopping=window.StopForTestsAsync();finish.Invoke(window,[insertion.FocusEpoch]);
                     Check(pending.IsRequested,"Enter dispatched after capture stopped attaches to the pending complete result");
                     pendingRecognition.SetResult("The complete queued fixture draft.");await stopping;
                     Check(pendingPaste.Pastes==1&&pendingPaste.Enters==1,"Raced Enter is sent once only after the final result");
                     var observation=typeof(MainWindow).GetField("lastDelivery",BindingFlags.Instance|BindingFlags.NonPublic)?.GetValue(window);
                     var metadata=JsonSerializer.Serialize(observation);
                     Check(observation!=null&&!metadata.Contains("fixture draft",StringComparison.OrdinalIgnoreCase),"Last delivery diagnostics contain classification without transcript text");
+                    foreach (var change in new[] { "original-field", "different-field", "unavailable-at-enter", "after-enter", "during-recognition", "hold-release", "cancel-during-capture" })
+                    {
+                        original = original with { FocusEpoch = insertion.FocusEpoch };
+                        current = original;
+                        foreground = (original.Window, original.OwnerProcessId);
+                        input = new Capture();
+                        var draft = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        window.RecognitionForTests = (_, token) => draft.Task.WaitAsync(token);
+                        var paste = new FakeDelivery();
+                        insertion.PasteTransportForTests = paste;
+                        window.ClipboardSequenceForTests = () => paste.Sequence;
+                        Check(await window.BeginForTestsAsync(), change + ": begins only fake capture");
+                        input.Emit(pcm);
+
+                        // Leave the original top-level window, then return while
+                        // hands-free recording is still running.
+                        insertion.ObserveFocusEvent(0, 0);
+                        context.Observe(new ActiveApplication(67890, original.OwnerProcessId + 1, "Other", insertion.FocusEpoch));
+                        insertion.ObserveFocusEvent(0, 0);
+                        current = original with { FocusEpoch = insertion.FocusEpoch };
+                        if (change == "different-field") current = current with { RuntimeId = [8] };
+                        context.Observe(new ActiveApplication(original.Window, original.OwnerProcessId, "Original", insertion.FocusEpoch));
+                        var enterEpoch = admission?.Invoke(window, null) as long?;
+                        Check(enterEpoch == insertion.FocusEpoch, change + ": Enter carries the focus stamp from the gesture");
+                        if (change == "after-enter")
+                        {
+                            insertion.ObserveFocusEvent(0, 0);
+                            current = current with { FocusEpoch = insertion.FocusEpoch };
+                        }
+                        if (change == "unavailable-at-enter") current = null;
+                        if (change == "cancel-during-capture")
+                            captureSideEffect = () =>
+                            {
+                                captureSideEffect = null;
+                                typeof(MainWindow).GetMethod("Cancel", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+                            };
+                        Task completed;
+                        if (change == "hold-release") completed = window.StopForTestsAsync();
+                        else
+                        {
+                            finish.Invoke(window, [enterEpoch ?? -1]);
+                            completed = (Task)operation.GetValue(window)!;
+                        }
+                        if (change == "unavailable-at-enter") current = original with { FocusEpoch = insertion.FocusEpoch };
+                        if (change == "during-recognition")
+                        {
+                            insertion.ObserveFocusEvent(0, 0);
+                            current = original with { FocusEpoch = insertion.FocusEpoch };
+                        }
+                        var fullDraft = string.Join(" ", Enumerable.Repeat("The complete original composer fixture draft.", 30));
+                        draft.SetResult(fullDraft);
+                        await completed;
+
+                        if (change == "original-field")
+                        {
+                            Check(paste.Pastes == 1 && paste.Enters == 1 && paste.Payload == fullDraft,
+                                "Explicit Enter can confirm the exact original field after returning to its window");
+                            var delivery = JsonSerializer.SerializeToElement(
+                                typeof(MainWindow).GetField("lastDelivery", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(window));
+                            Check(delivery.GetProperty("EnterTargetReconfirmed").GetBoolean() &&
+                                delivery.GetProperty("CapturedFocusEpoch").GetInt64() == original.FocusEpoch,
+                                "Diagnostics preserve the original focus stamp and record that Enter reconfirmed the target");
+                        }
+                        else if (change == "cancel-during-capture")
+                            Check(paste.Pastes == 0 && paste.Enters == 0 && window.SessionForTests == SessionState.Cancelled && !context.IsRecordingContext,
+                                "Cancellation during the accessibility check cannot restore a recording destination");
+                        else
+                            Check(paste.Pastes == 0 && paste.Enters == 0 && window.SessionForTests == SessionState.Ready,
+                                change + ": no automatic delivery after losing the recording destination");
+                    }
                     Check(!window.IsVisible&&!window.OverlayForTests.IsVisible,"All Enter regression windows and pills stay suppressed");Array.Clear(pcm);
                 }catch(Exception error){failures.Add(error.ToString());}
                 finally{window?.CancelForTests();window?.RequestQuit();app.Shutdown();}

@@ -12,8 +12,8 @@ public sealed class Hotkeys : IDisposable
     private readonly Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
     private readonly Func<bool, Task<bool>> begin;
     private readonly Action finish;
-    private readonly Action? finishAndSend;
-    private readonly Func<bool>? canFinishAndSend;
+    private readonly Action<long>? finishAndSend;
+    private readonly Func<long?>? readSubmitFocusEpoch;
     private readonly Func<bool>? awaitingResult;
     private readonly Action? queueResultSend;
     private readonly Action cancel;
@@ -42,7 +42,16 @@ public sealed class Hotkeys : IDisposable
     private const uint ReconcileMessage = 0x8003;
     public Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { }
     internal Hotkeys(nint handle, Func<bool, bool> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null) : this(handle, hold => Task.FromResult(begin(hold)), finish, cancel, insert, registerLegacy, toggleMode) { }
-    public Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, Func<bool>? toggleMode = null, Action? finishAndSend = null, Func<bool>? canFinishAndSend = null, Func<bool>? awaitingResult = null, Action? queueResultSend = null) : this(handle, begin, finish, cancel, insert, true, toggleMode) { this.finishAndSend = finishAndSend; this.canFinishAndSend = canFinishAndSend; this.awaitingResult = awaitingResult; this.queueResultSend = queueResultSend; }
+    public Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert,
+        Func<bool>? toggleMode = null, Action<long>? finishAndSend = null, Func<long?>? readSubmitFocusEpoch = null,
+        Func<bool>? awaitingResult = null, Action? queueResultSend = null)
+        : this(handle, begin, finish, cancel, insert, true, toggleMode)
+    {
+        this.finishAndSend = finishAndSend;
+        this.readSubmitFocusEpoch = readSubmitFocusEpoch;
+        this.awaitingResult = awaitingResult;
+        this.queueResultSend = queueResultSend;
+    }
     private Hotkeys(nint handle, Func<bool, Task<bool>> begin, Action finish, Action cancel, Action insert, bool registerLegacy, Func<bool>? toggleMode = null)
     {
         this.handle = handle; this.begin = begin; this.finish = finish; this.cancel = cancel; this.insert = insert;
@@ -108,14 +117,16 @@ public sealed class Hotkeys : IDisposable
         if (code >= 0 && Volatile.Read(ref disposed) == 0 && (message == 0x100 || message == 0x101 || message == 0x104 || message == 0x105))
         {
             var key = Marshal.ReadInt32(data); var completing = awaitingResult?.Invoke() == true;
-            var change = gesture.Key(key, message == 0x100 || message == 0x104, Now, (Marshal.ReadInt32(data, 8) & 0x10) != 0, toggleMode(), key == 0x0D && (gesture.PendingSubmit || Interlocked.Read(ref activeGeneration) != 0 && !activeIsHold || completing) && canFinishAndSend?.Invoke() == true, completing);
-            // This callback only stores atomic intent; it never touches WPF or sends input.
-            if (change.Action == HoldAction.QueueSend) queueResultSend?.Invoke(); else Dispatch(change);
+            var submitFocusEpoch = key == 0x0D && (gesture.PendingSubmit || Interlocked.Read(ref activeGeneration) != 0 && !activeIsHold || completing)
+                ? readSubmitFocusEpoch?.Invoke() : null;
+            var change = gesture.Key(key, message == 0x100 || message == 0x104, Now, (Marshal.ReadInt32(data, 8) & 0x10) != 0, toggleMode(), submitFocusEpoch.HasValue, completing);
+            // Capture the focus stamp with this key event, without calling UI Automation on the hook thread.
+            if (change.Action == HoldAction.QueueSend) queueResultSend?.Invoke(); else Dispatch(change, submitFocusEpoch);
             if (change.Suppress) return 1;
         }
         return CallNextHookEx(keyboardHook, code, message, data);
     }
-    private void Dispatch(HoldChange change)
+    private void Dispatch(HoldChange change, long? submitFocusEpoch = null)
     {
         if (change.Action == HoldAction.None) return;
         var epoch = Interlocked.Read(ref admissionEpoch);
@@ -155,7 +166,12 @@ public sealed class Hotkeys : IDisposable
             else if (activeGeneration == change.Generation)
             {
                 activeGeneration = 0; watchdog.Stop();
-                if (change.Action == HoldAction.Finish) { if (change.Submit) finishAndSend?.Invoke(); else finish(); } else cancel();
+                if (change.Action == HoldAction.Finish)
+                {
+                    if (change.Submit && submitFocusEpoch is { } focusEpoch) finishAndSend?.Invoke(focusEpoch);
+                    else finish();
+                }
+                else cancel();
             }
         }));
     }

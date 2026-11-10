@@ -1,5 +1,9 @@
 # Sona agent interface
 
+0.5.7 adds `enterTargetReconfirmed` to delivery status. It records whether an
+explicit Enter ending hands-free recording confirmed the original composer at a
+new focus epoch. `capturedFocusEpoch` still describes the recording start.
+
 0.5.5 adds pasteCaptureRejection and pasteCaptureGaps to delivery status. They
 describe the most recent failed capture check on the paste route and the count
 of gaps that used a bounded recheck. A Ready rejection means Windows returned

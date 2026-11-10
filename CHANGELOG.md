@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.7 - finish hands-free dictation after returning to the composer
+
+- Enter can reconfirm the original focused field after a switch during
+  recording. Sona withholds output if the field differs or focus moves again.
+- Delivery status records when Enter reconfirmed the original target.
+
 ## 0.5.6 - paste into deeply embedded editors
 
 - Use a hosted editor's exact native window ancestry to avoid rejecting the

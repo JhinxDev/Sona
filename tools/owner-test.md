@@ -1,14 +1,17 @@
 # Owner-started Sona test
 
-## Short 0.5.5 paste and Enter check
+## Short 0.5.7 paste and Enter check
 
 1. With an empty composer focused, hold Ctrl+Windows, dictate a short phrase and
    release. Expect one unsent draft. Repeat with another receiving app.
 2. In a safe test conversation, enable Enter-to-send, double-tap Ctrl+Windows
    for hands-free dictation and press Enter while Sona is listening. Check for
    one complete submission.
-3. If **Draft copied** appears, focus the intended text field before Ctrl+V.
-   If **Check the chat** appears, inspect the field before pasting again.
+3. Repeat hands-free in the same field. Switch to another window, return to
+   the original field while recording, then press Enter. Check for one complete
+   submission.
+4. If **Draft copied** appears, focus the intended text field before Ctrl+V.
+   If **Check the draft** appears, inspect the field before pasting again.
    Report the app and whether you used Hold or hands-free. A local
    sona-agent status read can check lastRetainedDelivery without sharing the
    draft. The next successful dictation does not overwrite the issue.

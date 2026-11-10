@@ -1,3 +1,12 @@
+## November 10 Enter after returning to the composer, 0.5.7
+
+During a long owner test, Windows moved the foreground from Codex to Edge.
+The user returned to Codex and pressed Enter. Sona 0.5.6 accepted Enter but
+retained the draft because focus had moved since recording began. The refusal
+occurred before the paste size check. The native fixture now covers explicit
+Enter after a return, a different or unavailable field, focus movement after
+Enter and ordinary Hold release after a window switch.
+
 ## November 9 native window ancestry, 0.5.6
 
 A live Hold attempt rejected the focused Codex editor as outside the active

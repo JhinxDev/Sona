@@ -8,7 +8,7 @@ internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Out
     bool DestinationChanged, long CapturedFocusEpoch, long FinalFocusEpoch,
     bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
     bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts,
-    string? PasteCaptureRejection, int PasteCaptureGaps);
+    string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed);
 
 public partial class MainWindow
 {
@@ -30,15 +30,17 @@ public partial class MainWindow
             : pasteAttempted ? "InsertionRefused"
             : current.State == SessionState.Inserted ? "Inserted"
             : "RetainedForReview";
+        var capturedEpoch = recordingCapture?.Target?.FocusEpoch ?? -1;
         lastDelivery = new(DateTimeOffset.UtcNow, outcome, true, stoppedByEnter, requested,
             recordingCapture?.Status.ToString() ?? "Unknown", destinationContext.DestinationChanged,
-            target?.FocusEpoch ?? -1, insertion.FocusEpoch, pasteAttempted,
+            capturedEpoch, insertion.FocusEpoch, pasteAttempted,
             pasteAttempted && insertion.LastPasteConfirmed,
             pasteAttempted && insertion.LastSubmissionAccepted, fallbackCopied,
             pasteAttempted && insertion.LastPasteRequested, pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
             recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts,
             pasteAttempted ? insertion.LastPasteCaptureRejection?.ToString() : null,
-            pasteAttempted ? insertion.LastPasteCaptureGaps : 0);
+            pasteAttempted ? insertion.LastPasteCaptureGaps : 0,
+            stoppedByEnter && capturedEpoch >= 0 && target is { } deliveryTarget && deliveryTarget.FocusEpoch != capturedEpoch);
         if ((preferences.AutoInsert || requested) && outcome is
             ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld"))
             lastRetainedDelivery = lastDelivery;

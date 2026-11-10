@@ -120,7 +120,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { SettingsResult.Text = ex.Message; }
             InitializeProtection();
             modelIdleTimer.Start(); modelPreparation = WarmAllSelectedAsync();
-            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, CanFinishAndSendShortcut, () => pendingSubmission.IsOpen, () => pendingSubmission.TryRequest()); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
+            try { hotkeys = new Hotkeys(new WindowInteropHelper(this).Handle, BeginShortcutAsync, FinishShortcut, RequestCancel, () => { if (!processing) operation = InsertReadyAsync(); }, () => Volatile.Read(ref shortcutToggleMode) == 1 && !Volatile.Read(ref preparedInsertionTest), FinishAndSendShortcut, ReadSubmitFocusEpoch, () => pendingSubmission.IsOpen, () => pendingSubmission.TryRequest()); ShortcutStatus.Text = "Ctrl + Win listener is ready. " + hotkeys.LegacyWarning; }
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
             var menu = new System.Windows.Forms.ContextMenuStrip();
@@ -167,14 +167,31 @@ public partial class MainWindow : Window
         var begin = BeginRecordingAsync(hold ? () => hotkeys?.CanBeginHold == true : hotkeys?.IsToggleAdmission == true ? () => hotkeys?.CanBeginToggle == true : null);
         operation = begin; return await begin;
     }
-    private bool CanFinishAndSendShortcut() => Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) && insertion.IsForegroundWindow(target);
-    private void FinishAndSendShortcut()
+    private long? ReadSubmitFocusEpoch()
     {
-        // Once Enter belongs to this recording it must finish capture, even if
-        // the field becomes unavailable before the UI handles the gesture.
-        // Final paste/send retains every exact-field and focus-epoch guard.
+        var epoch = insertion.FocusEpoch;
+        return Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) &&
+            insertion.IsForegroundWindow(Volatile.Read(ref target)) ? epoch : null;
+    }
+    private void FinishAndSendShortcut(long focusEpoch)
+    {
+        // Enter finishes recording even if the destination can no longer be proved.
         if (processing) { pendingSubmission.TryRequest(); return; }
-        if (recorder == null || session?.State != SessionState.Recording) return;
+        var recording = session;
+        if (recorder is not { } active || recording?.State != SessionState.Recording) return;
+        // An explicit Enter can reconfirm the original field after the owner
+        // returns. Any later focus event still invalidates paste and submission.
+        if (target is { } original && original.FocusEpoch != focusEpoch && insertion.FocusEpoch == focusEpoch)
+        {
+            var current = insertion.Capture();
+            // The accessibility call can pump messages, including a Cancel.
+            if (!ReferenceEquals(session, recording) || !ReferenceEquals(recorder, active) || recording.State != SessionState.Recording) return;
+            if (current != null && insertion.FocusEpoch == focusEpoch && Insertion.Same(original with { FocusEpoch = focusEpoch }, current))
+            {
+                target = current;
+                destinationContext.Begin(current, destinationContext.DestinationName, destinationContext.DestinationIcon);
+            }
+        }
         submitOnComplete = true; StartStop();
     }
     private void FinishShortcut()
