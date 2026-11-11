@@ -159,7 +159,7 @@ internal static class EnterDeliveryFixture
 
                         if (change == "original-field")
                         {
-                            Check(paste.Pastes == 1 && paste.Enters == 1 && paste.Payload == fullDraft,
+                            Check(paste.Pastes == 1 && paste.Enters == 1 && paste.Payload.Replace("\n\n", " ", StringComparison.Ordinal) == fullDraft,
                                 "Explicit Enter can confirm the exact original field after returning to its window");
                             var delivery = JsonSerializer.SerializeToElement(
                                 typeof(MainWindow).GetField("lastDelivery", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(window));

@@ -1,3 +1,24 @@
+## November 10 clean prose layout, 0.5.8
+
+The local cleanup model reproduced the reported sentence-per-line output on
+synthetic print/measurement dictation. The shared final formatter now joins
+those lines into prose, preserves intentional paragraphs/lists/code, and groups
+long prose at sentence boundaries. Over-limit or rejected model output uses
+safe basic formatting. Numeric values and complete code blocks are protected.
+
+Qualification passed 440 Core checks, the complete build/native gate with zero
+warnings/errors and no vulnerable packages, and 55 actual-runtime cleanup checks.
+Five new GPU cases covered English prose, rambling print/measurement speech,
+numbered steps, French prose and literal code. All five model results were
+accepted. The measurements 15, 20 and 19.41 survived exactly. The existing long
+Enter fixture now compares the full wording while allowing paragraph breaks.
+The initial failing regression and before/after synthetic model results are
+retained in the Vault's November 10 clean-paragraph evidence.
+
+These checks use synthetic text and isolated UI fixtures. They establish layout
+and preservation behavior, not owner microphone accuracy or equivalence to a
+cloud dictation service. The original transcript remains recoverable.
+
 ## November 10 Enter after returning to the composer, 0.5.7
 
 During a long owner test, Windows moved the foreground from Codex to Edge.

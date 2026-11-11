@@ -1,3 +1,12 @@
+## November 10 clean dictation layout, 0.5.8
+
+Clean treats ordinary transcript and model line endings as flowing prose. Blank
+lines, bullets, numbered steps, headings, quotes, tables, literal code and exact
+snippets retain their structure. Long prose is grouped at sentence boundaries
+after roughly 90 words, with at least 30 words left for the next paragraph.
+English/French new-line and new-paragraph commands apply after prose folding.
+Notes keeps note lines; Verbatim keeps the original. No new controls are needed.
+
 ## November 8 accurate model-loading copy, 0.5.3
 
 The 0.4.11 loading states keep their geometry, busy indicator, reduced-motion

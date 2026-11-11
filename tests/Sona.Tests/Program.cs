@@ -254,12 +254,13 @@ using (var clipboardPatch = System.Text.Json.JsonDocument.Parse("{\"copyToClipbo
     Check(clipboardSettings.CopyToClipboard && !originalClipboard.CopyToClipboard, "Clipboard backup is explicitly configurable and does not mutate the old settings");
 }
 CleanupRulesChecks.Run(Check);
+await DictationLayoutChecks.RunAsync(Check);
 var cleanupPrefs = new Preferences { CleanupEnabled = true, Terms = ["Sona"] };
 var modelCalls = 0;
 var intact = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => { modelCalls++; return Task.FromResult("Keep [TERM_0]."); }, CancellationToken.None);
 Check(intact.Applied && intact.Text == "Keep Sona." && modelCalls == 1, "Production cleanup processor restores terms after polishing");
 var drift = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => Task.FromResult("Keep another app."), CancellationToken.None);
-Check(!drift.Applied && drift.Text == "um keep Sona" && drift.Outcome == "preserved", "Protected-content drift falls back to the untouched original");
+Check(!drift.Applied && drift.Text == "keep Sona" && drift.Outcome == "preserved", "Protected-content drift falls back to basic cleanup with the original retained");
 var verbatim = await CleanupProcessor.RunAsync("um keep Sona", new Preferences { CleanupEnabled = true, Style = "Verbatim" }, "Codex", (prompt, ct) => throw new Exception("Verbatim called model"), CancellationToken.None);
 Check(!verbatim.Applied && verbatim.Text == "um keep Sona", "Verbatim never invokes the cleanup model");
 var unavailableCleanup = await CleanupProcessor.RunAsync("um keep Sona", cleanupPrefs, "Codex", (prompt, ct) => throw new IOException("fixture failure"), CancellationToken.None);

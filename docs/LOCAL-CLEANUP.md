@@ -10,7 +10,11 @@ then Set up selected backend. Setup explicitly downloads the model and the
 pinned portable runtime. Enable cleanup, choose a formatting style, and Save
 preferences. Polished uses formal punctuation; Casual keeps a conversational
 style; Lowercase uses the model's very casual style. Verbatim and exact snippets
-bypass the model. Voice dictation and local WAV transcription share this stage.
+bypass the model. Clean joins sentence lines into paragraphs while preserving
+lists, code and intentional paragraph breaks. Long prose gets sentence-boundary
+paragraph breaks. “New paragraph” / “new line” (or “nouveau paragraphe” /
+“nouvelle ligne”) request explicit breaks in Clean and Notes. Notes keeps note
+lines; Verbatim keeps the original layout. Voice dictation and local WAV transcription share this stage.
 
 GPU preference uses an installed CUDA runtime first. With only the CPU runtime
 installed it uses CPU; a CUDA failure does not silently switch engines. Memory
@@ -31,17 +35,20 @@ this application and hardware, not a claim of universal model superiority.
 
 ## Preservation and limits
 
-Project vocabulary, backtick code, URLs, paths and identifiers are replaced with
+Project vocabulary, complete code blocks, backtick code, written numeric values,
+URLs, paths and identifiers are replaced with
 protected placeholders. All placeholders must survive exactly once and in order
 before restoration. Bounds and narrow negation/instruction checks reject prompt
 leakage, missing terms and some meaning changes. Rejected text keeps the original
-wording; runtime failure uses basic cleanup. Esc cancellation cannot commit a
+wording through basic formatting; runtime failure uses the same basic cleanup. Esc cancellation cannot commit a
 late result. Home always retains the original transcript and Use original.
 
 These checks are conservative rather than comprehensive semantic verification.
 The earlier CPU study observed a mixed-language `cloud` → `Claude` change;
 `cloud` is now protected, and the production synthetic case preserved it. This
-does not establish that all names, numbers or meaning will always be correct.
+does not establish that all names or meaning will always be correct. Written
+numeric values now survive exactly and in order, but spoken number words and
+speech-recognition mistakes still need review.
 
 Input is bounded to 4000 characters and 2500 prompt tokens, with a 4096-token
 context and 1536-token output reserve. Output is capped at 6000 characters.

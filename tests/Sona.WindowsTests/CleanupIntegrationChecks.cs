@@ -44,6 +44,24 @@ internal static class CleanupIntegrationChecks
                 if (name == "negation") Check(result.Text.Contains("don't", StringComparison.OrdinalIgnoreCase), "Negation remains in the accepted polished result");
                 rows.Add(new { name, original, cleaned = result.Text, result.Applied, elapsedMilliseconds = elapsed.Elapsed.TotalMilliseconds });
             }
+            var layoutCases = new[]
+            {
+                ("sentence-lines", "I printed a sample.\nThe labels are faint.\nThe target width is 20 mm, but it measures 19.41 mm."),
+                ("rambling-print", "I printed a sample and there are a few things to check.\nI think the numbers were written in millimeters, but the labels are faint.\nI don't remember which sample was which.\nI am testing the width.\nI don't know whether I measured it correctly.\nThe 20 mm sample measures 19.41 mm, and the other target is 15 mm."),
+                ("numbered-layout", "Check the following:\n1. Measure 15 mm.\n2. Measure 20 mm.\n3. Compare the results."),
+                ("french-layout", "J'ai imprimé un échantillon.\nLes chiffres sont difficiles à lire.\nLa largeur prévue est de 20 mm, mais je mesure 19.41 mm."),
+                ("code-layout", "Keep this code:\n```python\nif ready:\n    print('um github')\n```\nThen test it.")
+            };
+            foreach (var (name, original) in layoutCases)
+            {
+                string raw = "";
+                var result = await CleanupProcessor.RunAsync(original, p, "Codex", async (prompt, ct) => raw = await model.RunAsync(prompt, p, ct), lifetime.Token);
+                if (name is "sentence-lines" or "rambling-print" or "french-layout")
+                    Check(!System.Text.RegularExpressions.Regex.IsMatch(result.Text, @"(?<!\n)\n(?!\n)"), "Production prose layout avoids sentence-per-line output for " + name);
+                if (original.Contains("19.41")) Check(result.Text.Contains("19.41") && result.Text.Contains("20"), "Production measurement values remain exact for " + name);
+                if (name == "code-layout") Check(result.Text.Contains("```python\nif ready:\n    print('um github')\n```", StringComparison.Ordinal), "Production fenced code keeps exact content and indentation");
+                rows.Add(new { name, original, raw, cleaned = result.Text, result.Applied, result.Outcome });
+            }
             foreach (var tone in new[] { "casual", "very casual" })
             {
                 p.CleanupTone = tone;

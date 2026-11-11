@@ -4,7 +4,7 @@ namespace Sona.Core;
 public static partial class TextPipeline
 {
     // Formatting acts outside literal tokens. It does not invent or paraphrase words.
-    private static readonly Regex Protected = new(@"`[^`]*`|https?://\S+|\S*[/\\]\S+|\b[\w]+[._][\w.]+\b|\b[A-Za-z_]+\([^)]*\)", RegexOptions.CultureInvariant);
+    private static readonly Regex Protected = new(@"(?m)^[ \t]*```[^\r\n]*\r?\n[\s\S]*?^[ \t]*```[^\r\n]*|^[ \t]*~~~[^\r\n]*\r?\n[\s\S]*?^[ \t]*~~~[^\r\n]*|^(?: {4}|\t)[^\r\n]*(?:\r?\n(?: {4}|\t)[^\r\n]*)*|`[^`]*`|https?://\S+|\S*[/\\]\S+|\b[\w]+[._][\w.]+\b|\b[A-Za-z_]+\([^)]*\)", RegexOptions.CultureInvariant);
     private static readonly Regex Filler = new(@"(?<![\w])(?:um+|uh+|erm|euh+)(?![\w])[, ]*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     public static string Apply(string transcript, Preferences settings)
     {
@@ -22,8 +22,7 @@ public static partial class TextPipeline
         }
         text = Regex.Replace(text, @"[ \t]{2,}", " ");
         text = Regex.Replace(text, @"\s+([,.;:!?])", "$1").Trim(' ', ',');
-        if (settings.Style == "Notes")
-            text = Regex.Replace(text, @"\b(?:new paragraph|nouveau paragraphe)\b[,.]?", "\n\n", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        text = DictationLayout.Apply(text, settings.Style);
         // Explicit correction syntax only. Ambiguous natural self-corrections remain visible.
         var correction = Regex.Match(text, @"^(.*?)\b(?:correction|corrige)\s*:\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
         if (correction.Success) text = correction.Groups[2].Value.Trim();

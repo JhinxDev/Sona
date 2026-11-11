@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.8 - clean dictation paragraphs
+
+- Clean joins sentence-by-sentence transcript and model lines into paragraphs,
+  with sentence-boundary breaks for long prose. Existing lists, blank-line
+  paragraphs, code blocks and exact snippets keep their structure.
+- Clean and Notes honor English and French new-line/paragraph commands.
+  Verbatim retains the original layout.
+- Safe basic formatting also runs when model cleanup is rejected or over limit.
+- Written numeric values and complete code blocks are protected during cleanup.
+
 ## 0.5.7 - finish hands-free dictation after returning to the composer
 
 - Enter can reconfirm the original focused field after a switch during

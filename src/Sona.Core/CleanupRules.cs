@@ -8,7 +8,7 @@ public static class CleanupRules
     public const int MaximumInputLength = 4000;
     public const int MaximumPromptLength = 6000;
     public const int MaximumOutputLength = 6000;
-    private static readonly Regex Literal = new(@"`[^`]*`|https?://\S+|(?<!\S)\S*[/\\]\S+|\b[\w]+[._][\w.]+\b|\b[A-Za-z_]+\([^)]*\)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+    private static readonly Regex Literal = new(@"(?m)^[ \t]*```[^\r\n]*\r?\n[\s\S]*?^[ \t]*```[^\r\n]*|^[ \t]*~~~[^\r\n]*\r?\n[\s\S]*?^[ \t]*~~~[^\r\n]*|^(?: {4}|\t)[^\r\n]*(?:\r?\n(?: {4}|\t)[^\r\n]*)*|`[^`]*`|https?://\S+|(?<!\S)\S*[/\\]\S+|\b[\w]+[._][\w.]+\b|\b[A-Za-z_]+\([^)]*\)|(?<![\w])[-+]?\d+(?:[.,:/-]\d+)*(?:%|\b)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     internal static readonly Regex Tags = new(@"\[TERM_\d+\]", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex Negations = new(@"(?<![\w])(?:not|never|without|cannot|can't|can’t|don't|don’t|doesn't|doesn’t|won't|won’t|shouldn't|shouldn’t|sans|pas|jamais)(?![\w])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex Leakage = new(@"(?:^|\n)\s*(?:app|tone|text|out)\s*:|<\||\|>|</?(?:think|thinking)>|(?:^|\n)\s*(?:Here is (?:the|your) (?:cleaned|corrected|formatted)|Sure[,!]|As an AI)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));

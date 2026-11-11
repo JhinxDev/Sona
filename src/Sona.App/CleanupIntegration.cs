@@ -100,7 +100,7 @@ public partial class MainWindow
             CleanupResult.Text = result.Outcome switch
             {
                 "polished" => "Text polished locally. Use original restores the transcript.",
-                "preserved" => "Original wording kept: cleanup could not safely preserve your terms or the text exceeded its limits.",
+                "preserved" => "Cleanup suggestion skipped. Basic formatting was used; the original transcript is available.",
                 "unavailable" => "Local cleanup was unavailable. Basic cleanup was used; the original transcript is retained.",
                 _ => "Local model cleanup skipped for this mode."
             };

@@ -12,12 +12,12 @@ public static class CleanupProcessor
         if (!settings.CleanupEnabled || settings.Style == "Verbatim" || snippet) return new(basic, false, "bypassed");
         if (CleanupPolicy.SkipModel(original, settings)) return new(basic, false, "already-clean");
         var request = CleanupRules.Prepare(original, settings, app);
-        if (request == null) return new(original.Trim(), false, "preserved");
+        if (request == null) return new(basic, false, "preserved");
         try
         {
             var output = await runModel(request.Prompt, token);
             token.ThrowIfCancellationRequested();
-            if (!request.TryRestore(output, out var restored)) return new(original.Trim(), false, "preserved");
+            if (!request.TryRestore(output, out var restored)) return new(basic, false, "preserved");
             return new(TextPipeline.Apply(restored, settings), true, "polished");
         }
         catch (OperationCanceledException) { throw; }

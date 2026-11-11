@@ -12,7 +12,7 @@ The primary owner integrates the app changes and a scoped independent review. Ex
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current source candidate identity is Sona 0.5.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.5.8; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 0.5.0 adds native per-app modes (ordered app identity to draft style and cleanup
 tone rules applied only to the captured session) and first-run Home guidance with
@@ -32,6 +32,12 @@ measurements when only the lifecycle harness changes; it never opens a microphon
 `tools/models-ui-smoke.ps1` checks provider/license/status and real model actions
 at normal and compact sizes. See PARAKEET.md for pins, native compatibility
 source, the long-recording repair and the existing Whisper mixed-language limit.
+
+Clean layout is shared by basic formatting and accepted local cleanup. Rejected
+or oversized model input also returns the safe basic draft, with the original
+retained separately. DictationLayout folds prose lines, preserves structural
+lines and inserts word-bounded sentence breaks for long prose. Literal masks
+protect code blocks and numeric values before model inference.
 
 Optional cleanup uses shared Core preservation rules and processing orchestration,
 one contained llama.cpp worker, pinned separately downloaded assets, and the same
