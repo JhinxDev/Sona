@@ -17,7 +17,8 @@ using Sona.App.Windows;
 internal static class NativeClipboardIsolationChecks
 {
     internal sealed record StageObservation(uint ReturnedSequence, uint AfterCloseSequence, uint AfterReadSequence, bool OwnerMatchesAfterClose, bool OwnerMatchesAfterRead);
-    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation", StageObservation? Stage = null);
+    internal sealed record ImageObservation(string[] OfferedFormats, bool UnsupportedPayloadRefused, bool OriginalImagePreserved);
+    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation", StageObservation? Stage = null, ImageObservation? Image = null);
 
     // This explicit entrypoint runs ONLY on a disposable GitHub-hosted VM.
     // Environment checks prevent accidental local/self-hosted use; they are not
@@ -27,6 +28,7 @@ internal static class NativeClipboardIsolationChecks
     {
         int checks = 0; bool boundaryVerified = false;
         StageObservation? stage = null;
+        ImageObservation? image = null;
         uint captureBefore = 0, captureAfter = 0;
         List<string> failures = [];
         try
@@ -49,7 +51,7 @@ internal static class NativeClipboardIsolationChecks
                 {
                     VerifyBoundary();
                     boundaryVerified = true;
-                    RunClipboardCases(VerifyBoundary, ref checks, ref captureBefore, ref captureAfter, ref stage);
+                    RunClipboardCases(VerifyBoundary, ref checks, ref captureBefore, ref captureAfter, ref stage, ref image);
                 }
                 catch (Exception error) { workerFailure = error; }
             }) { IsBackground = true, Name = "Sona hosted native clipboard regression" };
@@ -61,7 +63,7 @@ internal static class NativeClipboardIsolationChecks
         catch (Exception error) { failures.Add(error.Message); }
         // This mode intentionally replaces the disposable VM's clipboard. It
         // makes no private-window-station or original-clipboard preservation claim.
-        return new(checks, boundaryVerified, null, false, captureBefore, captureAfter, failures.ToArray(), "DisposableGitHubHostedRunner", stage);
+        return new(checks, boundaryVerified, null, false, captureBefore, captureAfter, failures.ToArray(), "DisposableGitHubHostedRunner", stage, image);
     }
 
     private static void RequireHostedRunner()
@@ -75,6 +77,7 @@ internal static class NativeClipboardIsolationChecks
     {
         int checks = 0; bool isolated = false, originalSequenceAvailable = false;
         StageObservation? stage = null;
+        ImageObservation? image = null;
         bool? unchanged = null;
         uint captureBefore = 0, captureAfter = 0;
         List<string> failures = [];
@@ -133,7 +136,7 @@ internal static class NativeClipboardIsolationChecks
                         ObjectName(GetProcessWindowStation()) != stationName || IsVisible(station))
                         throw new InvalidOperationException("STA isolation verification failed before WPF initialization.");
                     isolated = true;
-                    RunClipboardCases(() => AssertIsolated(stationName, desktopName), ref checks, ref captureBefore, ref captureAfter, ref stage);
+                    RunClipboardCases(() => AssertIsolated(stationName, desktopName), ref checks, ref captureBefore, ref captureAfter, ref stage, ref image);
                 }
                 catch (Exception error) { workerFailure = error; }
             }) { IsBackground = true, Name = "Sona isolated clipboard regression" };
@@ -165,11 +168,11 @@ internal static class NativeClipboardIsolationChecks
             if (station != 0 && !CloseWindowStation(station)) failures.Add("Private window station cleanup failed.");
             if (security != 0) LocalFree(security);
         }
-        return new(checks, isolated, unchanged, originalSequenceAvailable, captureBefore, captureAfter, failures.ToArray(), Stage: stage);
+        return new(checks, isolated, unchanged, originalSequenceAvailable, captureBefore, captureAfter, failures.ToArray(), Stage: stage, Image: image);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RunClipboardCases(Action assertBoundary, ref int checks, ref uint captureBefore, ref uint captureAfter, ref StageObservation? observation)
+    private static void RunClipboardCases(Action assertBoundary, ref int checks, ref uint captureBefore, ref uint captureAfter, ref StageObservation? observation, ref ImageObservation? imageObservation)
     {
         assertBoundary();
         try
@@ -219,17 +222,64 @@ internal static class NativeClipboardIsolationChecks
             var image = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, pixels, 8);
             image.Freeze();
             System.Windows.Clipboard.SetImage(image);
+            // WPF can additionally offer its serialized framework bitmap object.
+            // Record only the synthetic format names, not clipboard payloads.
+            // Unknown real payloads must remain a safe refusal, never be ignored.
+            if (!native.Open(window.Handle)) throw new ExternalException("Synthetic WPF image enumeration is unavailable.");
+            (uint Format, string Name)[] imageFormats;
+            try { imageFormats = native.Formats(128).Select(format => (format, native.FormatName(format))).ToArray(); }
+            finally { native.Close(); }
+            imageObservation = new(imageFormats.Select(entry => entry.Format + ":" + entry.Name).ToArray(), false, false);
+            var imageSequence = clipboard.Sequence;
+            bool imageRefused = false;
+            try { using var supportedImage = clipboard.Capture(); }
+            catch (ExternalException error) when (error.Message == "Clipboard contains a format that cannot be safely preserved.") { imageRefused = true; }
+            if (imageRefused)
+            {
+                Check(imageFormats.Any(entry => entry.Format >= 0xC000 && entry.Name is not ("DataObject" or "Ole Private Data" or "PNG")), "WPF image refusal must correspond to an additional real registered payload."); checks++;
+                bool preserved = clipboard.Sequence == imageSequence && ImagePixelsMatch(pixels);
+                imageObservation = imageObservation with { UnsupportedPayloadRefused = true, OriginalImagePreserved = preserved };
+                Check(preserved, "Refusing an unknown WPF image payload changed the original image."); checks++;
+            }
+            else
+            {
+                imageObservation = imageObservation with { OriginalImagePreserved = ImagePixelsMatch(pixels) };
+                Check(imageObservation.OriginalImagePreserved, "Supported WPF image capture changed its pixels."); checks++;
+            }
+
+            // Separately qualify supported native images without a serialized
+            // framework object: 40-byte BITMAPINFOHEADER + a top-down 32-bit DIB.
+            // Windows supplies its documented CF_BITMAP/CF_DIBV5 conversions.
+            // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapinfoheader
+            byte[] dib = new byte[40 + pixels.Length];
+            BitConverter.GetBytes(40).CopyTo(dib, 0);
+            BitConverter.GetBytes(2).CopyTo(dib, 4);
+            BitConverter.GetBytes(-2).CopyTo(dib, 8);
+            BitConverter.GetBytes((ushort)1).CopyTo(dib, 12);
+            BitConverter.GetBytes((ushort)32).CopyTo(dib, 14);
+            BitConverter.GetBytes(pixels.Length).CopyTo(dib, 20);
+            pixels.CopyTo(dib, 40);
+            assertBoundary();
+            nint dibHandle = native.Allocate(dib);
+            if (dibHandle == 0) throw new ExternalException("Synthetic DIB allocation failed.");
+            try
+            {
+                if (!native.Open(window.Handle)) throw new ExternalException("Synthetic DIB seed lock failed.");
+                try
+                {
+                    if (!native.Empty() || !native.Set(8, dibHandle)) throw new ExternalException("Synthetic DIB seed failed.");
+                    dibHandle = 0; // Windows now owns the allocation.
+                }
+                finally { native.Close(); }
+            }
+            finally { if (dibHandle != 0) native.Free(8, dibHandle); }
             using (var snapshot = clipboard.Capture())
             {
-                Check(snapshot.Formats.Any(f => f.Format is 2 or 8 or 17), "WPF image did not offer a supported image payload."); checks++;
+                Check(snapshot.Formats.Any(f => f.Format == 8) && snapshot.Formats.Any(f => f.Format == 2), "Native DIB seed did not offer DIB and bitmap payloads."); checks++;
                 var staged = clipboard.TrySetText(snapshot, "temporary image replacement");
                 Check(staged.Status == ClipboardChangeStatus.Staged, "Native bitmap staging failed."); checks++;
                 Check(clipboard.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored, "Native bitmap restoration failed."); checks++;
-                var restored = System.Windows.Clipboard.GetImage() ?? throw new InvalidOperationException("Restored image unavailable.");
-                var converted = new FormatConvertedBitmap(restored, PixelFormats.Bgra32, null, 0);
-                byte[] restoredPixels = new byte[pixels.Length];
-                converted.CopyPixels(restoredPixels, 8, 0);
-                Check(restored.PixelWidth == 2 && restored.PixelHeight == 2 && restoredPixels.SequenceEqual(pixels), "Native image pixel readback differs."); checks++;
+                Check(ImagePixelsMatch(pixels), "Native image pixel readback differs."); checks++;
             }
             foreach (bool unavailableReadback in new[] { false, true })
             {
@@ -263,6 +313,18 @@ internal static class NativeClipboardIsolationChecks
             try { assertBoundary(); System.Windows.Clipboard.Clear(); }
             finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
         }
+    }
+
+    private static bool ImagePixelsMatch(byte[] expected)
+    {
+        var restored = System.Windows.Clipboard.GetImage();
+        if (restored == null || restored.PixelWidth != 2 || restored.PixelHeight != 2) return false;
+        // BI_RGB's high byte is reserved, not an alpha channel. Prove every
+        // opaque pixel's B/G/R values without inventing an alpha-preservation claim.
+        var converted = new FormatConvertedBitmap(restored, PixelFormats.Bgr24, null, 0);
+        byte[] pixels = new byte[12];
+        converted.CopyPixels(pixels, 6, 0);
+        return pixels.SequenceEqual(expected.Where((_, index) => index % 4 != 3));
     }
 
     // Real clipboard transaction, fake target/readback and key gestures. No
