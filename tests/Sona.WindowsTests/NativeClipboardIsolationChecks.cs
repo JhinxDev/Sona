@@ -16,7 +16,8 @@ using Sona.App.Windows;
 // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setprocesswindowstation
 internal static class NativeClipboardIsolationChecks
 {
-    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation");
+    internal sealed record StageObservation(uint ReturnedSequence, uint AfterCloseSequence, uint AfterReadSequence, bool OwnerMatchesAfterClose, bool OwnerMatchesAfterRead);
+    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation", StageObservation? Stage = null);
 
     // This explicit entrypoint runs ONLY on a disposable GitHub-hosted VM.
     // Environment checks prevent accidental local/self-hosted use; they are not
@@ -25,6 +26,7 @@ internal static class NativeClipboardIsolationChecks
     internal static Report RunOnHostedRunner()
     {
         int checks = 0; bool boundaryVerified = false;
+        StageObservation? stage = null;
         uint captureBefore = 0, captureAfter = 0;
         List<string> failures = [];
         try
@@ -47,7 +49,7 @@ internal static class NativeClipboardIsolationChecks
                 {
                     VerifyBoundary();
                     boundaryVerified = true;
-                    RunClipboardCases(VerifyBoundary, ref checks, ref captureBefore, ref captureAfter);
+                    RunClipboardCases(VerifyBoundary, ref checks, ref captureBefore, ref captureAfter, ref stage);
                 }
                 catch (Exception error) { workerFailure = error; }
             }) { IsBackground = true, Name = "Sona hosted native clipboard regression" };
@@ -59,7 +61,7 @@ internal static class NativeClipboardIsolationChecks
         catch (Exception error) { failures.Add(error.Message); }
         // This mode intentionally replaces the disposable VM's clipboard. It
         // makes no private-window-station or original-clipboard preservation claim.
-        return new(checks, boundaryVerified, null, false, captureBefore, captureAfter, failures.ToArray(), "DisposableGitHubHostedRunner");
+        return new(checks, boundaryVerified, null, false, captureBefore, captureAfter, failures.ToArray(), "DisposableGitHubHostedRunner", stage);
     }
 
     private static void RequireHostedRunner()
@@ -72,6 +74,7 @@ internal static class NativeClipboardIsolationChecks
     internal static Report Run()
     {
         int checks = 0; bool isolated = false, originalSequenceAvailable = false;
+        StageObservation? stage = null;
         bool? unchanged = null;
         uint captureBefore = 0, captureAfter = 0;
         List<string> failures = [];
@@ -130,7 +133,7 @@ internal static class NativeClipboardIsolationChecks
                         ObjectName(GetProcessWindowStation()) != stationName || IsVisible(station))
                         throw new InvalidOperationException("STA isolation verification failed before WPF initialization.");
                     isolated = true;
-                    RunClipboardCases(() => AssertIsolated(stationName, desktopName), ref checks, ref captureBefore, ref captureAfter);
+                    RunClipboardCases(() => AssertIsolated(stationName, desktopName), ref checks, ref captureBefore, ref captureAfter, ref stage);
                 }
                 catch (Exception error) { workerFailure = error; }
             }) { IsBackground = true, Name = "Sona isolated clipboard regression" };
@@ -162,11 +165,11 @@ internal static class NativeClipboardIsolationChecks
             if (station != 0 && !CloseWindowStation(station)) failures.Add("Private window station cleanup failed.");
             if (security != 0) LocalFree(security);
         }
-        return new(checks, isolated, unchanged, originalSequenceAvailable, captureBefore, captureAfter, failures.ToArray());
+        return new(checks, isolated, unchanged, originalSequenceAvailable, captureBefore, captureAfter, failures.ToArray(), Stage: stage);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RunClipboardCases(Action assertBoundary, ref int checks, ref uint captureBefore, ref uint captureAfter)
+    private static void RunClipboardCases(Action assertBoundary, ref int checks, ref uint captureBefore, ref uint captureAfter, ref StageObservation? observation)
     {
         assertBoundary();
         try
@@ -187,8 +190,10 @@ internal static class NativeClipboardIsolationChecks
             {
                 checks++;
                 var staged = clipboard.TrySetText(snapshot, "Sona synthetic temporary draft");
+                observation = new(staged.Sequence, clipboard.Sequence, 0, GetClipboardOwner() == window.Handle, false);
                 Check(staged.Status == ClipboardChangeStatus.Staged, "Native WPF text staging failed: " + staged.Status); checks++;
                 Check(System.Windows.Clipboard.GetText() == "Sona synthetic temporary draft", "Native staged Unicode readback differs."); checks++;
+                observation = observation with { AfterReadSequence = clipboard.Sequence, OwnerMatchesAfterRead = GetClipboardOwner() == window.Handle };
                 var restored = clipboard.Restore(snapshot, staged.Sequence);
                 Check(restored.Status == ClipboardChangeStatus.Restored, "Native WPF text restoration failed: " + restored.Status); checks++;
                 Check(System.Windows.Clipboard.GetText() == "Sona synthetic original \u00e9\u6c34", "Native restored Unicode readback differs."); checks++;
@@ -308,6 +313,7 @@ internal static class NativeClipboardIsolationChecks
     [DllImport("user32.dll")] private static extern nint GetThreadDesktop(uint thread);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
+    [DllImport("user32.dll")] private static extern nint GetClipboardOwner();
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern nint CreateWindowStation(string? name, uint flags, uint access, ref SecurityAttributes attributes);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetProcessWindowStation(nint station);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern nint CreateDesktop(string name, string? device, nint mode, uint flags, uint access, ref SecurityAttributes attributes);
