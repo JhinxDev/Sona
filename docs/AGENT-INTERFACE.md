@@ -1,4 +1,9 @@
-## 0.6.0 diagnostics
+## 0.6.1 diagnostics
+
+`lastDelivery.clipboardStatus` and `lastRetainedDelivery.clipboardStatus` identify
+the clipboard stage, including `CaptureFailed`, staging failures, `Restored`
+and `RestorationFailed`. They contain no copied data. This distinguishes a
+pre-paste clipboard refusal from target capture or paste readback failures.
 
 `destinationCapture.windowStable` reports whether capture proved the same native
 window throughout its inspection. Delivery can report `InterruptedRetained`

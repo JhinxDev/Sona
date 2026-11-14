@@ -24,6 +24,27 @@ internal static class OwnedClipboardChecks
             Check(n.Owned.Count == 0 && n.OpenCount == n.CloseCount, "Transferred allocations or clipboard locks leaked.");
         }
         {
+            var (n, c) = Create(); var payload = n.CopyContents();
+            n.Contents[0xC006] = [99]; n.Contents[0xC007] = [88];
+            using var snapshot = c.Capture();
+            var staged = c.TrySetText(snapshot, "WPF copy regression");
+            Check(staged.Status == ClipboardChangeStatus.Staged && c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(payload), "WPF DataObject/Ole Private Data bookkeeping must not block exact supported payload restoration.");
+            Check(!n.ReadFormats.Contains(0xC006) && !n.ReadFormats.Contains(0xC007), "Owner-bound OLE metadata must never be copied or replayed.");
+        }
+        foreach (bool addUnknownPayload in new[] { false, true })
+        {
+            var (n, c) = Create(); n.UserCopy((0xC006, new byte[] { 99 }), (0xC007, new byte[] { 88 }));
+            if (addUnknownPayload) n.Contents[0xC999] = [77];
+            bool refused = false; try { using var snapshot = c.Capture(); } catch (ExternalException) { refused = true; }
+            Check(refused && n.EmptyCalls == 0, "OLE bookkeeping alone or an unknown real OLE payload must still refuse without mutation.");
+        }
+        {
+            var (n, c) = Create(); var initial = n.Sequence; n.OnRead = n.Materialize;
+            using var snapshot = c.Capture();
+            Check(snapshot.InitialSequence == initial && snapshot.Sequence == initial + 1, "Snapshot must distinguish pre-render ownership from final materialized sequence.");
+            Check(c.TrySetText(snapshot, "after delayed render").Status == ClipboardChangeStatus.Staged, "Own delayed rendering must not be confused with a newer copy.");
+        }
+        {
             var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); n.FailOpen = true;
             Check(c.TrySetText(snapshot, "draft").Status == ClipboardChangeStatus.Unavailable && n.SameContents(original) && n.EmptyCalls == 0, "Failed OpenClipboard must not mutate.");
             Check(n.Owned.Count == 0, "Failed lock leaked staged allocations.");
@@ -150,12 +171,14 @@ internal static class OwnedClipboardChecks
         internal readonly Dictionary<nint, (uint Kind, byte[] Bytes)> Owned = [];
         internal readonly HashSet<int> FailSets = [];
         internal readonly HashSet<uint> Markers = [];
+        internal readonly HashSet<uint> ReadFormats = [];
         internal bool FailOpen, FailEmpty, FailRead, FailBitmap, FailRegistration;
         internal int FailAllocationAt, FailEmptyAt, Allocations, EmptyCalls, OpenCount, CloseCount, SetCalls, BitmapFrees;
         internal Action? BeforeOpen, OnRead;
         private bool opened;
         private int nextHandle;
         public uint Sequence { get; private set; } = 1;
+        internal void Materialize() { RequireOpen(); Sequence++; }
         internal void UserCopy(params (uint Format, byte[] Bytes)[] entries)
         {
             if (opened) throw new InvalidOperationException("Another clipboard owner cannot copy while lock held.");
@@ -174,12 +197,14 @@ internal static class OwnedClipboardChecks
         public string FormatName(uint format) => format switch
         {
             0xC001 => "HTML Format", 0xC002 => "CanIncludeInClipboardHistory", 0xC003 => "CanUploadToCloudClipboard",
-            0xC004 => "Chromium internal source URL", 0xC005 => "WebKit Smart Paste Format", _ => "unknown owner-specific format"
+            0xC004 => "Chromium internal source URL", 0xC005 => "WebKit Smart Paste Format",
+            0xC006 => "DataObject", 0xC007 => "Ole Private Data", _ => "unknown owner-specific format"
         };
         public uint RegisterFormat(string name) => FailRegistration ? 0u : name switch
         { "CanIncludeInClipboardHistory" => 0xC002u, "CanUploadToCloudClipboard" => 0xC003u, _ => throw new InvalidOperationException("Unexpected registration.") };
         public byte[] Read(uint format, int maximumBytes)
         {
+            ReadFormats.Add(format);
             RequireOpen(); var action = OnRead; OnRead = null; action?.Invoke();
             if (FailRead || Contents[format].Length > maximumBytes || Contents[format].Length == 0 && !Markers.Contains(format)) throw new ExternalException();
             return Contents[format].ToArray();

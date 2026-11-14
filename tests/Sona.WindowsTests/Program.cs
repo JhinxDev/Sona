@@ -5,6 +5,13 @@ using Sona.App.Audio;
 using Sona.App.Windows;
 using NAudio.Wave;
 
+if (args.Length == 1 && args[0] == "--native-clipboard-isolation-checks")
+{
+    var report = NativeClipboardIsolationChecks.Run();
+    Console.WriteLine(JsonSerializer.Serialize(report));
+    if (report.Failures.Length > 0) Environment.ExitCode = 1;
+    return;
+}
 var executable = Environment.ProcessPath!;
 if (args.Length == 1 && args[0] == "--owned-clipboard-checks") { Console.WriteLine($"{OwnedClipboardChecks.Run()} owned-clipboard checks passed."); return; }
 if (args.Length == 2 && args[0] == "--model-loading-fixture")

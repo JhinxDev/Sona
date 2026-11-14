@@ -8,6 +8,8 @@ namespace Sona.App.Windows;
 internal interface ICompletedDraftTransport
 {
     object? SaveClipboard();
+    uint SavedClipboardSequence(object? previous) => ClipboardSequence;
+    uint SavedClipboardInitialSequence(object? previous) => SavedClipboardSequence(previous);
     ClipboardChange SetClipboard(object? previous, string text);
     uint ClipboardSequence { get; }
     ClipboardChange RestoreClipboard(object? previous, uint expectedSequence);
@@ -31,12 +33,14 @@ public sealed partial class Insertion
     internal bool LastPasteRequested => LastPasteReadback != PasteReadback.NotRequested;
     internal bool LastDraftOnClipboard { get; private set; }
     internal bool LastClipboardRestorationFailed { get; private set; }
+    internal string LastClipboardStatus { get; private set; } = "NotUsed";
     internal uint LastDraftClipboardSequence { get; private set; }
     internal ICompletedDraftTransport? PasteTransportForTests { get; set; }
     public async Task<(bool Inserted, string Detail)> PasteAsync(DraftTarget? target, string text, bool submit, CancellationToken cancellation = default, bool keepOnFailure = false, uint? recoverySequence = null, Func<bool>? requestSubmission = null)
     {
         LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = LastClipboardRestorationFailed = false;
         LastPasteReadback = PasteReadback.NotRequested;
+        LastClipboardStatus = "NotUsed";
         LastPasteCaptureRejection = null;
         LastPasteCaptureGaps = 0;
         if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > DraftLimits.MaximumCharacters || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
@@ -59,14 +63,20 @@ public sealed partial class Insertion
         object? previous = null; uint sequence = 0; bool changed = false, pasted = false, confirmed = false, allowRecovery = false;
         try
         {
-            var initialSequence = transport.ClipboardSequence;
-            allowRecovery = keepOnFailure && (!recoverySequence.HasValue || initialSequence == recoverySequence.Value);
+            LastClipboardStatus = "Capturing";
             previous = transport.SaveClipboard();
+            // Reading delayed clipboard formats may legitimately advance its
+            // sequence while our capture owns the lock. Use that snapshot's
+            // final sequence, then reject any change after it was captured.
+            var initialSequence = transport.SavedClipboardSequence(previous);
+            LastClipboardStatus = "Captured";
+            allowRecovery = keepOnFailure && (!recoverySequence.HasValue || transport.SavedClipboardInitialSequence(previous) == recoverySequence.Value);
             var before = transport.ReadText(target);
             var documentBefore = transport.ReadDocumentText(target);
             cancellation.ThrowIfCancellationRequested();
             if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != initialSequence) return (false, "Focus, keys or clipboard changed before paste. Your draft stays in Sona.");
             var staged = transport.SetClipboard(previous, text);
+            LastClipboardStatus = staged.Status == ClipboardChangeStatus.Staged ? "Staged" : "Staging" + staged.Status;
             sequence = staged.Sequence;
             changed = staged.Status is ClipboardChangeStatus.Staged or ClipboardChangeStatus.FailedOwnedPartial;
             if (staged.Status != ClipboardChangeStatus.Staged)
@@ -150,7 +160,10 @@ public sealed partial class Insertion
             return LastSubmissionAccepted ? (true, "Complete draft pasted, then Enter sent once to the same composer.") : (true, "Draft pasted. Windows did not confirm the complete Enter keystroke. Submission may have occurred; check the composer before retrying.");
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
-        { return (pasted, pasted ? "Paste was requested but verification failed. Review the composer; Sona did not retry." : "Clipboard is busy or unavailable. Your complete draft stays in Sona."); }
+        {
+            if (LastClipboardStatus == "Capturing") LastClipboardStatus = "CaptureFailed";
+            return (pasted, pasted ? "Paste was requested but verification failed. Review the composer; Sona did not retry." : "The clipboard could not be safely prepared. Your complete draft stays in Sona.");
+        }
         finally
         {
             // A newer owner copy always wins. Never restore across a clipboard change.
@@ -159,7 +172,7 @@ public sealed partial class Insertion
                 // Recovery is for an insertion that could not be attempted.
                 // A missing send acknowledgement is not a failed paste. Even
                 // uncertain pastes restore the prior clipboard and ask for review.
-                if (allowRecovery && !cancellation.IsCancellationRequested && !LastPasteRequested) { LastDraftOnClipboard = true; LastDraftClipboardSequence = sequence; }
+                if (allowRecovery && !cancellation.IsCancellationRequested && !LastPasteRequested) { LastDraftOnClipboard = true; LastDraftClipboardSequence = sequence; LastClipboardStatus = "RecoveryRetained"; }
                 else for (var attempt = 0; attempt < 3; attempt++)
                 {
                     if (transport.ClipboardSequence != sequence) { LastClipboardRestorationFailed = false; break; }
@@ -167,14 +180,16 @@ public sealed partial class Insertion
                     {
                         var restored = transport.RestoreClipboard(previous, sequence);
                         if (restored.Status is ClipboardChangeStatus.Restored or ClipboardChangeStatus.OwnershipChanged)
-                        { LastClipboardRestorationFailed = false; break; }
+                        { LastClipboardRestorationFailed = false; LastClipboardStatus = restored.Status.ToString(); break; }
                         if (restored.Status == ClipboardChangeStatus.FailedOwnedPartial) sequence = restored.Sequence;
                         LastClipboardRestorationFailed = true;
+                        LastClipboardStatus = "RestorationFailed";
                         if (attempt < 2) await transport.Delay(40);
                     }
                     catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
                     {
                         LastClipboardRestorationFailed = true;
+                        LastClipboardStatus = "RestorationFailed";
                         if (attempt < 2) await transport.Delay(40);
                     }
                 }
@@ -238,6 +253,8 @@ public sealed partial class Insertion
         private readonly OwnedClipboard clipboard = new(() => Application.Current?.MainWindow is { } window
             ? new System.Windows.Interop.WindowInteropHelper(window).Handle : 0);
         public object SaveClipboard() => clipboard.Capture();
+        public uint SavedClipboardSequence(object? previous) => ((OwnedClipboard.Snapshot)previous!).Sequence;
+        public uint SavedClipboardInitialSequence(object? previous) => ((OwnedClipboard.Snapshot)previous!).InitialSequence;
         public ClipboardChange SetClipboard(object? previous, string text) => clipboard.TrySetText((OwnedClipboard.Snapshot)previous!, text);
         public uint ClipboardSequence => clipboard.Sequence;
         public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence) => clipboard.Restore((OwnedClipboard.Snapshot)previous!, expectedSequence);

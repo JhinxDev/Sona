@@ -160,17 +160,25 @@ internal static class CompletedDraftPasteChecks
         transport=new(){UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
         await insertion.PasteAsync(target,"finished draft",false,requestSubmission:()=>true);
         Check(transport.Enters==0,"Late queued Enter still cannot send without full draft readback");
+        transport = new() { MaterializeOnCapture = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "delayed rendered copy", false);
+        Check(transport.Pastes == 1 && transport.Restores == 1 && insertion.LastClipboardStatus == "Restored",
+            "Materializing delayed clipboard data uses the captured sequence, then restores the original");
+        transport = new() { RejectCapture = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "retained draft", true);
+        Check(transport.Pastes == 0 && transport.Enters == 0 && insertion.LastClipboardStatus == "CaptureFailed",
+            "Clipboard capture refusal is visible in content-free delivery diagnostics");
         return count;
     }
     private sealed class FakePaste : ICompletedDraftTransport
     {
         public int Saves, Pastes, Enters, Restores, RestoreErrors, RestoreAttempts; public uint Sequence = 1;
-        public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue, NewCopyAtRestore, StagePartial, RestorePartial;
+        public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue, NewCopyAtRestore, StagePartial, RestorePartial, MaterializeOnCapture, RejectCapture;
         public string? DocumentBefore, DocumentAfter, DocumentFinal;
         private int documentReadsAfterPaste;
         public Action? AfterPaste, BeforePasteRead;
         public Action<int>? OnDelay;
-        public object SaveClipboard() { Saves++; return "private prior formats"; }
+        public object SaveClipboard() { Saves++; if (RejectCapture) throw new System.Runtime.InteropServices.ExternalException("Synthetic unsupported format"); if (MaterializeOnCapture) Sequence++; return "private prior formats"; }
         public ClipboardChange SetClipboard(object? previous, string text) { Payload = text; return new(StagePartial ? ClipboardChangeStatus.FailedOwnedPartial : ClipboardChangeStatus.Staged, ++Sequence); }
         public uint ClipboardSequence => Sequence;
         public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence)

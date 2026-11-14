@@ -27,6 +27,7 @@ internal sealed class OwnedClipboard
         internal readonly OwnedClipboard Source;
         internal readonly List<Content> Formats = [];
         internal uint Sequence;
+        internal uint InitialSequence;
         internal bool Disposed;
         internal Snapshot(OwnedClipboard source) => Source = source;
         public void Dispose()
@@ -48,8 +49,14 @@ internal sealed class OwnedClipboard
         var snapshot = new Snapshot(this);
         try
         {
-            var formats = native.Formats(MaximumFormats);
-            // Preserve every offered format or refuse before modifying anything.
+            // Capture the owner generation before delayed rendering can change
+            // the sequence. Staging uses the fully materialized final Sequence.
+            snapshot.InitialSequence = native.Sequence;
+            var offered = native.Formats(MaximumFormats);
+            var formats = offered.Where(format => !IsOleBookkeeping(format)).ToArray();
+            if (offered.Length != 0 && formats.Length == 0)
+                throw new ExternalException("Clipboard has no materializable content formats.");
+            // Preserve every offered payload format or refuse before modifying anything.
             // Unknown registered formats can contain owner-bound OLE structures;
             // private/palette/metafile formats need distinct lifetime semantics.
             // OleDuplicateData does not turn those into bounded, portable bytes.
@@ -71,7 +78,7 @@ internal sealed class OwnedClipboard
             }
             // Delayed renderers may add formats while answering GetClipboardData.
             // Refuse an incomplete snapshot instead of silently dropping them.
-            if (!formats.SequenceEqual(native.Formats(MaximumFormats)))
+            if (!formats.SequenceEqual(native.Formats(MaximumFormats).Where(format => !IsOleBookkeeping(format))))
                 throw new ExternalException("Clipboard formats changed during capture.");
             snapshot.Sequence = native.Sequence;
             return snapshot;
@@ -79,6 +86,16 @@ internal sealed class OwnedClipboard
         catch { snapshot.Dispose(); throw; }
         finally { native.Close(); }
     }
+
+    // These exact OLE bookkeeping formats describe the original IDataObject's
+    // owner/FORMATETC transport, not user payload. Replaying the original HWND
+    // or marshalled object descriptor after taking ownership would be invalid.
+    // Materialize all supported payloads; unknown real OLE object formats still
+    // refuse. OleGetClipboard builds a data object over the restored formats.
+    // https://learn.microsoft.com/en-us/windows/win32/api/ole2/nf-ole2-olegetclipboard
+    // https://github.com/wine-mirror/wine/blob/master/dlls/ole32/tests/clipboard.c
+    private bool IsOleBookkeeping(uint format) => format >= 0xC000 &&
+        native.FormatName(format) is "DataObject" or "Ole Private Data";
 
     private bool Supported(uint format) => format is 1 or 2 or 4 or 5 or 6 or 7 or 8 or 11 or 13 or 15 or 16 or 17 ||
         format >= 0xC000 && native.FormatName(format) is

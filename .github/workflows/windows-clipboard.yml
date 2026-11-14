@@ -1,0 +1,43 @@
+name: Windows clipboard regression
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/local-dictation, codex/sona-reliability-rework]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/windows-clipboard.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  clipboard:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build the isolated Windows checks
+        shell: pwsh
+        run: |
+          dotnet build tests/Sona.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
+          if ($LASTEXITCODE -ne 0) { throw 'Windows test build failed' }
+      - name: Exercise actual Windows and WPF clipboard in a private station
+        shell: pwsh
+        run: |
+          & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --native-clipboard-isolation-checks
+          if ($LASTEXITCODE -ne 0) { throw 'Native clipboard regression failed' }
+      - name: Exercise ownership races and complete paste verification
+        shell: pwsh
+        run: |
+          & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --owned-clipboard-checks
+          if ($LASTEXITCODE -ne 0) { throw 'Clipboard ownership checks failed' }
+          & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --completed-paste-fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Complete paste checks failed' }

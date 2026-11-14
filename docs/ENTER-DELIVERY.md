@@ -1,4 +1,4 @@
-# Current behavior in 0.6.0
+# Current behavior in 0.6.1
 
 Hold Ctrl+Windows, speak, and release to paste an unsent draft. Double-tap for
 hands-free recording. With Enter-to-send enabled, a bare Enter in the original
@@ -29,6 +29,13 @@ bounded to 64 MiB and 128 formats. An unsupported application-specific format or
 clipboard causes a refusal before modification; review the draft in Sona and
 use Copy draft explicitly if needed. Temporary paste does not promise support
 for every application's private clipboard objects.
+
+0.6.1 corrects a 0.6.0 compatibility regression: Windows' `DataObject` and
+`Ole Private Data` bookkeeping is excluded from snapshots, while the actual
+payload formats remain preserved. This allows ordinary text copied by WPF
+apps, including Sona's Copy draft, to be borrowed and restored. Delayed
+rendering uses the snapshot's final sequence instead of treating Windows'
+own materialization as a new user copy.
 
 With recovery enabled, **Draft copied** means no paste was attempted and normal
 Ctrl+V can recover the result. **Check the draft** means a paste was attempted;

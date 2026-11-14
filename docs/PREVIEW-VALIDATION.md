@@ -1,3 +1,20 @@
+## November 13 owner-found clipboard regression, 0.6.1
+
+The owner's first 0.6.0 hands-free Codex attempt accepted Enter and retained an
+exact stable editable field, but refused before any paste gesture or clipboard
+recovery. Read-only format inspection after Copy draft found ordinary WPF
+DataObject/Ole Private Data bookkeeping beside Unicode/text/locale payloads.
+The strict 0.6.0 snapshot policy rejected that bookkeeping. A maintained regression
+reproduced the rejection; 0.6.1 excludes only those two transport records and
+preserves supported content formats. Unknown real OLE payloads still refuse.
+
+The new `--native-clipboard-isolation-checks` fixture uses a fresh private Windows
+window station with its own clipboard, verified before any WPF initialization or
+write. It never switches the visible desktop or sends keys. Local station creation
+was unavailable and the test failed closed with the original clipboard sequence
+unchanged. The repository's Windows CI runs this actual OS boundary test; a
+simulated test alone no longer qualifies this clipboard change.
+
 ## November 13 recording and delivery rework, 0.6.0
 
 The initial failure was reproduced with a noneditable Codex-style pane whose

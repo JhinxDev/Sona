@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1 - ordinary Windows clipboard compatibility
+
+- Fix 0.6.0 refusing copied text from WPF apps, including Sona's Copy draft.
+  Exclude only Windows' DataObject/Ole Private Data transport bookkeeping from
+  snapshots; preserve actual text, HTML and other supported payload formats.
+- Use the sequence captured after delayed rendering for paste ownership, while
+  recovery still checks for a newer owner copy before capture.
+- Expose a content-free clipboard stage in delivery diagnostics.
+- Add actual Windows/WPF clipboard regression coverage in a private window
+  station, run on the public repository's Windows CI runner.
+
 ## 0.6.0 - recording, delivery and recovery rework
 
 - Separate hands-free Enter stopping from text-field capture, and recheck an

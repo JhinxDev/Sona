@@ -39,7 +39,7 @@ public partial class MainWindow
             {
                 var clipboard = new OwnedClipboard(() => new System.Windows.Interop.WindowInteropHelper(this).Handle);
                 using var previous = clipboard.Capture();
-                if (previous.Sequence != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }
+                if (previous.InitialSequence != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }
                 var copied = clipboard.TrySetText(previous, text);
                 if (copied.Status != ClipboardChangeStatus.Staged)
                 {
