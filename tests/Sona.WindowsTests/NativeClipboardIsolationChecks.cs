@@ -16,10 +16,11 @@ using Sona.App.Windows;
 // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setprocesswindowstation
 internal static class NativeClipboardIsolationChecks
 {
-    internal sealed record Report(int Checks, bool IsolationEstablished, bool OriginalClipboardUnchanged, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures);
+    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures);
     internal static Report Run()
     {
-        int checks = 0; bool isolated = false, unchanged = false;
+        int checks = 0; bool isolated = false, originalSequenceAvailable = false;
+        bool? unchanged = null;
         uint captureBefore = 0, captureAfter = 0;
         List<string> failures = [];
         var originalStation = GetProcessWindowStation();
@@ -32,8 +33,15 @@ internal static class NativeClipboardIsolationChecks
         var desktopName = "Private_" + Guid.NewGuid().ToString("N");
         try
         {
-            if (originalStation == 0 || originalDesktop == 0 || originalSequence == 0 || originalName.Length == 0 || originalDesktopName.Length == 0)
-                throw new InvalidOperationException("Original station identity/sequence is unavailable; isolation refused.");
+            if (originalStation == 0 || originalName.Length == 0)
+                throw new InvalidOperationException("Original station identity is unavailable; isolation refused.");
+            if (originalDesktop == 0 || originalDesktopName.Length == 0)
+                throw new InvalidOperationException("Original desktop identity is unavailable; isolation refused.");
+            // A service station may deny WINSTA_ACCESSCLIPBOARD, for which the
+            // sequence API returns zero. That prevents a preservation claim,
+            // but does not weaken the independently verified NEW station below.
+            // Never open or read the original clipboard to obtain extra proof.
+            // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber
             using var identity = WindowsIdentity.GetCurrent();
             var sid = identity.User?.Value ?? throw new InvalidOperationException("Current-user identity unavailable.");
             bool administrator = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
@@ -90,14 +98,19 @@ internal static class NativeClipboardIsolationChecks
             if (originalDesktop != 0 && !SetThreadDesktop(originalDesktop)) failures.Add("Original desktop restoration failed.");
             if (ObjectName(GetProcessWindowStation()) == originalName && ObjectName(GetThreadDesktop(GetCurrentThreadId())) == originalDesktopName)
             {
-                unchanged = GetClipboardSequenceNumber() == originalSequence;
-                if (!unchanged) failures.Add("Original clipboard sequence changed during the isolated run; concurrent user copy may also cause this.");
+                var finalOriginalSequence = GetClipboardSequenceNumber();
+                originalSequenceAvailable = originalSequence != 0 && finalOriginalSequence != 0;
+                if (originalSequenceAvailable)
+                {
+                    unchanged = finalOriginalSequence == originalSequence;
+                    if (unchanged == false) failures.Add("Original clipboard sequence changed during the isolated run; concurrent user copy may also cause this.");
+                }
             }
             if (desktop != 0 && !CloseDesktop(desktop)) failures.Add("Private desktop cleanup failed.");
             if (station != 0 && !CloseWindowStation(station)) failures.Add("Private window station cleanup failed.");
             if (security != 0) LocalFree(security);
         }
-        return new(checks, isolated, unchanged, captureBefore, captureAfter, failures.ToArray());
+        return new(checks, isolated, unchanged, originalSequenceAvailable, captureBefore, captureAfter, failures.ToArray());
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
