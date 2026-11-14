@@ -22,6 +22,7 @@ internal static class OwnedClipboardChecks
             var restored = c.Restore(snapshot, staged.Sequence);
             Check(restored.Status == ClipboardChangeStatus.Restored && n.SameContents(original), "All original text and HTML bytes/order must be restored.");
             Check(n.Owned.Count == 0 && n.OpenCount == n.CloseCount, "Transferred allocations or clipboard locks leaked.");
+            Check(n.EncodedBuffers.Count == 2 && n.EncodedBuffers.All(buffer => buffer.All(value => value == 0)), "Temporary ANSI/OEM conversion buffers must be cleared after successful staging.");
         }
         {
             var (n, c) = Create(); var payload = n.CopyContents();
@@ -38,8 +39,17 @@ internal static class OwnedClipboardChecks
             Check(c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored, "Strict restoration must accept the completely materialized staging generation.");
         }
         {
-            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); n.FailMaterialize = true;
-            Check(c.TrySetText(snapshot, "conversion failure").Status == ClipboardChangeStatus.FailedRestored && n.SameContents(original) && n.Owned.Count == 0, "Failed native text conversion must rollback under the same lock without leaking handles.");
+            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); n.FailEncoding = true;
+            Check(c.TrySetText(snapshot, "conversion failure").Status == ClipboardChangeStatus.Unavailable && n.SameContents(original) && n.EmptyCalls == 0 && n.Owned.Count == 0, "Failed native text conversion must refuse before mutation without leaking handles.");
+        }
+        {
+            var (n, c) = Create(); using var snapshot = c.Capture(); n.FailOemEncoding = true;
+            Check(c.TrySetText(snapshot, "second conversion failure").Status == ClipboardChangeStatus.Unavailable && n.EmptyCalls == 0 && n.EncodedBuffers.Single().All(value => value == 0), "A failed second conversion must clear the first buffer and preserve original clipboard.");
+        }
+        foreach (int rejectedFormat in new[] { 5, 6 })
+        {
+            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); n.FailSets.Add(rejectedFormat);
+            Check(c.TrySetText(snapshot, "legacy format publish failure").Status == ClipboardChangeStatus.FailedRestored && n.SameContents(original) && n.Owned.Count == 0 && n.EncodedBuffers.All(buffer => buffer.All(value => value == 0)), "Rejected ANSI/OEM publication must rollback all formats and clear converted buffers.");
         }
         foreach (bool addUnknownPayload in new[] { false, true })
         {
@@ -92,7 +102,7 @@ internal static class OwnedClipboardChecks
             Check(c.Restore(snapshot, failed.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(original), "Partial rollback must remain recoverable.");
         }
         {
-            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); var staged = c.TrySetText(snapshot, "draft"); n.FailSets.Add(5);
+            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); var staged = c.TrySetText(snapshot, "draft"); n.FailSets.Add(7);
             var failed = c.Restore(snapshot, staged.Sequence);
             Check(failed.Status == ClipboardChangeStatus.FailedOwnedPartial && failed.Sequence != staged.Sequence, "Partial restoration must expose updated ownership.");
             Check(c.Restore(snapshot, failed.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(original), "A later restore must replace all partially restored formats.");
@@ -172,6 +182,15 @@ internal static class OwnedClipboardChecks
             catch (ExternalException) { refused = true; }
             Check(refused, "Invalid or overflowing bitmap allocations must refuse before cloning.");
         }
+        if (OperatingSystem.IsWindows())
+        {
+            // Only pure locale/conversion APIs, never a real clipboard operation.
+            var converter = new ClipboardNative();
+            Check(converter.EncodeText("\u00e9\u6c34", 0x409, false, 16).SequenceEqual(new byte[] { 0xE9, 0x3F, 0 }), "Win32 English-locale ANSI conversion must use CP1252, substitution and a NUL terminator.");
+            Check(converter.EncodeText("\u00e9\u6c34", 0x409, true, 16).SequenceEqual(new byte[] { 0x82, 0x3F, 0 }), "Win32 English-locale OEM conversion must use CP437 and a NUL terminator.");
+            bool refused = false; try { converter.EncodeText("too large", 0x409, false, 1); } catch (ExternalException) { refused = true; }
+            Check(refused, "Native conversion sizing must reject oversized output before allocating it.");
+        }
         return checks;
     }
 
@@ -182,19 +201,21 @@ internal static class OwnedClipboardChecks
         internal readonly HashSet<int> FailSets = [];
         internal readonly HashSet<uint> Markers = [];
         internal readonly HashSet<uint> ReadFormats = [];
-        internal bool FailOpen, FailEmpty, FailRead, FailBitmap, FailRegistration, SynthesizeOnClose, FailMaterialize;
+        internal bool FailOpen, FailEmpty, FailRead, FailBitmap, FailRegistration, SynthesizeOnClose, FailEncoding, FailOemEncoding;
         internal int FailAllocationAt, FailEmptyAt, Allocations, EmptyCalls, OpenCount, CloseCount, SetCalls, BitmapFrees;
         internal Action? BeforeOpen, OnRead;
         private bool opened;
         private int nextHandle;
         public uint Sequence { get; private set; } = 1;
         public uint TextLocale => 0x409;
-        public bool MaterializeText()
+        internal readonly List<byte[]> EncodedBuffers = [];
+        public byte[] EncodeText(string text, uint locale, bool oem, int maximumBytes)
         {
-            RequireOpen(); if (FailMaterialize) return false;
-            foreach (uint format in new uint[] { 1, 7 })
-                if (!Contents.ContainsKey(format)) { Contents[format] = Contents[13].ToArray(); Sequence++; }
-            return Contents.ContainsKey(16);
+            if (opened) throw new InvalidOperationException("Conversion must precede clipboard locking/mutation.");
+            if (FailEncoding || oem && FailOemEncoding) throw new ExternalException();
+            var result = System.Text.Encoding.ASCII.GetBytes(text + '\0');
+            if (result.Length > maximumBytes) throw new ExternalException();
+            EncodedBuffers.Add(result); return result;
         }
         internal void Materialize() { RequireOpen(); Sequence++; }
         internal void UserCopy(params (uint Format, byte[] Bytes)[] entries)

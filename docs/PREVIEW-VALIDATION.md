@@ -10,9 +10,10 @@ preserves supported content formats. Unknown real OLE payloads still refuse.
 
 The real Windows regression also exposed sequence changes on CloseClipboard:
 the staging generation advanced from13 to16 while the owner window stayed the
-same, then remained16 through WPF text readback. Sona now provides the locale and
-materializes Windows text conversions while holding the original lock. Strict
-sequence comparisons remain in place; no post-close counter is blindly adopted.
+same, then remained16 through WPF text readback. Requesting conversions before
+close was unavailable and rolled back safely. Sona now prepares Unicode, locale,
+ANSI and OEM representations before staging them together under the original
+lock. Strict sequence comparisons remain; no post-close counter is blindly adopted.
 
 The `--native-clipboard-hosted-checks` fixture runs only on the repository's
 disposable GitHub-hosted Windows VM. It verifies the hosted environment before

@@ -110,6 +110,7 @@ internal sealed class OwnedClipboard
         if (text.Length > MaximumBytes / 2 - 1 || text.Contains('\0'))
             return new(ClipboardChangeStatus.Unavailable, 0);
         byte[] bytes = Encoding.Unicode.GetBytes(text + '\0');
+        byte[] ansi = [], oem = [];
         try
         {
             // Windows documents DWORD zero to exclude temporary content from
@@ -119,7 +120,12 @@ internal sealed class OwnedClipboard
             var cloud = native.RegisterFormat("CanUploadToCloudClipboard");
             var locale = native.TextLocale;
             if (history == 0 || cloud == 0 || locale == 0) return new(ClipboardChangeStatus.Unavailable, 0);
-            using var staging = Prepare([new(history, new byte[4]), new(cloud, new byte[4]), new(16u, BitConverter.GetBytes(locale)), new(13u, bytes)]);
+            // Build all legacy representations BEFORE taking ownership. Windows
+            // cannot synthesize them until CloseClipboard, which would advance
+            // the sequence after our final locked ownership check.
+            ansi = native.EncodeText(text, locale, false, MaximumBytes - bytes.Length - 12);
+            oem = native.EncodeText(text, locale, true, MaximumBytes - bytes.Length - ansi.Length - 12);
+            using var staging = Prepare([new(history, new byte[4]), new(cloud, new byte[4]), new(16u, BitConverter.GetBytes(locale)), new(13u, bytes), new(1u, ansi), new(7u, oem)]);
             using var rollback = Prepare(snapshot.Formats);
             var hwnd = owner();
             if (hwnd == 0 || !native.Open(hwnd)) return new(ClipboardChangeStatus.Unavailable, 0);
@@ -129,12 +135,12 @@ internal sealed class OwnedClipboard
                 if (!native.Empty()) return new(ClipboardChangeStatus.Unavailable, native.Sequence);
                 // Never expose draft text if either privacy flag was rejected.
                 // CloseClipboard otherwise adds locale/text conversions and
-                // advances our sequence after we sampled it. Publish locale and
-                // force both Windows conversions while STILL holding the lock.
+                // advances our sequence after we sampled it. Publish every
+                // prebuilt representation while STILL holding the lock.
                 // Never adopt a post-close sequence or relax ownership checks.
                 // https://learn.microsoft.com/en-us/windows/win32/dataxchg/standard-clipboard-formats
                 // https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats
-                if (staging.Publish(stopOnFailure: true) && native.MaterializeText()) return new(ClipboardChangeStatus.Staged, native.Sequence);
+                if (staging.Publish(stopOnFailure: true)) return new(ClipboardChangeStatus.Staged, native.Sequence);
                 // Staging failed after EmptyClipboard. Rollback was allocated
                 // BEFORE clearing, and still executes under the same open lock.
                 // Remove all partially staged text/privacy formats first.
@@ -144,7 +150,12 @@ internal sealed class OwnedClipboard
             finally { native.Close(); }
         }
         catch (ExternalException) { return new(ClipboardChangeStatus.Unavailable, 0); }
-        finally { CryptographicOperations.ZeroMemory(bytes); }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            CryptographicOperations.ZeroMemory(ansi);
+            CryptographicOperations.ZeroMemory(oem);
+        }
     }
 
     // One bounded attempt. FailedOwnedPartial supplies the new owned sequence;
@@ -219,7 +230,7 @@ internal interface IClipboardNative
 {
     uint Sequence { get; }
     uint TextLocale { get; }
-    bool MaterializeText();
+    byte[] EncodeText(string text, uint locale, bool oem, int maximumBytes);
     bool Open(nint hwnd);
     void Close();
     uint[] Formats(int maximum);
@@ -240,7 +251,31 @@ internal sealed class ClipboardNative : IClipboardNative
     public uint Sequence => GetClipboardSequenceNumber();
     // Match the current input language that Windows would choose on close.
     public uint TextLocale => (uint)(GetKeyboardLayout(0).ToInt64() & 0xffff);
-    public bool MaterializeText() => GetClipboardData(1) != 0 && GetClipboardData(7) != 0 && GetClipboardData(16) != 0;
+    public byte[] EncodeText(string text, uint locale, bool oem, int maximumBytes)
+    {
+        // CF_LOCALE determines the Windows ANSI/OEM code pages. Locale values
+        // 0 (CP_ACP) / 1 (CP_OEMCP) are documented fallbacks, not failures.
+        // LOCALE_RETURN_NUMBER writes a DWORD into a two-WCHAR output buffer.
+        // https://learn.microsoft.com/en-us/windows/win32/intl/locale-idefault-constants
+        // https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-getlocaleinfow
+        if (GetLocaleInfo(locale, 0x20000000u | (oem ? 0xBu : 0x1004u), out var codePage, 2) != 2)
+            throw new ExternalException("Clipboard locale conversion is unavailable.");
+        // -1 includes the terminating NUL; size is BYTES, not UTF-16 chars.
+        // Flags/default pointers remain zero so every documented code page,
+        // including UTF-8 system locales, uses its supported native conversion.
+        // Unicode stays exact; legacy formats use Windows' default substitution.
+        // https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
+        int count = WideCharToMultiByte(codePage, 0, text, -1, null, 0, 0, 0);
+        if (count <= 0 || count > maximumBytes) throw new ExternalException("Clipboard text conversion is unavailable or too large.");
+        var result = new byte[count];
+        try
+        {
+            if (WideCharToMultiByte(codePage, 0, text, -1, result, result.Length, 0, 0) != count || result[^1] != 0)
+                throw new ExternalException("Clipboard text conversion failed.");
+            return result;
+        }
+        catch { CryptographicOperations.ZeroMemory(result); throw; }
+    }
     public bool Open(nint hwnd) => OpenClipboard(hwnd);
     public void Close() => CloseClipboard();
     public bool Empty() => EmptyClipboard();
@@ -343,6 +378,8 @@ internal sealed class ClipboardNative : IClipboardNative
     }
     [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);
+    [DllImport("kernel32.dll", EntryPoint = "GetLocaleInfoW", CharSet = CharSet.Unicode)] private static extern int GetLocaleInfo(uint locale, uint type, out uint value, int characters);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern int WideCharToMultiByte(uint codePage, uint flags, string text, int characters, [Out] byte[]? destination, int bytes, nint defaultCharacter, nint usedDefaultCharacter);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool OpenClipboard(nint hwnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseClipboard();
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EmptyClipboard();

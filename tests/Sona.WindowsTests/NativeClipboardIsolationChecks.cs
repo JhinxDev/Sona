@@ -189,10 +189,10 @@ internal static class NativeClipboardIsolationChecks
             using (var snapshot = textSnapshot)
             {
                 checks++;
-                var staged = clipboard.TrySetText(snapshot, "Sona synthetic temporary draft");
+                var staged = clipboard.TrySetText(snapshot, "Sona synthetic temporary draft \u00e9\u6c34");
                 observation = new(staged.Sequence, clipboard.Sequence, 0, GetClipboardOwner() == window.Handle, false);
                 Check(staged.Status == ClipboardChangeStatus.Staged, "Native WPF text staging failed: " + staged.Status); checks++;
-                Check(System.Windows.Clipboard.GetText() == "Sona synthetic temporary draft", "Native staged Unicode readback differs."); checks++;
+                Check(System.Windows.Clipboard.GetText() == "Sona synthetic temporary draft \u00e9\u6c34", "Native staged Unicode readback differs."); checks++;
                 observation = observation with { AfterReadSequence = clipboard.Sequence, OwnerMatchesAfterRead = GetClipboardOwner() == window.Handle };
                 var restored = clipboard.Restore(snapshot, staged.Sequence);
                 Check(restored.Status == ClipboardChangeStatus.Restored, "Native WPF text restoration failed: " + restored.Status); checks++;
