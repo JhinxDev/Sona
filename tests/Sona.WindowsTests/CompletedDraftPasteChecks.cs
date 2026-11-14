@@ -168,18 +168,71 @@ internal static class CompletedDraftPasteChecks
         await insertion.PasteAsync(target, "retained draft", true);
         Check(transport.Pastes == 0 && transport.Enters == 0 && insertion.LastClipboardStatus == "CaptureFailed",
             "Clipboard capture refusal is visible in content-free delivery diagnostics");
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue }; insertion.PasteTransportForTests = transport;
+        result = await insertion.PasteAsync(target, "Complete fallback draft", true, keepOnFailure: true);
+        Check(result.Inserted && transport.UnicodeCalls == 1 && transport.Pastes == 0 && transport.Sets == 0 && transport.RestoreAttempts == 0 && transport.Enters == 1,
+            "Capture failure sends one complete Unicode batch and one verified Enter without clipboard mutation");
+        Check(insertion.LastDeliveryRoute == "UnicodeBatch" && insertion.LastUnicodeAttempted && insertion.LastUnicodeConfirmed && !insertion.LastPasteRequested && !insertion.LastPasteConfirmed && !insertion.LastDraftOnClipboard && insertion.LastClipboardFailureCode == "UnsupportedFormat",
+            "Unicode route, confirmation and bounded capture reason do not claim clipboard paste");
+        foreach (uint accepted in new uint[] { 0, 1, 6 })
+        {
+            transport = new() { RejectCapture = true, UnicodeAccepted = accepted }; insertion.PasteTransportForTests = transport;
+            result = await insertion.PasteAsync(target, "Complete fallback draft", true, keepOnFailure: true);
+            Check(transport.UnicodeCalls == 1 && transport.Enters == 0 && transport.Pastes == 0 && transport.Sets == 0 && transport.RestoreAttempts == 0 && insertion.LastUnicodeAttempted && !insertion.LastUnicodeConfirmed && !insertion.LastDraftOnClipboard && result.Inserted == (accepted != 0),
+                "Zero or partial Unicode acceptance permanently withholds Enter, retry and recovery");
+        }
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue, UnsupportedReadback = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Unconfirmed fallback draft", true, keepOnFailure: true);
+        Check(transport.UnicodeCalls == 1 && transport.Enters == 0 && transport.Sets == 0 && !insertion.LastUnicodeConfirmed && !insertion.LastPasteRequested,
+            "Missing Unicode readback never sends or copies a recovery draft");
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue, OnCaptureFailure = () => current = target with { RuntimeId = [77] } }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Wrong target fallback", true);
+        Check(transport.UnicodeCalls == 0 && transport.Enters == 0, "Capture exception reentrancy cannot send Unicode to a different field"); current = target;
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue, OnCaptureFailure = () => modifiers = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Held modifier fallback", true);
+        Check(transport.UnicodeCalls == 0 && transport.Enters == 0, "Changed modifiers after capture refusal prevent Unicode output"); modifiers = false;
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue }; transport.OnCaptureFailure = () => transport.HeldEnter = true; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Held Enter fallback", true);
+        Check(transport.UnicodeCalls == 0 && transport.Enters == 0, "Held Enter after capture refusal prevents Unicode output");
+        using (var fallbackCancel = new CancellationTokenSource())
+        {
+            transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue, OnCaptureFailure = fallbackCancel.Cancel }; insertion.PasteTransportForTests = transport;
+            bool cancelled = false; try { await insertion.PasteAsync(target, "Cancelled fallback", true, fallbackCancel.Token); } catch (OperationCanceledException) { cancelled = true; }
+            Check(cancelled && transport.UnicodeCalls == 0 && transport.Enters == 0 && transport.Sets == 0, "Cancellation after capture failure prevents all output");
+        }
+        foreach (string guarded in new[] { "first\nsecond", "first\tsecond", new string('x', 6001) })
+        {
+            transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue }; insertion.PasteTransportForTests = transport;
+            await insertion.PasteAsync(target, guarded, true);
+            Check(transport.UnicodeCalls == 0 && transport.Enters == 0 && transport.Sets == 0, "Multiline, control and overlong drafts cannot use Unicode fallback");
+        }
+        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue, AfterUnicode = () => current = target with { RuntimeId = [88] } }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Focus moves after Unicode", true);
+        Check(transport.UnicodeCalls == 1 && transport.Enters == 0, "Focus change after Unicode prevents Enter without retry"); current = target;
+        transport = new() { StagePartial = true, UnicodeAccepted = uint.MaxValue }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Never switch after mutation", true);
+        Check(transport.UnicodeCalls == 0 && transport.Enters == 0 && transport.RestoreAttempts > 0, "A partially mutated clipboard can only restore, never switch to Unicode input");
+        transport = new() { UnicodeAccepted = uint.MaxValue, BeforePasteRead = () => throw new System.Runtime.InteropServices.ExternalException("Synthetic provider failure") }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "Never switch after successful capture", true);
+        Check(transport.UnicodeCalls == 0 && transport.Pastes == 0 && transport.Enters == 0, "Only capture failure qualifies fallback, not later readback/preparation errors");
+        var packetText = "\u00e9\u6c34\U0001F600";
+        var packets = Insertion.UnicodePacketsForTests(packetText);
+        Check(packets.Length == packetText.Length * 2 && packets.Select((packet, index) => packet.Key == 0 && packet.Scan == packetText[index / 2] && packet.Flags == (index % 2 == 0 ? 4u : 6u)).All(value => value),
+            "Unicode fallback constructs one exact UTF-16 down/up batch with no virtual navigation or Enter keys");
         return count;
     }
     private sealed class FakePaste : ICompletedDraftTransport
     {
-        public int Saves, Pastes, Enters, Restores, RestoreErrors, RestoreAttempts; public uint Sequence = 1;
+        public int Saves, Pastes, Enters, Restores, RestoreErrors, RestoreAttempts, Sets, UnicodeCalls; public uint Sequence = 1;
+        public uint? UnicodeAccepted;
+        public bool HeldEnter;
         public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue, NewCopyAtRestore, StagePartial, RestorePartial, MaterializeOnCapture, RejectCapture;
         public string? DocumentBefore, DocumentAfter, DocumentFinal;
         private int documentReadsAfterPaste;
-        public Action? AfterPaste, BeforePasteRead;
+        public Action? AfterPaste, BeforePasteRead, OnCaptureFailure, AfterUnicode;
         public Action<int>? OnDelay;
-        public object SaveClipboard() { Saves++; if (RejectCapture) throw new System.Runtime.InteropServices.ExternalException("Synthetic unsupported format"); if (MaterializeOnCapture) Sequence++; return "private prior formats"; }
-        public ClipboardChange SetClipboard(object? previous, string text) { Payload = text; return new(StagePartial ? ClipboardChangeStatus.FailedOwnedPartial : ClipboardChangeStatus.Staged, ++Sequence); }
+        public object SaveClipboard() { Saves++; if (RejectCapture) { OnCaptureFailure?.Invoke(); throw new System.Runtime.InteropServices.ExternalException("Clipboard contains a format that cannot be safely preserved."); } if (MaterializeOnCapture) Sequence++; return "private prior formats"; }
+        public ClipboardChange SetClipboard(object? previous, string text) { Sets++; Payload = text; return new(StagePartial ? ClipboardChangeStatus.FailedOwnedPartial : ClipboardChangeStatus.Staged, ++Sequence); }
         public uint ClipboardSequence => Sequence;
         public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence)
         {
@@ -192,9 +245,10 @@ internal static class CompletedDraftPasteChecks
             Restores++; return new(ClipboardChangeStatus.Restored, Sequence);
         }
         public bool Paste() { Pastes++; AfterPaste?.Invoke(); return true; }
+        public uint Unicode(string text) { UnicodeCalls++; Payload = text; AfterUnicode?.Invoke(); return UnicodeAccepted == uint.MaxValue ? (uint)text.Length * 2 : UnicodeAccepted ?? 0; }
         public bool Enter() { Enters++; return true; }
-        public bool EnterHeld => false;
-        public string? ReadText(DraftTarget target) { if (Pastes == 0) BeforePasteRead?.Invoke(); return UnsupportedReadback ? null : Pastes == 0 || StaleValue ? "before" : Partial ? "partial" : Payload; }
+        public bool EnterHeld => HeldEnter;
+        public string? ReadText(DraftTarget target) { if (Pastes == 0 && UnicodeCalls == 0) BeforePasteRead?.Invoke(); return UnsupportedReadback ? null : Pastes == 0 && UnicodeCalls == 0 || StaleValue ? "before" : Partial ? "partial" : Payload; }
         public string? ReadDocumentText(DraftTarget target) => Pastes == 0 ? DocumentBefore
             : ++documentReadsAfterPaste == 1 ? DocumentAfter : DocumentFinal ?? DocumentAfter;
         public Task Delay(int milliseconds) { OnDelay?.Invoke(milliseconds); return Task.CompletedTask; }

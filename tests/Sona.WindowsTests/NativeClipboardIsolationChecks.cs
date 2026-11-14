@@ -241,6 +241,19 @@ internal static class NativeClipboardIsolationChecks
                 bool preserved = clipboard.Sequence == imageSequence && ImagePixelsMatch(pixels);
                 imageObservation = imageObservation with { UnsupportedPayloadRefused = true, OriginalImagePreserved = preserved };
                 Check(preserved, "Refusing an unknown WPF image payload changed the original image."); checks++;
+                foreach (uint accepted in new uint[] { 0, 1, uint.MaxValue })
+                {
+                    assertBoundary();
+                    var beforeFallback = clipboard.Sequence;
+                    var fallbackTarget = new DraftTarget(window.Handle, Environment.ProcessId, [50, 60], 0);
+                    using var fallbackInsertion = new Insertion(() => fallbackTarget, () => false, _ => throw new InvalidOperationException("Native input is forbidden."));
+                    var fallbackTransport = new NativeClipboardFakeInput(clipboard, assertBoundary) { UnicodeAccepted = accepted };
+                    fallbackInsertion.PasteTransportForTests = fallbackTransport;
+                    var fallbackResult = fallbackInsertion.PasteAsync(fallbackTarget, "Synthetic fallback \u00e9\u6c34", true, keepOnFailure: true).GetAwaiter().GetResult();
+                    Check(fallbackTransport.UnicodeCalls == 1 && fallbackTransport.Pastes == 0 && fallbackTransport.Enters == (accepted == uint.MaxValue ? 1 : 0) && fallbackResult.Inserted == (accepted != 0), "Real unsupported image capture must route to one bounded fake Unicode attempt with exact send gating."); checks++;
+                    Check(fallbackInsertion.LastUnicodeAttempted && fallbackInsertion.LastUnicodeConfirmed == (accepted == uint.MaxValue) && !fallbackInsertion.LastPasteRequested && !fallbackInsertion.LastDraftOnClipboard && fallbackInsertion.LastClipboardFailureCode == "UnsupportedFormat", "Native unsupported image fallback diagnostics are incorrect."); checks++;
+                    Check(clipboard.Sequence == beforeFallback && ImagePixelsMatch(pixels), "Unicode fallback modified the unrelated image clipboard."); checks++;
+                }
             }
             else
             {
@@ -377,7 +390,8 @@ internal static class NativeClipboardIsolationChecks
     // SendInput, UI Automation, microphone, or foreground changes are involved.
     private sealed class NativeClipboardFakeInput(OwnedClipboard clipboard, Action assertIsolated) : ICompletedDraftTransport
     {
-        internal int Pastes, Enters;
+        internal int Pastes, Enters, UnicodeCalls;
+        internal uint UnicodeAccepted = uint.MaxValue;
         internal string Field = "";
         internal bool UnavailableReadback;
         internal Action? AfterPaste;
@@ -388,6 +402,13 @@ internal static class NativeClipboardIsolationChecks
         public uint ClipboardSequence => clipboard.Sequence;
         public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence) { assertIsolated(); return clipboard.Restore((OwnedClipboard.Snapshot)previous!, expectedSequence); }
         public bool Paste() { assertIsolated(); Pastes++; Field += System.Windows.Clipboard.GetText(); AfterPaste?.Invoke(); return true; }
+        public uint Unicode(string text)
+        {
+            assertIsolated(); UnicodeCalls++;
+            var accepted = UnicodeAccepted == uint.MaxValue ? (uint)text.Length * 2 : UnicodeAccepted;
+            if (accepted > 0) Field += accepted == text.Length * 2 ? text : text[..1];
+            return accepted;
+        }
         public bool Enter() { Enters++; return true; }
         public bool EnterHeld => false;
         public string? ReadText(DraftTarget target) => UnavailableReadback ? null : Field;

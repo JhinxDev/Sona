@@ -1,3 +1,16 @@
+## 0.6.2 delivery diagnostics
+
+`deliveryRoute` distinguishes `None`, `ClipboardPaste` and `UnicodeBatch`.
+`unicodeAttempted` records any direct-input attempt; `unicodeConfirmed` requires
+full input acceptance and complete text readback. `deliveryReadback` describes
+readback for either route. `pasteRequested`, `pasteConfirmed` and `pasteReadback`
+describe actual clipboard paste only. `clipboardFailureCode` is a bounded,
+content-free classification of capture failure. No clipboard contents are exposed.
+
+Direct insertion can report `UnicodeConfirmed`, `UnicodeConfirmedSendWithheld` or
+`UnicodeUnconfirmed`. `Sent` requires an accepted Enter after verified insertion.
+No automatic clipboard recovery or second insertion follows a Unicode attempt.
+
 ## 0.6.1 diagnostics
 
 `lastDelivery.clipboardStatus` and `lastRetainedDelivery.clipboardStatus` identify

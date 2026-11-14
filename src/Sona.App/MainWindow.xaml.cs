@@ -362,7 +362,7 @@ public partial class MainWindow : Window
             activeApplication?.Refresh();
             if (!retainOnly && (preferences.AutoInsert || submitOnComplete) && target != null && !destinationContext.DestinationChanged && liveDraft?.ManuallyEdited != true)
             {
-                overlay.Update("Preparing your draft", submitOnComplete ? "Paste, then Enter in the captured composer" : "Inserting the complete draft");
+                overlay.Update("Preparing your draft", submitOnComplete ? "Insert, then Enter in the captured composer" : "Inserting the complete draft");
                 pasteAttempted = preferences.PasteCompletedDraft || submitOnComplete;
                 var result = pasteAttempted
                     ? await insertion.PasteAsync(target, current.Draft, submitOnComplete, cancellation!.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence, requestSubmission: () => { submitOnComplete |= pendingSubmission.IsRequested; return submitOnComplete; })
@@ -376,7 +376,7 @@ public partial class MainWindow : Window
             else { Status.Text = "Draft ready"; StatusDetail.Text = (recordingInterrupted ? "The microphone was interrupted. Audio captured so far was recovered for review; nothing was pasted or sent." : retainOnly ? "The five-minute recording limit was reached. Your draft is ready for review; nothing was pasted or sent." : liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
             DescribeSessionMode();
             if (!retainOnly && !cancellation!.IsCancellationRequested && (preferences.AutoInsert || submitOnComplete) && liveDraft?.ManuallyEdited != true &&
-                (current.State == SessionState.Ready || pasteAttempted && (!insertion.LastPasteConfirmed || submitOnComplete && !insertion.LastSubmissionAccepted)))
+                (current.State == SessionState.Ready || pasteAttempted && (!(insertion.LastPasteConfirmed || insertion.LastUnicodeConfirmed) || submitOnComplete && !insertion.LastSubmissionAccepted)))
                 RecoverClipboard(current.Draft, recoverySequence, pasteAttempted, recordingCapture?.Status);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
@@ -396,7 +396,7 @@ public partial class MainWindow : Window
             pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
             if (!shutdownPending && current.State is SessionState.Ready or SessionState.Inserted &&
                 (current.State == SessionState.Ready || fallbackCopied ||
-                 lastDelivery is { PasteRequested: true, PasteConfirmed: false } or { Outcome: "PasteConfirmedSendWithheld" }))
+                 lastDelivery is { PasteRequested: true, PasteConfirmed: false } or { Outcome: "PasteConfirmedSendWithheld" or "UnicodeUnconfirmed" or "UnicodeConfirmedSendWithheld" }))
                 ShowRetainedDraftNotice();
             if (completedFeedback.HasValue && current.State is SessionState.Ready or SessionState.Inserted) _ = PlayFeedbackAsync(completedFeedback.Value);
         }
@@ -420,7 +420,7 @@ public partial class MainWindow : Window
             Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail;
             if (preferences.PasteCompletedDraft && insertion.LastClipboardRestorationFailed)
                 StatusDetail.Text += " Windows could not restore all previous clipboard content.";
-            if (!cancellation.IsCancellationRequested && (!result.Inserted || preferences.PasteCompletedDraft && !insertion.LastPasteConfirmed)) RecoverClipboard(current.Draft, recoverySequence, preferences.PasteCompletedDraft);
+            if (!cancellation.IsCancellationRequested && (!result.Inserted || preferences.PasteCompletedDraft && !(insertion.LastPasteConfirmed || insertion.LastUnicodeConfirmed))) RecoverClipboard(current.Draft, recoverySequence, preferences.PasteCompletedDraft);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); }

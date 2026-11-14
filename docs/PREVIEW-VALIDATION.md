@@ -1,3 +1,20 @@
+## November 13 physical 0.6.1 failure and 0.6.2 correction
+
+The owner tested installed 0.6.1 in Codex and again received a retained draft.
+Content-free diagnostics showed accepted Enter, a stable editable target and
+`CaptureFailed` before any paste request. Copy draft subsequently replaced the
+original clipboard, so its payload and exact capture-failure cause are unknown.
+A read-only capture of the later ordinary-text clipboard succeeded; this does
+not establish what failed during the recording. Prior hosted native results
+remain valid for their fixtures and do not establish physical Codex acceptance.
+
+0.6.2 adds direct Unicode insertion only after capture fails before clipboard
+mutation. Bounded single-line text, full accepted input count, exact target/epoch,
+released keys and complete readback guard one Enter. Every direct-input attempt
+suppresses automatic clipboard recovery and retries. Pure transport fixtures use
+fake fields and keys; no unattended real microphone or message submission occurs.
+Live installation identity and owner physical acceptance are separate evidence.
+
 ## November 13 owner-found clipboard regression, 0.6.1
 
 The owner's first 0.6.0 hands-free Codex attempt accepted Enter and retained an

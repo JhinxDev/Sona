@@ -41,10 +41,10 @@ internal static class EnterDeliveryFixture
                         ((FrameworkElement)window.OverlayForTests.FindName("NoticeDisplay")).Visibility == Visibility.Visible &&
                         ((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("NoticeTitle")).Text == title;
                     var pcm=new byte[64000];for(var i=1;i<pcm.Length;i+=2)pcm[i]=8;
-                    foreach(var change in new[]{"epoch","field","unavailable","departure-return","between-hook-and-ui","unconfirmed-no-backup","valid","pasted-send-held","pasted-focus-changed"}){
+                    foreach(var change in new[]{"epoch","field","unavailable","departure-return","between-hook-and-ui","unconfirmed-no-backup","valid","pasted-send-held","pasted-focus-changed","unicode-valid","unicode-zero","unicode-partial","unicode-unconfirmed","unicode-send-held"}){
                         current=original;foreground=(original.Window,original.OwnerProcessId);copied="";input=new Capture();
                         settings.CopyOnInsertionFailure = change != "unconfirmed-no-backup";
-                        var paste=new FakeDelivery{HoldAfterPaste=change=="pasted-send-held", Unreadable=change=="unconfirmed-no-backup"};insertion.PasteTransportForTests=paste;window.ClipboardSequenceForTests=()=>paste.Sequence;
+                        var paste=new FakeDelivery{CaptureFails=change.StartsWith("unicode-"), UnicodeResult=change=="unicode-zero"?0u:change=="unicode-partial"?2u:null, HoldAfterPaste=change is "pasted-send-held" or "unicode-send-held", Unreadable=change is "unconfirmed-no-backup" or "unicode-unconfirmed"};insertion.PasteTransportForTests=paste;window.ClipboardSequenceForTests=()=>paste.Sequence;
                         if(change=="pasted-focus-changed")paste.AfterPastedRead=()=>{current=original with{FocusEpoch=1};context.Observe(new ActiveApplication(original.Window,original.OwnerProcessId,"Original",1));};
                         var recognition=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                         window.RecognitionForTests=(_,token)=>recognition.Task.WaitAsync(token);
@@ -67,7 +67,26 @@ internal static class EnterDeliveryFixture
                         Check(paste.Pastes==0&&paste.Enters==0,change+": no partial result reaches the composer");
                         if(window.SessionForTests==SessionState.Recording){window.CancelForTests();await window.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);recognition.TrySetResult("Fixture final text.");continue;}
                         recognition.SetResult("The complete final fixture draft.");await ((Task)operation.GetValue(window)!);
-                        if(change is "pasted-send-held" or "pasted-focus-changed")
+                        if(change.StartsWith("unicode-"))
+                        {
+                            Check(paste.Unicodes==1 && paste.Pastes==0 && copied=="" && paste.Clipboard=="fixture prior clipboard" && paste.Sequence==1,
+                                change+": direct insertion never pastes, copies recovery or changes clipboard");
+                            var delivery=typeof(MainWindow).GetField("lastDelivery",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+                            using var json=JsonDocument.Parse(JsonSerializer.Serialize(delivery));
+                            var facts=json.RootElement;
+                            Check(facts.GetProperty("UnicodeAttempted").GetBoolean() && !facts.GetProperty("PasteRequested").GetBoolean() && facts.GetProperty("PasteReadback").GetString()=="NotRequested" && facts.GetProperty("DeliveryRoute").GetString()=="UnicodeBatch",
+                                change+": diagnostics distinguish direct input from clipboard paste");
+                            var confirmed=change is "unicode-valid" or "unicode-send-held";
+                            Check(facts.GetProperty("UnicodeConfirmed").GetBoolean()==confirmed && !facts.GetProperty("ClipboardRecovery").GetBoolean(),
+                                change+": confirmation and recovery reflect actual delivery");
+                            if(change=="unicode-valid")
+                                Check(paste.Enters==1 && facts.GetProperty("Outcome").GetString()=="Sent" && window.SessionForTests==SessionState.Inserted,
+                                    "Clipboard capture refusal still delivers one complete draft and one Enter");
+                            else
+                                Check(paste.Enters==0 && ShowsNotice(confirmed?"Draft inserted":"Check the draft"),
+                                    change+": no send and clear review guidance after incomplete or withheld delivery");
+                        }
+                        else if(change is "pasted-send-held" or "pasted-focus-changed")
                         {
                             Check(paste.Pastes==1&&paste.Enters==0&&insertion.LastPasteConfirmed,"Full paste is distinct from withheld send");
                             Check(paste.Clipboard == "fixture prior clipboard", "A completed paste preserves the previous clipboard even if Enter is withheld");
@@ -244,12 +263,13 @@ internal static class EnterDeliveryFixture
     }
     private sealed class Clock:TimeProvider{long now;public override long TimestampFrequency=>1000;public override long GetTimestamp()=>now;public void Advance(double seconds)=>now+=(long)(seconds*1000);}
     private sealed class FakeDelivery:ICompletedDraftTransport {
-        public int Pastes,Enters;public uint Sequence=1;public string Clipboard="fixture prior clipboard",Payload="";
-        public object SaveClipboard()=>Clipboard;public ClipboardChange SetClipboard(object? previous,string text){Clipboard=Payload=text;return new(ClipboardChangeStatus.Staged,++Sequence);}public uint ClipboardSequence=>Sequence;
+        public int Pastes,Enters,Unicodes;public bool CaptureFails;public uint? UnicodeResult;public uint Sequence=1;public string Clipboard="fixture prior clipboard",Payload="";
+        public object SaveClipboard()=>CaptureFails?throw new System.Runtime.InteropServices.ExternalException("Clipboard is unavailable."):Clipboard;public ClipboardChange SetClipboard(object? previous,string text){Clipboard=Payload=text;return new(ClipboardChangeStatus.Staged,++Sequence);}public uint ClipboardSequence=>Sequence;
         public ClipboardChange RestoreClipboard(object? previous,uint expectedSequence){Clipboard=(string?)previous??"";return new(ClipboardChangeStatus.Restored,++Sequence);}
-        public bool Paste(){Pastes++;return true;}public bool Enter(){Enters++;return true;}public bool HoldAfterPaste{get;set;}public bool EnterHeld=>HoldAfterPaste&&Pastes>0;
+        public uint Unicode(string text){Unicodes++;Payload=text;return UnicodeResult??(uint)(text.Length*2);}
+        public bool Paste(){Pastes++;return true;}public bool Enter(){Enters++;return true;}public bool HoldAfterPaste{get;set;}public bool EnterHeld=>HoldAfterPaste&&(Pastes>0||Unicodes>0);
         public bool Unreadable{get;set;}
-        public Action? AfterPastedRead{get;set;}public string? ReadText(DraftTarget target){if(Pastes>0)AfterPastedRead?.Invoke();return Unreadable?null:Pastes>0?Payload:"";}public Task Delay(int milliseconds)=>Task.CompletedTask;
+        public Action? AfterPastedRead{get;set;}public string? ReadText(DraftTarget target){if(Pastes>0)AfterPastedRead?.Invoke();return Unreadable?null:Pastes>0||Unicodes>0?Payload:"";}public Task Delay(int milliseconds)=>Task.CompletedTask;
     }
     private sealed class Capture:IWaveIn{
         public bool Started,Disposed;public WaveFormat WaveFormat{get;set;}=new(16000,16,1);public event EventHandler<WaveInEventArgs>? DataAvailable;public event EventHandler<StoppedEventArgs>? RecordingStopped;

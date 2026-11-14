@@ -9,6 +9,9 @@ public partial class MainWindow
     private uint ClipboardSequence() => arguments.Contains("--test-ui") ? ClipboardSequenceForTests?.Invoke() ?? 0 : GetClipboardSequenceNumber();
     private void RecoverClipboard(string text, uint expected, bool usedPaste, TargetCaptureStatus? rejected = null)
     {
+        // Any direct-input attempt, including zero/partial/unconfirmed input,
+        // ends automatic delivery. Preserve the clipboard and never retry it.
+        if (usedPaste && insertion.LastUnicodeAttempted) return;
         if (!preferences.CopyOnInsertionFailure || string.IsNullOrWhiteSpace(text)) return;
         if (rejected == TargetCaptureStatus.PasswordField) { StatusDetail.Text += " Password fields stay protected; automatic recovery does not copy this draft."; return; }
         if (usedPaste && insertion.LastPasteConfirmed)

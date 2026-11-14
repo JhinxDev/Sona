@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 - insert and send when the clipboard cannot be captured
+
+- When clipboard capture fails before any write or paste, insert a bounded
+  single-line draft directly as Unicode without changing the clipboard.
+- Require full input acceptance and complete field readback before one Enter.
+  Partial input, focus changes, held keys or cancellation withhold send and retry.
+- Keep clipboard recovery off after any direct-input attempt so the earlier copy
+  remains available. Long or multiline text retains the guarded paste path.
+- Distinguish direct insertion, actual paste and clipboard capture failure codes
+  in content-free diagnostics.
+
 ## 0.6.1 - ordinary Windows clipboard compatibility
 
 - Fix 0.6.0 refusing copied text from WPF apps, including Sona's Copy draft.

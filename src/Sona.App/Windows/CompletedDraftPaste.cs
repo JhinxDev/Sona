@@ -14,6 +14,7 @@ internal interface ICompletedDraftTransport
     uint ClipboardSequence { get; }
     ClipboardChange RestoreClipboard(object? previous, uint expectedSequence);
     bool Paste();
+    uint Unicode(string text) => 0;
     bool Enter();
     bool EnterHeld { get; }
     string? ReadText(DraftTarget target);
@@ -30,7 +31,11 @@ public sealed partial class Insertion
     internal PasteReadback LastPasteReadback { get; private set; }
     internal TargetCaptureStatus? LastPasteCaptureRejection { get; private set; }
     internal int LastPasteCaptureGaps { get; private set; }
-    internal bool LastPasteRequested => LastPasteReadback != PasteReadback.NotRequested;
+    internal bool LastPasteRequested => !LastUnicodeAttempted && LastPasteReadback != PasteReadback.NotRequested;
+    internal string LastDeliveryRoute { get; private set; } = "None";
+    internal bool LastUnicodeAttempted { get; private set; }
+    internal bool LastUnicodeConfirmed { get; private set; }
+    internal string? LastClipboardFailureCode { get; private set; }
     internal bool LastDraftOnClipboard { get; private set; }
     internal bool LastClipboardRestorationFailed { get; private set; }
     internal string LastClipboardStatus { get; private set; } = "NotUsed";
@@ -41,6 +46,9 @@ public sealed partial class Insertion
         LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = LastClipboardRestorationFailed = false;
         LastPasteReadback = PasteReadback.NotRequested;
         LastClipboardStatus = "NotUsed";
+        LastDeliveryRoute = "None";
+        LastUnicodeAttempted = LastUnicodeConfirmed = false;
+        LastClipboardFailureCode = null;
         LastPasteCaptureRejection = null;
         LastPasteCaptureGaps = 0;
         if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > DraftLimits.MaximumCharacters || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
@@ -60,36 +68,64 @@ public sealed partial class Insertion
         }
         if (ModifiersDown() || transport.EnterHeld || !Same(target, captured.Target))
             return (false, "Focus or held keys changed. Your draft stays in Sona.");
-        object? previous = null; uint sequence = 0; bool changed = false, pasted = false, confirmed = false, allowRecovery = false;
+        object? previous = null; uint sequence = 0; bool changed = false, pasted = false, confirmed = false, allowRecovery = false, unicode = false;
         try
         {
             LastClipboardStatus = "Capturing";
-            previous = transport.SaveClipboard();
+            try { previous = transport.SaveClipboard(); }
+            catch (Exception error) when (error is ExternalException or InvalidOperationException)
+            {
+                // Capture has not performed EmptyClipboard, SetClipboardData or
+                // any paste gesture. Only this boundary may choose direct input.
+                LastClipboardFailureCode = ClassifyClipboardCaptureFailure(error);
+                LastClipboardStatus = "CaptureFailed";
+                if (!CanSendUnicodeBatch(text)) return (false, "The clipboard is unavailable and this draft needs clipboard paste. Your complete draft stays in Sona.");
+                unicode = true;
+            }
             // Reading delayed clipboard formats may legitimately advance its
             // sequence while our capture owns the lock. Use that snapshot's
             // final sequence, then reject any change after it was captured.
-            var initialSequence = transport.SavedClipboardSequence(previous);
-            LastClipboardStatus = "Captured";
-            allowRecovery = keepOnFailure && (!recoverySequence.HasValue || transport.SavedClipboardInitialSequence(previous) == recoverySequence.Value);
+            var initialSequence = unicode ? 0 : transport.SavedClipboardSequence(previous);
+            if (!unicode) LastClipboardStatus = "Captured";
+            allowRecovery = !unicode && keepOnFailure && (!recoverySequence.HasValue || transport.SavedClipboardInitialSequence(previous) == recoverySequence.Value);
             var before = transport.ReadText(target);
             var documentBefore = transport.ReadDocumentText(target);
             cancellation.ThrowIfCancellationRequested();
-            if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != initialSequence) return (false, "Focus, keys or clipboard changed before paste. Your draft stays in Sona.");
-            var staged = transport.SetClipboard(previous, text);
-            LastClipboardStatus = staged.Status == ClipboardChangeStatus.Staged ? "Staged" : "Staging" + staged.Status;
-            sequence = staged.Sequence;
-            changed = staged.Status is ClipboardChangeStatus.Staged or ClipboardChangeStatus.FailedOwnedPartial;
-            if (staged.Status != ClipboardChangeStatus.Staged)
+            if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || !unicode && transport.ClipboardSequence != initialSequence) return (false, "Focus, keys or clipboard changed before insertion. Your draft stays in Sona.");
+            if (unicode)
             {
-                allowRecovery = false;
-                return (false, "Clipboard could not be safely prepared. Your complete draft stays in Sona.");
+                // Capture/readback can pump messages. Recheck immediately before
+                // the ONE Unicode batch; no navigation/Return/Tab packets exist.
+                cancellation.ThrowIfCancellationRequested();
+                if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || cancellation.IsCancellationRequested)
+                    return (false, "Focus or keys changed before insertion. Your draft stays in Sona.");
+                LastUnicodeAttempted = true;
+                LastDeliveryRoute = "UnicodeBatch";
+                var accepted = transport.Unicode(text);
+                if (accepted == 0) return (false, "Windows blocked text insertion. Your draft stays in Sona and the clipboard was left untouched.");
+                pasted = true;
+                if (accepted != text.Length * 2)
+                    return (true, "Windows accepted only part of the text input. Check the composer; Sona did not retry or send Enter. Your clipboard was left untouched.");
             }
-            if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
-                return (false, "Paste cancelled because focus, keys or clipboard changed. Your draft stays in Sona.");
-            // Exactly one paste gesture, never per-character typing or retries.
-            LastPasteReadback = PasteReadback.GestureRejected;
-            if (!transport.Paste()) return (false, "Windows did not accept the full paste shortcut. Check the destination before retrying.");
-            pasted = true;
+            else
+            {
+                var staged = transport.SetClipboard(previous, text);
+                LastClipboardStatus = staged.Status == ClipboardChangeStatus.Staged ? "Staged" : "Staging" + staged.Status;
+                sequence = staged.Sequence;
+                changed = staged.Status is ClipboardChangeStatus.Staged or ClipboardChangeStatus.FailedOwnedPartial;
+                if (staged.Status != ClipboardChangeStatus.Staged)
+                {
+                    allowRecovery = false;
+                    return (false, "Clipboard could not be safely prepared. Your complete draft stays in Sona.");
+                }
+                if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
+                    return (false, "Paste cancelled because focus, keys or clipboard changed. Your draft stays in Sona.");
+                // Exactly one paste gesture, never per-character typing or retries.
+                LastDeliveryRoute = "ClipboardPaste";
+                LastPasteReadback = PasteReadback.GestureRejected;
+                if (!transport.Paste()) return (false, "Windows did not accept the full paste shortcut. Check the destination before retrying.");
+                pasted = true;
+            }
             string? confirmedText = null;
             var readbackInterrupted = false;
             LastPasteReadback = PasteReadback.Unavailable;
@@ -142,27 +178,28 @@ public sealed partial class Insertion
                     : after != null || documentAfter != null ? PasteReadback.Unchanged : PasteReadback.Unavailable;
             }
             confirmed = confirmedText != null;
-            LastPasteConfirmed = confirmed;
+            LastPasteConfirmed = !unicode && confirmed;
+            LastUnicodeConfirmed = unicode && confirmed;
             submit |= requestSubmission?.Invoke() == true;
-            if (!submit) return (true, confirmed ? "Complete draft pasted once. Nothing was submitted." : "Paste requested once. Check the result; nothing was submitted.");
+            if (!submit) return (true, confirmed ? "Complete draft inserted once. Nothing was submitted." : "Text insertion requested once. Check the result; nothing was submitted.");
             if (confirmed && readbackInterrupted)
-                return (true, "Draft pasted. Check the composer before pressing Enter because the focused field was temporarily unavailable.");
-            if (!confirmed || cancellation.IsCancellationRequested || !Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence)
-                return (true, "Paste requested, but sending was withheld because the full draft, focus or key state could not be confirmed. Review the composer and press Enter yourself.");
+                return (true, "Draft inserted. Check the composer before pressing Enter because the focused field was temporarily unavailable.");
+            if (!confirmed || cancellation.IsCancellationRequested || !Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || !unicode && transport.ClipboardSequence != sequence)
+                return (true, "Text insertion was requested, but sending was withheld because the full draft, focus or key state could not be confirmed. Review the composer and press Enter yourself.");
             // Re-read immediately before Return. No old or partial draft is sent.
             var documentConfirmed = LastPasteReadback == PasteReadback.DocumentConfirmed;
             var final = documentConfirmed ? transport.ReadDocumentText(target) : transport.ReadText(target);
             var finalValue = documentConfirmed && before != null ? transport.ReadText(target) : null;
             var conflictingValue = TextChanged(before, finalValue) && !ConfirmsCompleteInsertion(before!, finalValue!, text);
-            if (final == null || NormalizePasted(final) != confirmedText || conflictingValue || !Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
+            if (final == null || NormalizePasted(final) != confirmedText || conflictingValue || !Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.EnterHeld || !unicode && transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
                 return (true, "Composer verification changed. Nothing was submitted by Sona.");
             LastSubmissionAccepted = transport.Enter();
-            return LastSubmissionAccepted ? (true, "Complete draft pasted, then Enter sent once to the same composer.") : (true, "Draft pasted. Windows did not confirm the complete Enter keystroke. Submission may have occurred; check the composer before retrying.");
+            return LastSubmissionAccepted ? (true, "Complete draft inserted, then Enter sent once to the same composer.") : (true, "Draft inserted. Windows did not confirm the complete Enter keystroke. Submission may have occurred; check the composer before retrying.");
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
         {
             if (LastClipboardStatus == "Capturing") LastClipboardStatus = "CaptureFailed";
-            return (pasted, pasted ? "Paste was requested but verification failed. Review the composer; Sona did not retry." : "The clipboard could not be safely prepared. Your complete draft stays in Sona.");
+            return (pasted, pasted ? "Text insertion was requested but verification failed. Review the composer; Sona did not retry." : "Text insertion could not be safely prepared. Your complete draft stays in Sona.");
         }
         finally
         {
@@ -197,6 +234,22 @@ public sealed partial class Insertion
             (previous as IDisposable)?.Dispose();
         }
     }
+    private static string ClassifyClipboardCaptureFailure(Exception error) => error switch
+    {
+        InvalidOperationException => "OwnerOrThreadUnavailable",
+        ExternalException { Message: "Clipboard is unavailable." } => "OwnerOrLockUnavailable",
+        ExternalException { Message: "Clipboard contains a format that cannot be safely preserved." } => "UnsupportedFormat",
+        ExternalException { Message: "Clipboard has no materializable content formats." } => "NoPayloadFormats",
+        ExternalException { Message: "Clipboard formats changed during capture." } => "FormatsChanged",
+        ExternalException { Message: "Clipboard has too many formats." } => "FormatLimit",
+        ExternalException { Message: "Clipboard enumeration failed." } => "EnumerationFailed",
+        ExternalException { Message: "Clipboard format is too large or unsupported." } => "FormatSizeOrHandle",
+        ExternalException { Message: "Clipboard bitmap is too large." } => "BitmapSizeLimit",
+        ExternalException { Message: "Clipboard bitmap is unsupported." } => "BitmapUnsupported",
+        ExternalException { Message: "Clipboard bitmap could not be preserved." } => "BitmapCopyFailed",
+        ExternalException { Message: "Clipboard format is unavailable." or "Clipboard data is unavailable." } => "FormatReadFailed",
+        _ => "NativeCaptureFailure"
+    };
     private TargetCaptureResult CapturePasteTarget(DraftTarget target)
     {
         var captured = CaptureWithStatus();
@@ -261,6 +314,7 @@ public sealed partial class Insertion
         public bool EnterHeld => (GetAsyncKeyState(0x0D) & 0x8000) != 0;
         public Task Delay(int milliseconds) => Task.Delay(milliseconds);
         public bool Paste() => SendKeys([Key(0x11), Key(0x56), Key(0x56, true), Key(0x11, true)]);
+        public uint Unicode(string text) => SendUnicodeBatch(text);
         public bool Enter() => SendKeys([Key(0x0D), Key(0x0D, true)]);
         private static Input Key(ushort key, bool up = false) => new() { Type = 1, Data = new Union { Keyboard = new Keyboard { Key = key, Flags = up ? 2u : 0u } } };
         private static bool SendKeys(Input[] keys)

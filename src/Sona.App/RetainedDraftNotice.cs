@@ -8,6 +8,8 @@ internal sealed record RetainedDraftNotice(string Title, string Hint)
     {
         if (limitReached) return new("Draft ready", "Recording limit reached.");
         if (outcome == "InterruptedRetained") return new("Draft recovered", "Microphone interrupted. Review first.");
+        if (outcome == "UnicodeConfirmedSendWithheld") return new("Draft inserted", "Check the chat before sending.");
+        if (outcome == "UnicodeUnconfirmed") return new("Check the draft", "Check the chat before retrying.");
         if (pasteConfirmed && !sendAccepted) return new("Draft pasted", "Check the chat before sending.");
         if (pasteRequested && !pasteConfirmed) return new("Check the draft", "Look before pasting again.");
         if (clipboardRecovery) return new("Draft copied", outcome switch

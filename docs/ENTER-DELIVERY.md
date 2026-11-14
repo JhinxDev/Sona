@@ -1,4 +1,4 @@
-# Current behavior in 0.6.1
+# Current behavior in 0.6.2
 
 Hold Ctrl+Windows, speak, and release to paste an unsent draft. Double-tap for
 hands-free recording. With Enter-to-send enabled, a bare Enter in the original
@@ -26,8 +26,13 @@ Clipboard writes check ownership while holding the Windows clipboard lock.
 The previous text, rich-text/HTML, file lists and common bitmap formats are
 preserved together, including browser HTML/source metadata. The snapshot is
 bounded to 64 MiB and 128 formats. An unsupported application-specific format or an oversized
-clipboard causes a refusal before modification; review the draft in Sona and
-use Copy draft explicitly if needed. Temporary paste does not promise support
+clipboard refuses the paste route before modification. Sona can then insert a
+single-line draft of at most 6,000 UTF-16 characters directly as Unicode, keeping
+the clipboard untouched. Control characters are not converted or injected.
+Full input acceptance, exact target/epoch, released keys and complete before/after
+readback are required before one Enter. Zero or partial input never triggers
+retry, send or automatic clipboard recovery. Longer or multiline drafts remain
+available in Sona if clipboard capture is unavailable. Temporary paste does not promise support
 for every application's private clipboard objects.
 
 0.6.1 corrects a 0.6.0 compatibility regression: Windows' `DataObject` and
@@ -38,7 +43,7 @@ rendering uses the snapshot's final sequence instead of treating Windows'
 own materialization as a new user copy.
 
 With recovery enabled, **Draft copied** means no paste was attempted and normal
-Ctrl+V can recover the result. **Check the draft** means a paste was attempted;
+Ctrl+V can recover the result. **Check the draft** means insertion was attempted;
 look in the field first, and use Sona's Copy draft only if the text is missing.
 **Draft pasted** means paste was verified but sending was withheld. Press Enter
 yourself after reviewing it. A missing send acknowledgement never justifies

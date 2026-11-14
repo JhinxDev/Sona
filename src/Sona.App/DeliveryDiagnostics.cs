@@ -8,7 +8,8 @@ internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Out
     bool DestinationChanged, long CapturedFocusEpoch, long FinalFocusEpoch,
     bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
     bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts,
-    string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed, bool ClipboardRestorationFailed, string ClipboardStatus);
+    string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed, bool ClipboardRestorationFailed, string ClipboardStatus,
+    string DeliveryRoute, bool UnicodeAttempted, bool UnicodeConfirmed, string DeliveryReadback, string? ClipboardFailureCode);
 
 public partial class MainWindow
 {
@@ -23,6 +24,9 @@ public partial class MainWindow
             : liveDraft?.ManuallyEdited == true ? "ManualEditRetained"
             : target == null ? "NoCapturedField"
             : pasteAttempted && insertion.LastSubmissionAccepted ? "Sent"
+            : pasteAttempted && insertion.LastUnicodeConfirmed && requested ? "UnicodeConfirmedSendWithheld"
+            : pasteAttempted && insertion.LastUnicodeConfirmed ? "UnicodeConfirmed"
+            : pasteAttempted && insertion.LastUnicodeAttempted ? "UnicodeUnconfirmed"
             : pasteAttempted && insertion.LastPasteConfirmed && requested ? "PasteConfirmedSendWithheld"
             : pasteAttempted && insertion.LastPasteConfirmed ? "PasteConfirmed"
             : destinationContext.DestinationChanged ? "FocusChanged"
@@ -36,15 +40,19 @@ public partial class MainWindow
             capturedEpoch, insertion.FocusEpoch, pasteAttempted,
             pasteAttempted && insertion.LastPasteConfirmed,
             pasteAttempted && insertion.LastSubmissionAccepted, fallbackCopied,
-            pasteAttempted && insertion.LastPasteRequested, pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
+            pasteAttempted && insertion.LastPasteRequested, pasteAttempted && insertion.LastPasteRequested ? insertion.LastPasteReadback.ToString() : "NotRequested",
             recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts,
             pasteAttempted ? insertion.LastPasteCaptureRejection?.ToString() : null,
             pasteAttempted ? insertion.LastPasteCaptureGaps : 0,
             stoppedByEnter && capturedEpoch >= 0 && target is { } deliveryTarget && deliveryTarget.FocusEpoch != capturedEpoch,
             pasteAttempted && insertion.LastClipboardRestorationFailed,
-            pasteAttempted ? insertion.LastClipboardStatus : "NotUsed");
+            pasteAttempted ? insertion.LastClipboardStatus : "NotUsed",
+            pasteAttempted ? insertion.LastDeliveryRoute : "None",
+            pasteAttempted && insertion.LastUnicodeAttempted, pasteAttempted && insertion.LastUnicodeConfirmed,
+            pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
+            pasteAttempted ? insertion.LastClipboardFailureCode : null);
         if ((preferences.AutoInsert || requested) && outcome is
-            ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld"))
+            ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld" or "UnicodeUnconfirmed" or "UnicodeConfirmedSendWithheld"))
             lastRetainedDelivery = lastDelivery;
     }
 }

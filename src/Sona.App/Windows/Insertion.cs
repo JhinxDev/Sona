@@ -125,12 +125,7 @@ public sealed partial class Insertion : IDisposable
         if (ModifiersDown()) return (false, "Release the modifier keys before inserting. Your transcript is safe here.");
         if (text.Any(char.IsControl)) return (false, "This draft contains line breaks or control characters. Copy it explicitly for this app.");
         if (text.Length > 6000) return (false, "This draft is too long for safe typing. Copy it explicitly.");
-        var input = new Input[text.Length * 2];
-        for (var i = 0; i < text.Length; i++)
-        {
-            input[2 * i] = new Input { Type = 1, Data = new Union { Keyboard = new Keyboard { Scan = text[i], Flags = 4 } } };
-            input[2 * i + 1] = new Input { Type = 1, Data = new Union { Keyboard = new Keyboard { Scan = text[i], Flags = 6 } } };
-        }
+        var input = BuildUnicodeInput(text);
         // One OS batch, only Unicode packets. No Return/Tab/navigation keys or clipboard mutations.
         if (!Same(target, Capture())) return (false, "Focus changed. Your transcript stayed here instead of going into another field.");
         if (ModifiersDown()) return (false, "A modifier key changed before insertion. Your transcript is safe here.");
@@ -140,6 +135,25 @@ public sealed partial class Insertion : IDisposable
         if (sent != input.Length) return (true, "Windows accepted only part of the input. Check your draft; automatic retry is disabled to prevent duplicates.");
         return (true, "Text sent to the captured field. Check the result; nothing was submitted.");
     }
+    internal static bool CanSendUnicodeBatch(string text) => text.Length is > 0 and <= 6000 && !text.Any(char.IsControl);
+    private static Input[] BuildUnicodeInput(string text)
+    {
+        var input = new Input[text.Length * 2];
+        for (var i = 0; i < text.Length; i++)
+        {
+            input[2 * i] = new Input { Type = 1, Data = new Union { Keyboard = new Keyboard { Scan = text[i], Flags = 4 } } };
+            input[2 * i + 1] = new Input { Type = 1, Data = new Union { Keyboard = new Keyboard { Scan = text[i], Flags = 6 } } };
+        }
+        return input;
+    }
+    private static uint SendUnicodeBatch(string text)
+    {
+        if (!CanSendUnicodeBatch(text)) return 0;
+        var input = BuildUnicodeInput(text);
+        return SendInput((uint)input.Length, input, Marshal.SizeOf<Input>());
+    }
+    internal static (ushort Key, ushort Scan, uint Flags)[] UnicodePacketsForTests(string text) =>
+        BuildUnicodeInput(text).Select(input => (input.Data.Keyboard.Key, input.Data.Keyboard.Scan, input.Data.Keyboard.Flags)).ToArray();
     private bool ModifiersDown() => readModifiers?.Invoke() ?? new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }.Any(k => (GetAsyncKeyState(k) & 0x8000) != 0);
     public void Dispose() { if (hook != 0) UnhookWinEvent(hook); if (foregroundHook != 0) UnhookWinEvent(foregroundHook); }
     private delegate void WinEventDelegate(nint hook, uint evt, nint hwnd, int objectId, int childId, uint thread, uint time);

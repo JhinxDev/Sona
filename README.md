@@ -7,11 +7,11 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.6.1/Sona-Setup-0.6.1.exe)**
+**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/Sona-Setup-0.6.2.exe)**
 
-The published Windows installer is **v0.6.1**, an unsigned early preview.
-[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.6.1) ·
-[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.6.1/SHA256SUMS.txt)
+The published Windows installer is **v0.6.2**, an unsigned early preview.
+[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.6.2) ·
+[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/SHA256SUMS.txt)
 
 See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
 instructions. Build-from-source instructions are below.
@@ -26,7 +26,7 @@ narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.6.1),
+Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.6.2),
 or compile the current source with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
@@ -68,12 +68,14 @@ identity. Voice, audio and transcripts stay on this PC.
   paste the finished draft, then review and send it yourself. Double-tap for
   hands-free dictation and tap once to stop. Esc cancels.
 - **Optional Enter-to-send.** During hands-free recording, Enter waits for the
-  complete draft, pastes once, verifies the inserted text in the same composer,
+  complete draft, inserts once, verifies the inserted text in the same composer,
   and only then submits. Focus, field identity and readback guard every step.
 - **A reviewable draft by default.** Home keeps the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
   into a different field. A retained-draft notice opens review or copy, and
-  optional clipboard recovery enables normal Ctrl+V when no paste could be attempted.
+  optional clipboard recovery enables normal Ctrl+V when no insertion could be attempted.
+  Successful delivery preserves the earlier clipboard by default. If Windows cannot
+  capture it, bounded single-line dictation can be inserted directly instead.
 - **Per-app modes.** Ordered rules map a captured app name, executable or package
   identity to a draft style (Clean, Verbatim, Notes) and a cleanup tone
   (Polished, Casual, Lowercase). Unmatched apps use the default mode.
