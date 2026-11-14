@@ -29,10 +29,10 @@ jobs:
         run: |
           dotnet build tests/Sona.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
           if ($LASTEXITCODE -ne 0) { throw 'Windows test build failed' }
-      - name: Exercise actual Windows and WPF clipboard in a private station
+      - name: Exercise actual Windows and WPF clipboard on the disposable runner
         shell: pwsh
         run: |
-          & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --native-clipboard-isolation-checks
+          & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --native-clipboard-hosted-checks
           if ($LASTEXITCODE -ne 0) { throw 'Native clipboard regression failed' }
       - name: Exercise ownership races and complete paste verification
         shell: pwsh

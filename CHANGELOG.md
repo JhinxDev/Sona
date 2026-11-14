@@ -8,8 +8,8 @@
 - Use the sequence captured after delayed rendering for paste ownership, while
   recovery still checks for a newer owner copy before capture.
 - Expose a content-free clipboard stage in delivery diagnostics.
-- Add actual Windows/WPF clipboard regression coverage in a private window
-  station, run on the public repository's Windows CI runner.
+- Add actual Windows/WPF clipboard regression coverage on the repository's
+  disposable GitHub-hosted Windows runner, using synthetic content and fake keys.
 
 ## 0.6.0 - recording, delivery and recovery rework
 

@@ -16,7 +16,59 @@ using Sona.App.Windows;
 // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setprocesswindowstation
 internal static class NativeClipboardIsolationChecks
 {
-    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures);
+    internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation");
+
+    // This explicit entrypoint runs ONLY on a disposable GitHub-hosted VM.
+    // Environment checks prevent accidental local/self-hosted use; they are not
+    // a security boundary against a caller deliberately manufacturing values.
+    // Never invoke this as a fallback after private-station isolation fails.
+    internal static Report RunOnHostedRunner()
+    {
+        int checks = 0; bool boundaryVerified = false;
+        uint captureBefore = 0, captureAfter = 0;
+        List<string> failures = [];
+        try
+        {
+            RequireHostedRunner(); // Before WPF, clipboard, or desktop APIs.
+            var stationName = ObjectName(GetProcessWindowStation());
+            var desktopName = ObjectName(GetThreadDesktop(GetCurrentThreadId()));
+            if (stationName.Length == 0 || desktopName.Length == 0)
+                throw new InvalidOperationException("Hosted runner station/desktop identity is unavailable.");
+            void VerifyBoundary()
+            {
+                RequireHostedRunner();
+                if (ObjectName(GetProcessWindowStation()) != stationName || ObjectName(GetThreadDesktop(GetCurrentThreadId())) != desktopName)
+                    throw new InvalidOperationException("Hosted runner station/desktop identity changed.");
+            }
+            Exception? workerFailure = null;
+            var worker = new Thread(() =>
+            {
+                try
+                {
+                    VerifyBoundary();
+                    boundaryVerified = true;
+                    RunClipboardCases(VerifyBoundary, ref checks, ref captureBefore, ref captureAfter);
+                }
+                catch (Exception error) { workerFailure = error; }
+            }) { IsBackground = true, Name = "Sona hosted native clipboard regression" };
+            worker.SetApartmentState(ApartmentState.STA);
+            worker.Start();
+            if (!worker.Join(TimeSpan.FromSeconds(30))) Environment.FailFast("Hosted native clipboard test timed out.");
+            if (workerFailure != null) failures.Add("Hosted clipboard case: " + workerFailure.Message);
+        }
+        catch (Exception error) { failures.Add(error.Message); }
+        // This mode intentionally replaces the disposable VM's clipboard. It
+        // makes no private-window-station or original-clipboard preservation claim.
+        return new(checks, boundaryVerified, null, false, captureBefore, captureAfter, failures.ToArray(), "DisposableGitHubHostedRunner");
+    }
+
+    private static void RequireHostedRunner()
+    {
+        if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true" ||
+            Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT") != "github-hosted" ||
+            Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") != "JhinxDev/Sona")
+            throw new InvalidOperationException("Hosted clipboard test requires the JhinxDev/Sona GitHub-hosted workflow; local and self-hosted execution is refused.");
+    }
     internal static Report Run()
     {
         int checks = 0; bool isolated = false, originalSequenceAvailable = false;
@@ -78,7 +130,7 @@ internal static class NativeClipboardIsolationChecks
                         ObjectName(GetProcessWindowStation()) != stationName || IsVisible(station))
                         throw new InvalidOperationException("STA isolation verification failed before WPF initialization.");
                     isolated = true;
-                    RunClipboardCases(stationName, desktopName, ref checks, ref captureBefore, ref captureAfter);
+                    RunClipboardCases(() => AssertIsolated(stationName, desktopName), ref checks, ref captureBefore, ref captureAfter);
                 }
                 catch (Exception error) { workerFailure = error; }
             }) { IsBackground = true, Name = "Sona isolated clipboard regression" };
@@ -114,9 +166,9 @@ internal static class NativeClipboardIsolationChecks
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RunClipboardCases(string station, string desktop, ref int checks, ref uint captureBefore, ref uint captureAfter)
+    private static void RunClipboardCases(Action assertBoundary, ref int checks, ref uint captureBefore, ref uint captureAfter)
     {
-        AssertIsolated(station, desktop);
+        assertBoundary();
         try
         {
             using var window = new HwndSource(new HwndSourceParameters("Sona private clipboard owner") { WindowStyle = 0, Width = 1, Height = 1 });
@@ -125,7 +177,7 @@ internal static class NativeClipboardIsolationChecks
             void Check(bool condition, string failure) { if (!condition) throw new InvalidOperationException(failure); }
 
             // Exactly the WPF path used by Copy draft, containing OLE bookkeeping.
-            AssertIsolated(station, desktop);
+            assertBoundary();
             System.Windows.Clipboard.SetText("Sona synthetic original \u00e9\u6c34", TextDataFormat.UnicodeText);
             captureBefore = clipboard.Sequence;
             OwnedClipboard.Snapshot textSnapshot;
@@ -145,7 +197,7 @@ internal static class NativeClipboardIsolationChecks
             var rich = new System.Windows.DataObject();
             rich.SetData(DataFormats.UnicodeText, "Sona rich synthetic", false);
             rich.SetData(DataFormats.Html, "<html><body><b>Sona rich synthetic</b></body></html>", false);
-            AssertIsolated(station, desktop);
+            assertBoundary();
             System.Windows.Clipboard.SetDataObject(rich, true);
             using (var snapshot = clipboard.Capture())
             {
@@ -157,7 +209,7 @@ internal static class NativeClipboardIsolationChecks
                 using var restored = clipboard.Capture();
                 Check(original.Length == restored.Formats.Count && original.Zip(restored.Formats).All(pair => pair.First.Format == pair.Second.Format && pair.First.Bytes.SequenceEqual(pair.Second.Bytes)), "Native rich formats/order/bytes changed."); checks++;
             }
-            AssertIsolated(station, desktop);
+            assertBoundary();
             byte[] pixels = [10, 20, 30, 255, 40, 50, 60, 255, 70, 80, 90, 255, 100, 110, 120, 255];
             var image = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, pixels, 8);
             image.Freeze();
@@ -176,32 +228,36 @@ internal static class NativeClipboardIsolationChecks
             }
             foreach (bool unavailableReadback in new[] { false, true })
             {
-                AssertIsolated(station, desktop);
+                assertBoundary();
                 System.Windows.Clipboard.SetText("Synthetic copy before completed paste");
                 var target = new DraftTarget(window.Handle, Environment.ProcessId, [10, 20], 0);
                 using var insertion = new Insertion(() => target, () => false, _ => throw new InvalidOperationException("Native keys are forbidden in this fixture."));
-                var transport = new NativeClipboardFakeInput(clipboard, () => AssertIsolated(station, desktop)) { UnavailableReadback = unavailableReadback };
+                var transport = new NativeClipboardFakeInput(clipboard, assertBoundary) { UnavailableReadback = unavailableReadback };
                 insertion.PasteTransportForTests = transport;
                 var result = insertion.PasteAsync(target, "Synthetic full completed draft", true).GetAwaiter().GetResult();
                 Check(result.Inserted && transport.Pastes == 1 && transport.Field == "Synthetic full completed draft", "Full PasteAsync failed with real WPF/Win32 clipboard: " + insertion.LastClipboardStatus); checks++;
                 Check(transport.Enters == (unavailableReadback ? 0 : 1) && insertion.LastPasteConfirmed == !unavailableReadback, "Full PasteAsync send/readback guard differs."); checks++;
                 Check(insertion.LastClipboardStatus == "Restored" && !insertion.LastDraftOnClipboard && System.Windows.Clipboard.GetText() == "Synthetic copy before completed paste", "Full PasteAsync did not restore the original WPF copy."); checks++;
             }
-            AssertIsolated(station, desktop);
+            assertBoundary();
             System.Windows.Clipboard.SetText("Synthetic copy before ownership race");
             {
                 var target = new DraftTarget(window.Handle, Environment.ProcessId, [30], 0);
                 using var insertion = new Insertion(() => target, () => false, _ => throw new InvalidOperationException("Native keys are forbidden in this fixture."));
-                var transport = new NativeClipboardFakeInput(clipboard, () => AssertIsolated(station, desktop))
+                var transport = new NativeClipboardFakeInput(clipboard, assertBoundary)
                 { AfterPaste = () => System.Windows.Clipboard.SetText("Newer synthetic owner copy") };
                 insertion.PasteTransportForTests = transport;
                 insertion.PasteAsync(target, "Synthetic race draft", true).GetAwaiter().GetResult();
                 Check(transport.Pastes == 1 && transport.Enters == 0 && System.Windows.Clipboard.GetText() == "Newer synthetic owner copy", "Full PasteAsync overwrote a newer copy or submitted across clipboard change."); checks++;
             }
-            AssertIsolated(station, desktop);
-            System.Windows.Clipboard.Clear();
         }
-        finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+        finally
+        {
+            // Clear only inside the verified test boundary, including when a
+            // test assertion fails. Never clear after a boundary verification failure.
+            try { assertBoundary(); System.Windows.Clipboard.Clear(); }
+            finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+        }
     }
 
     // Real clipboard transaction, fake target/readback and key gestures. No

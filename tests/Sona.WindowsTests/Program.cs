@@ -5,6 +5,13 @@ using Sona.App.Audio;
 using Sona.App.Windows;
 using NAudio.Wave;
 
+if (args.Length == 1 && args[0] == "--native-clipboard-hosted-checks")
+{
+    var report = NativeClipboardIsolationChecks.RunOnHostedRunner();
+    Console.WriteLine(JsonSerializer.Serialize(report));
+    if (report.Failures.Length > 0) Environment.ExitCode = 1;
+    return;
+}
 if (args.Length == 1 && args[0] == "--native-clipboard-isolation-checks")
 {
     var report = NativeClipboardIsolationChecks.Run();

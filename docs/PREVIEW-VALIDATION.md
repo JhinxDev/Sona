@@ -8,12 +8,17 @@ The strict 0.6.0 snapshot policy rejected that bookkeeping. A maintained regress
 reproduced the rejection; 0.6.1 excludes only those two transport records and
 preserves supported content formats. Unknown real OLE payloads still refuse.
 
-The new `--native-clipboard-isolation-checks` fixture uses a fresh private Windows
-window station with its own clipboard, verified before any WPF initialization or
-write. It never switches the visible desktop or sends keys. Local station creation
-was unavailable and the test failed closed with the original clipboard sequence
-unchanged. The repository's Windows CI runs this actual OS boundary test; a
-simulated test alone no longer qualifies this clipboard change.
+The `--native-clipboard-hosted-checks` fixture runs only on the repository's
+disposable GitHub-hosted Windows VM. It verifies the hosted environment before
+WPF/clipboard access and exercises synthetic text, HTML, bitmap pixels and full
+paste transactions with fake keys. No owner's clipboard, microphone or chat is
+involved. Do not manufacture hosted environment flags or invoke this mode locally.
+These flags prevent accidental use; they are not a security boundary.
+
+The separate local private-station fixture remains fail-closed. Local station
+creation was unavailable, and hosted station/STA initialization also refused
+before any clipboard write. The hosted VM itself supplies the isolation used for
+native qualification. Simulated checks alone do not qualify this clipboard change.
 
 ## November 13 recording and delivery rework, 0.6.0
 
