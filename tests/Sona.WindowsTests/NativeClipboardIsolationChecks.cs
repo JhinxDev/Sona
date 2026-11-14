@@ -17,7 +17,8 @@ using Sona.App.Windows;
 internal static class NativeClipboardIsolationChecks
 {
     internal sealed record StageObservation(uint ReturnedSequence, uint AfterCloseSequence, uint AfterReadSequence, bool OwnerMatchesAfterClose, bool OwnerMatchesAfterRead);
-    internal sealed record ImageObservation(string[] OfferedFormats, bool UnsupportedPayloadRefused, bool OriginalImagePreserved);
+    internal sealed record BitmapObservation(bool HandlePresent, int GetObjectBytes, int Width, int Height, int Stride, int Planes, int BitsPerPixel, int Error);
+    internal sealed record ImageObservation(string[] OfferedFormats, bool UnsupportedPayloadRefused, bool OriginalImagePreserved, BitmapObservation? SynthesizedBitmap = null, BitmapObservation? ExplicitBitmap = null);
     internal sealed record Report(int Checks, bool IsolationEstablished, bool? OriginalClipboardUnchanged, bool OriginalClipboardSequenceAvailable, uint CaptureSequenceBefore, uint CaptureSequenceAfter, string[] Failures, string Boundary = "PrivateWindowStation", StageObservation? Stage = null, ImageObservation? Image = null);
 
     // This explicit entrypoint runs ONLY on a disposable GitHub-hosted VM.
@@ -273,6 +274,36 @@ internal static class NativeClipboardIsolationChecks
                 finally { native.Close(); }
             }
             finally { if (dibHandle != 0) native.Free(8, dibHandle); }
+            imageObservation = imageObservation with { SynthesizedBitmap = ObserveBitmap(native, window.Handle) };
+
+            // Do not assume a service-session display can synthesize a usable
+            // HBITMAP from a DIB. Record that capability separately, then qualify
+            // an explicit, real CF_BITMAP source alongside the exact DIB bytes.
+            // This does not broaden production acceptance of unreadable formats.
+            assertBoundary();
+            dibHandle = native.Allocate(dib);
+            nint bitmapHandle = CreateDIBSection(0, dib, 0, out var bitmapPixels, 0, 0);
+            try
+            {
+                if (dibHandle == 0 || bitmapHandle == 0 || bitmapPixels == 0) throw new ExternalException("Explicit native image allocation failed.");
+                Marshal.Copy(pixels, 0, bitmapPixels, pixels.Length);
+                if (!native.Open(window.Handle)) throw new ExternalException("Explicit native image seed lock failed.");
+                try
+                {
+                    if (!native.Empty() || !native.Set(8, dibHandle)) throw new ExternalException("Explicit DIB seed failed.");
+                    dibHandle = 0;
+                    if (!native.Set(2, bitmapHandle)) throw new ExternalException("Explicit bitmap seed failed.");
+                    bitmapHandle = 0;
+                }
+                finally { native.Close(); }
+            }
+            finally
+            {
+                if (dibHandle != 0) native.Free(8, dibHandle);
+                if (bitmapHandle != 0) native.Free(2, bitmapHandle);
+            }
+            imageObservation = imageObservation with { ExplicitBitmap = ObserveBitmap(native, window.Handle) };
+            Check(imageObservation.ExplicitBitmap is { HandlePresent: true, Width: 2, Height: 2, Planes: 1, BitsPerPixel: 32 }, "Explicit native clipboard bitmap is not a valid 2x2 image."); checks++;
             using (var snapshot = clipboard.Capture())
             {
                 Check(snapshot.Formats.Any(f => f.Format == 8) && snapshot.Formats.Any(f => f.Format == 2), "Native DIB seed did not offer DIB and bitmap payloads."); checks++;
@@ -327,6 +358,21 @@ internal static class NativeClipboardIsolationChecks
         return pixels.SequenceEqual(expected.Where((_, index) => index % 4 != 3));
     }
 
+    private static BitmapObservation ObserveBitmap(ClipboardNative native, nint owner)
+    {
+        if (!native.Open(owner)) throw new ExternalException("Synthetic bitmap metadata lock failed.");
+        try
+        {
+            Marshal.SetLastPInvokeError(0);
+            var handle = GetClipboardData(2);
+            if (handle == 0) return new(false, 0, 0, 0, 0, 0, 0, Marshal.GetLastPInvokeError());
+            Marshal.SetLastPInvokeError(0);
+            var size = GetObject(handle, Marshal.SizeOf<NativeBitmap>(), out var bitmap);
+            return new(true, size, bitmap.Width, bitmap.Height, bitmap.Stride, bitmap.Planes, bitmap.BitsPerPixel, Marshal.GetLastPInvokeError());
+        }
+        finally { native.Close(); }
+    }
+
     // Real clipboard transaction, fake target/readback and key gestures. No
     // SendInput, UI Automation, microphone, or foreground changes are involved.
     private sealed class NativeClipboardFakeInput(OwnedClipboard clipboard, Action assertIsolated) : ICompletedDraftTransport
@@ -376,6 +422,15 @@ internal static class NativeClipboardIsolationChecks
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll")] private static extern nint GetClipboardOwner();
+    [DllImport("user32.dll", SetLastError = true)] private static extern nint GetClipboardData(uint format);
+    [DllImport("gdi32.dll", EntryPoint = "GetObjectW", SetLastError = true)] private static extern int GetObject(nint handle, int size, out NativeBitmap bitmap);
+    [DllImport("gdi32.dll", SetLastError = true)] private static extern nint CreateDIBSection(nint dc, byte[] info, uint usage, out nint pixels, nint section, uint offset);
+    [StructLayout(LayoutKind.Sequential)] private struct NativeBitmap
+    {
+        public int Type, Width, Height, Stride;
+        public ushort Planes, BitsPerPixel;
+        public nint Pixels;
+    }
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern nint CreateWindowStation(string? name, uint flags, uint access, ref SecurityAttributes attributes);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetProcessWindowStation(nint station);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern nint CreateDesktop(string name, string? device, nint mode, uint flags, uint access, ref SecurityAttributes attributes);
