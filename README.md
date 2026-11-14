@@ -36,27 +36,6 @@ from the Dictation Models page. There is no macOS or Linux build: the app uses W
 and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
 platform would be a separate native app rather than a repackage.
 
-## New in 0.6.0
-
-- **Reliable hands-free stopping.** Enter can stop recording in the original
-  app window even when Windows could not identify its editor. Sona briefly
-  rechecks an initial pane-to-editor transition; actual paste and send still
-  require the exact verified field.
-- **Your clipboard stays yours.** A completed or uncertain paste restores what
-  you had copied, even if sending is withheld. Optional Ctrl+V recovery is used
-  when no paste could be attempted. A newer copy you make always takes priority.
-- **Complete audio and longer drafts.** Final microphone buffers survive Stop.
-  Interrupted audio is recovered for review without automatic output. Paste,
-  history and saved drafts support up to 32,000 characters per text field.
-- **Less work before delivery.** History saves once after paste/send and leaves
-  unchanged saved drafts alone. Live preview can finish its current request and
-  reuse the result when it covers the exact final audio.
-- **Recoverable installs and working preview checks.** Private version installs
-  are staged and verified before activation. Optional update checks find public
-  preview installers and still never download or install automatically.
-
-[All changes](CHANGELOG.md) · [Delivery and clipboard behavior](docs/ENTER-DELIVERY.md)
-
 ## The app
 
 ![Sona home with the first-run welcome card, local model status and an editable draft](docs/images/sona-welcome-050.png)
