@@ -117,8 +117,9 @@ internal sealed class OwnedClipboard
             // https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats
             var history = native.RegisterFormat("CanIncludeInClipboardHistory");
             var cloud = native.RegisterFormat("CanUploadToCloudClipboard");
-            if (history == 0 || cloud == 0) return new(ClipboardChangeStatus.Unavailable, 0);
-            using var staging = Prepare([new(history, new byte[4]), new(cloud, new byte[4]), new(13u, bytes)]);
+            var locale = native.TextLocale;
+            if (history == 0 || cloud == 0 || locale == 0) return new(ClipboardChangeStatus.Unavailable, 0);
+            using var staging = Prepare([new(history, new byte[4]), new(cloud, new byte[4]), new(16u, BitConverter.GetBytes(locale)), new(13u, bytes)]);
             using var rollback = Prepare(snapshot.Formats);
             var hwnd = owner();
             if (hwnd == 0 || !native.Open(hwnd)) return new(ClipboardChangeStatus.Unavailable, 0);
@@ -127,7 +128,13 @@ internal sealed class OwnedClipboard
                 if (native.Sequence != snapshot.Sequence) return new(ClipboardChangeStatus.OwnershipChanged, native.Sequence);
                 if (!native.Empty()) return new(ClipboardChangeStatus.Unavailable, native.Sequence);
                 // Never expose draft text if either privacy flag was rejected.
-                if (staging.Publish(stopOnFailure: true)) return new(ClipboardChangeStatus.Staged, native.Sequence);
+                // CloseClipboard otherwise adds locale/text conversions and
+                // advances our sequence after we sampled it. Publish locale and
+                // force both Windows conversions while STILL holding the lock.
+                // Never adopt a post-close sequence or relax ownership checks.
+                // https://learn.microsoft.com/en-us/windows/win32/dataxchg/standard-clipboard-formats
+                // https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats
+                if (staging.Publish(stopOnFailure: true) && native.MaterializeText()) return new(ClipboardChangeStatus.Staged, native.Sequence);
                 // Staging failed after EmptyClipboard. Rollback was allocated
                 // BEFORE clearing, and still executes under the same open lock.
                 // Remove all partially staged text/privacy formats first.
@@ -211,6 +218,8 @@ internal sealed class OwnedClipboard
 internal interface IClipboardNative
 {
     uint Sequence { get; }
+    uint TextLocale { get; }
+    bool MaterializeText();
     bool Open(nint hwnd);
     void Close();
     uint[] Formats(int maximum);
@@ -229,6 +238,9 @@ internal interface IClipboardNative
 internal sealed class ClipboardNative : IClipboardNative
 {
     public uint Sequence => GetClipboardSequenceNumber();
+    // Match the current input language that Windows would choose on close.
+    public uint TextLocale => (uint)(GetKeyboardLayout(0).ToInt64() & 0xffff);
+    public bool MaterializeText() => GetClipboardData(1) != 0 && GetClipboardData(7) != 0 && GetClipboardData(16) != 0;
     public bool Open(nint hwnd) => OpenClipboard(hwnd);
     public void Close() => CloseClipboard();
     public bool Empty() => EmptyClipboard();
@@ -330,6 +342,7 @@ internal sealed class ClipboardNative : IClipboardNative
         return handle;
     }
     [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
+    [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool OpenClipboard(nint hwnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseClipboard();
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EmptyClipboard();

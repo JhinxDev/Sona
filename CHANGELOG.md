@@ -7,6 +7,8 @@
   snapshots; preserve actual text, HTML and other supported payload formats.
 - Use the sequence captured after delayed rendering for paste ownership, while
   recovery still checks for a newer owner copy before capture.
+- Materialize standard Windows text formats while the clipboard lock is held,
+  so close-time synthesis cannot invalidate Sona's own staging sequence.
 - Expose a content-free clipboard stage in delivery diagnostics.
 - Add actual Windows/WPF clipboard regression coverage on the repository's
   disposable GitHub-hosted Windows runner, using synthetic content and fake keys.

@@ -8,6 +8,12 @@ The strict 0.6.0 snapshot policy rejected that bookkeeping. A maintained regress
 reproduced the rejection; 0.6.1 excludes only those two transport records and
 preserves supported content formats. Unknown real OLE payloads still refuse.
 
+The real Windows regression also exposed sequence changes on CloseClipboard:
+the staging generation advanced from13 to16 while the owner window stayed the
+same, then remained16 through WPF text readback. Sona now provides the locale and
+materializes Windows text conversions while holding the original lock. Strict
+sequence comparisons remain in place; no post-close counter is blindly adopted.
+
 The `--native-clipboard-hosted-checks` fixture runs only on the repository's
 disposable GitHub-hosted Windows VM. It verifies the hosted environment before
 WPF/clipboard access and exercises synthetic text, HTML, bitmap pixels and full

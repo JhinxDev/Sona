@@ -17,7 +17,7 @@ internal static class OwnedClipboardChecks
             var (n, c) = Create(); var original = n.CopyContents();
             using var snapshot = c.Capture();
             var staged = c.TrySetText(snapshot, "fixture draft");
-            Check(staged.Status == ClipboardChangeStatus.Staged && n.Contents.Count == 3, "Text and privacy staging failed.");
+            Check(staged.Status == ClipboardChangeStatus.Staged && n.Contents.Count == 6, "Complete native text representations and privacy staging failed.");
             Check(n.Contents[0xC002].SequenceEqual(new byte[4]) && n.Contents[0xC003].SequenceEqual(new byte[4]), "Temporary draft must opt out of Windows clipboard history and cloud upload.");
             var restored = c.Restore(snapshot, staged.Sequence);
             Check(restored.Status == ClipboardChangeStatus.Restored && n.SameContents(original), "All original text and HTML bytes/order must be restored.");
@@ -30,6 +30,16 @@ internal static class OwnedClipboardChecks
             var staged = c.TrySetText(snapshot, "WPF copy regression");
             Check(staged.Status == ClipboardChangeStatus.Staged && c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(payload), "WPF DataObject/Ole Private Data bookkeeping must not block exact supported payload restoration.");
             Check(!n.ReadFormats.Contains(0xC006) && !n.ReadFormats.Contains(0xC007), "Owner-bound OLE metadata must never be copied or replayed.");
+        }
+        {
+            var (n, c) = Create(); using var snapshot = c.Capture(); n.SynthesizeOnClose = true;
+            var staged = c.TrySetText(snapshot, "CloseClipboard synthesis");
+            Check(staged.Status == ClipboardChangeStatus.Staged && staged.Sequence == n.Sequence, "Windows close-time text synthesis must not invalidate Sona's own returned sequence.");
+            Check(c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored, "Strict restoration must accept the completely materialized staging generation.");
+        }
+        {
+            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); n.FailMaterialize = true;
+            Check(c.TrySetText(snapshot, "conversion failure").Status == ClipboardChangeStatus.FailedRestored && n.SameContents(original) && n.Owned.Count == 0, "Failed native text conversion must rollback under the same lock without leaking handles.");
         }
         foreach (bool addUnknownPayload in new[] { false, true })
         {
@@ -82,7 +92,7 @@ internal static class OwnedClipboardChecks
             Check(c.Restore(snapshot, failed.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(original), "Partial rollback must remain recoverable.");
         }
         {
-            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); var staged = c.TrySetText(snapshot, "draft"); n.FailSets.Add(4);
+            var (n, c) = Create(); using var snapshot = c.Capture(); var original = n.CopyContents(); var staged = c.TrySetText(snapshot, "draft"); n.FailSets.Add(5);
             var failed = c.Restore(snapshot, staged.Sequence);
             Check(failed.Status == ClipboardChangeStatus.FailedOwnedPartial && failed.Sequence != staged.Sequence, "Partial restoration must expose updated ownership.");
             Check(c.Restore(snapshot, failed.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(original), "A later restore must replace all partially restored formats.");
@@ -172,12 +182,20 @@ internal static class OwnedClipboardChecks
         internal readonly HashSet<int> FailSets = [];
         internal readonly HashSet<uint> Markers = [];
         internal readonly HashSet<uint> ReadFormats = [];
-        internal bool FailOpen, FailEmpty, FailRead, FailBitmap, FailRegistration;
+        internal bool FailOpen, FailEmpty, FailRead, FailBitmap, FailRegistration, SynthesizeOnClose, FailMaterialize;
         internal int FailAllocationAt, FailEmptyAt, Allocations, EmptyCalls, OpenCount, CloseCount, SetCalls, BitmapFrees;
         internal Action? BeforeOpen, OnRead;
         private bool opened;
         private int nextHandle;
         public uint Sequence { get; private set; } = 1;
+        public uint TextLocale => 0x409;
+        public bool MaterializeText()
+        {
+            RequireOpen(); if (FailMaterialize) return false;
+            foreach (uint format in new uint[] { 1, 7 })
+                if (!Contents.ContainsKey(format)) { Contents[format] = Contents[13].ToArray(); Sequence++; }
+            return Contents.ContainsKey(16);
+        }
         internal void Materialize() { RequireOpen(); Sequence++; }
         internal void UserCopy(params (uint Format, byte[] Bytes)[] entries)
         {
@@ -192,7 +210,14 @@ internal static class OwnedClipboardChecks
             OpenCount++; var before = BeforeOpen; BeforeOpen = null; before?.Invoke();
             if (FailOpen) return false; opened = true; return true;
         }
-        public void Close() { RequireOpen(); opened = false; CloseCount++; }
+        public void Close()
+        {
+            RequireOpen();
+            if (SynthesizeOnClose && Contents.ContainsKey(13))
+                foreach (uint format in new uint[] { 16, 1, 7 })
+                    if (!Contents.ContainsKey(format)) { Contents[format] = format == 16 ? BitConverter.GetBytes(0x409u) : Contents[13].ToArray(); Sequence++; }
+            opened = false; CloseCount++;
+        }
         public uint[] Formats(int maximum) { RequireOpen(); if (Contents.Count > maximum) throw new ExternalException(); return Contents.Keys.ToArray(); }
         public string FormatName(uint format) => format switch
         {
