@@ -1,3 +1,12 @@
+## November 13 successful owner 0.6.2 test
+
+The owner reported that 0.6.2 worked in Codex and repeated the test. Read-only
+status at 2026-11-13T21:59:23.6815493-05:00 recorded `Sent`, complete value readback,
+unchanged field/focus, accepted Enter and `clipboardStatus=Restored`, with no
+clipboard recovery or restoration failure. This and the earlier 21:58:47 successful delivery used
+`ClipboardPaste`; the Unicode fallback was not exercised. Repeated-use reliability
+and an owner Ctrl+V check of the earlier clipboard remain open.
+
 ## November 13 physical 0.6.1 failure and 0.6.2 correction
 
 The owner tested installed 0.6.1 in Codex and again received a retained draft.
