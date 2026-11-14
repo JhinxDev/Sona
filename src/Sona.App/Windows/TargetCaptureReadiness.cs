@@ -16,7 +16,12 @@ internal static class TargetCaptureReadiness
         CheckAdmission();
         var first = capture();
         CheckAdmission();
-        if (!EligiblePane(first)) return first;
+        // Codex/Chromium can expose its containing pane while the editor gains
+        // focus. Only this initial noneditable pane may settle to the final
+        // epoch observed by that same capture. Never rebase an existing editor.
+        var settling = InitialPaneRace(first);
+        if (!EligiblePane(first) && !settling) return first;
+        var scope = settling ? first with { FocusEpochBefore = first.FocusEpochAfter } : first;
         var current = first;
         for (var attempt = 2; attempt <= 4; attempt++)
         {
@@ -27,7 +32,7 @@ internal static class TargetCaptureReadiness
             current = capture();
             CheckAdmission();
             current = current with { InitialStatus = first.Status, CaptureAttempts = attempt };
-            if (!SameScope(first, current)) return RejectChanged(current);
+            if (!SameScope(scope, current)) return RejectChanged(current);
             if (current.Target != null && current.Status == TargetCaptureStatus.Ready)
                 return CoherentTarget(current) ? current : RejectChanged(current);
             if (!EligiblePane(current)) return current;
@@ -42,6 +47,14 @@ internal static class TargetCaptureReadiness
         result.ControlTypeId == 50033 && result.ReadOnly != true && result.Stable &&
         result.ForegroundWindow != 0 && result.WindowProcessId is > 0 && result.ProviderProcessId is > 0 &&
         result.FocusEpochBefore >= 0 && result.FocusEpochBefore == result.FocusEpochAfter &&
+        result.FieldInForegroundWindow == true && !string.IsNullOrEmpty(result.RuntimeIdentityHash);
+
+    private static bool InitialPaneRace(TargetCaptureResult result) =>
+        result.Target == null && result.Status == TargetCaptureStatus.FocusChanged &&
+        result.WindowStable && result.ControlTypeId == 50033 && result.ReadOnly != true &&
+        result.Password == false && result.Enabled == true &&
+        result.ForegroundWindow != 0 && result.WindowProcessId is > 0 && result.ProviderProcessId is > 0 &&
+        result.FocusEpochBefore >= 0 && result.FocusEpochAfter >= result.FocusEpochBefore &&
         result.FieldInForegroundWindow == true && !string.IsNullOrEmpty(result.RuntimeIdentityHash);
 
     private static bool SameScope(TargetCaptureResult first, TargetCaptureResult current) =>

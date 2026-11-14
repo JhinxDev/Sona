@@ -95,7 +95,7 @@ public partial class MainWindow
         try
         {
             var draft = System.Text.Json.JsonSerializer.Deserialize<TransferredDraft>(payload);
-            if (draft == null || draft.Draft == null || draft.Original == null || draft.Draft.Length > 6000 || draft.Original.Length > 6000) return;
+            if (draft == null || draft.Draft == null || draft.Original == null || draft.Draft.Length > DraftLimits.MaximumCharacters || draft.Original.Length > DraftLimits.MaximumCharacters) return;
             session = new(); session.Begin(); session.Stop(); session.Complete(draft.Original, draft.Draft); Render(session);
             Status.Text = "Your draft was restored"; StatusDetail.Text = "Your text is here. Hold Ctrl + Windows to start a new dictation.";
         }

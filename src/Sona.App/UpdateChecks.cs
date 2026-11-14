@@ -44,7 +44,7 @@ public partial class MainWindow
         {
             using var checkTimeout = CancellationTokenSource.CreateLinkedTokenSource(updateCheckLifetime.Token);
             checkTimeout.CancelAfter(TimeSpan.FromSeconds(10));
-            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/JhinxDev/Sona/releases/latest");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/JhinxDev/Sona/releases?per_page=10");
             request.Headers.UserAgent.ParseAdd("Sona/" + AppVersion.Number);
             request.Headers.Accept.ParseAdd("application/vnd.github+json");
             request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -63,13 +63,14 @@ public partial class MainWindow
                 if (bytes.Length + read > ReleaseVersion.MaximumBytes) throw new FormatException("Release response is too large.");
                 bytes.Write(buffer, 0, read);
             }
-            var release = ReleaseVersion.Parse(bytes.ToArray());
-            if (!Version.TryParse(AppVersion.Number, out _)) { UpdateStatus.Text = "Installed version is unknown; compare versions on the release page."; return; }
+            if (!Version.TryParse(AppVersion.Number, out var installed)) { UpdateStatus.Text = "Installed version is unknown; compare versions on the release page."; return; }
+            var release = ReleaseVersion.LatestPublished(bytes.ToArray(), includePreviews: installed.Major == 0);
+            if (release == null) { updateReleaseUrl = null; UpdateRelease.Visibility = Visibility.Collapsed; UpdateNotice.Visibility = Visibility.Collapsed; UpdateStatus.Text = "No compatible public installer is available yet."; return; }
             if (ReleaseVersion.IsNewer(release, AppVersion.Number))
             {
                 updateReleaseUrl = release.Url;
                 UpdateRelease.Visibility = Visibility.Visible; UpdateNotice.Visibility = Visibility.Visible;
-                UpdateStatus.Text = $"Sona {release.Version.ToString(3)} is available. Installed: {AppVersion.Number}.";
+                UpdateStatus.Text = $"Sona {release.Version.ToString(3)}{(release.Preview ? " preview" : "")} is available. Installed: {AppVersion.Number}.";
             }
             else
             {

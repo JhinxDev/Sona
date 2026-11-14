@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private int shortcutToggleMode;
     private int enterToSendEnabled;
     private bool submitOnComplete;
+    private RecordingWindow? recordingWindow;
+    private bool recordingInterrupted;
     private readonly PendingSubmission pendingSubmission = new();
     private bool fallbackCopied;
     private System.Windows.Forms.NotifyIcon? tray;
@@ -171,7 +173,7 @@ public partial class MainWindow : Window
     {
         var epoch = insertion.FocusEpoch;
         return Volatile.Read(ref enterToSendEnabled) == 1 && !Volatile.Read(ref preparedInsertionTest) &&
-            insertion.IsForegroundWindow(Volatile.Read(ref target)) ? epoch : null;
+            insertion.IsRecordingWindowForeground(Volatile.Read(ref recordingWindow)) ? epoch : null;
     }
     private void FinishAndSendShortcut(long focusEpoch)
     {
@@ -212,10 +214,10 @@ public partial class MainWindow : Window
         if (transcriber.CleanupPending) { ReportError("A temporary recording still needs cleanup. Use Quit to retry before recording again."); return false; }
         if (transcriber.ResidentCleanupPending) { StatusDetail.Text = "The previous model still needs cleanup. Use Unload now before recording again."; return false; }
         if (!transcriber.AvailableFor(preferences)) { ReportError("Install the selected local engine before recording."); return false; }
-        cancellation?.Dispose(); cancellation = new(); submitOnComplete = false; recordingLimitReached = false; fallbackCopied = false; pendingSubmission.Complete();
+        cancellation?.Dispose(); cancellation = new(); submitOnComplete = false; recordingLimitReached = recordingInterrupted = false; fallbackCopied = false; pendingSubmission.Complete();
         // Own preparation before the first asynchronous readiness wait. A late
         // capture cannot install a destination into a cancelled or newer session.
-        target = null; recordingCapture = null; destinationContext.End();
+        target = null; recordingCapture = null; recordingWindow = insertion.CaptureRecordingWindow(); destinationContext.End();
         ResetSessionMode();
         ResetModelLoadTracking();
         barPreview.Stop();
@@ -260,7 +262,11 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(session, captureSession) || captureSession.State != SessionState.Recording || shutdownPending) return false;
             if (admission != null && !admission()) { Cancel(); return false; }
             var capture = arguments.Contains("--test-ui") ? RecorderForTests!() : new Recorder(); recorder = capture;
-            capture.UnexpectedStop += error => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(recorder, capture)) { session?.Fail(error); ReportError(error); } });
+            capture.UnexpectedStop += _ => Dispatcher.BeginInvoke(() =>
+            {
+                if (ReferenceEquals(recorder, capture) && session?.State == SessionState.Recording && !processing)
+                    operation = StopAsync(retainOnly: true);
+            });
             if (admission != null && !admission()) { Cancel(); return false; }
             capture.Start(preferences.Device);
             if (admission != null && !admission()) { Cancel(); return false; }
@@ -298,18 +304,21 @@ public partial class MainWindow : Window
         var current = session; var active = recorder;
         if (current == null || active == null || !current.Stop()) return;
         var stoppedByEnter = submitOnComplete;
-        retainOnly |= active.Elapsed >= RecordingLimits.MaximumSeconds || active.LimitReached;
+        recordingLimitReached = active.Elapsed >= RecordingLimits.MaximumSeconds || active.LimitReached;
+        retainOnly |= recordingLimitReached;
         if (retainOnly) submitOnComplete = false;
         FeedbackCue? completedFeedback = null;
-        recorder = null; livePolling?.Cancel(); recordingLimitReached = retainOnly;
+        recorder = null; livePolling?.Cancel();
         processing = true; pendingSubmission.Begin(!retainOnly && preferences.EnterToSend); RefreshQuickCleanup();
-        var recoverySequence = ClipboardSequence(); var pasteAttempted = false;
+        var recoverySequence = ClipboardSequence(); var pasteAttempted = false; var historyAdded = false;
         timer.Stop(); RecordButton.Content = "Record";
         try
         {
             Status.Text = "Making your draft"; StatusDetail.Text = "Transcribing locally. Esc still cancels."; overlay.Update("Transcribing", "Esc cancels");
             var wav = await active.StopAsync();
             var stopTimedOut = active.StopTimedOut;
+            recordingInterrupted = active.StopInterrupted || stopTimedOut;
+            if (recordingInterrupted) { retainOnly = true; submitOnComplete = false; pendingSubmission.Begin(false); }
             // Capture can reach its PCM bound on the last callback while Stop is entering.
             if (active.LimitReached) { retainOnly = recordingLimitReached = true; submitOnComplete = false; pendingSubmission.Begin(false); }
             active.Dispose();
@@ -323,7 +332,14 @@ public partial class MainWindow : Window
                 cancellation!.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) { throw; }
-            catch (TimeoutException) { _ = liveOperation.ContinueWith(task => _ = task.Exception, TaskScheduler.Default); }
+            catch (TimeoutException)
+            {
+                // A healthy pending preview finishes without tearing down the
+                // resident worker. A stalled request is still cancelled before
+                // final recognition, which keeps the existing worker cleanup.
+                liveInference?.Cancel();
+                _ = liveOperation.ContinueWith(task => _ = task.Exception, TaskScheduler.Default);
+            }
             catch (Exception) { _ = liveOperation.Exception; }
             string original;
             if (previewOriginal != null && previewAudioBytes == active.CapturedBytes)
@@ -336,7 +352,7 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(current, session) || current.State == SessionState.Cancelled) return;
             submitOnComplete |= pendingSubmission.IsRequested;
             if (!current.Complete(original, CompleteLiveDraft(original, cleanupResult.Text, cleanupResult.Applied))) { Render(current); Status.Text = "No draft to insert"; StatusDetail.Text = liveDraft?.ManuallyEdited == true ? "Your empty edit was kept. The original and cleanup suggestion remain available for review." : current.Error; return; }
-            Render(current); AddHistory(current); completedFeedback = FeedbackCue.Ready;
+            Render(current); AddHistory(current, persist: false); historyAdded = true; completedFeedback = FeedbackCue.Ready;
             var clipboardDetail = cleanupResult.Applied ? " Polished locally." : "";
             if (preferences.CopyToClipboard && !retainOnly)
             {
@@ -351,12 +367,13 @@ public partial class MainWindow : Window
                 var result = pasteAttempted
                     ? await insertion.PasteAsync(target, current.Draft, submitOnComplete, cancellation!.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence, requestSubmission: () => { submitOnComplete |= pendingSubmission.IsRequested; return submitOnComplete; })
                     : await insertion.InsertAsync(target, current.Draft, cancellation!.Token);
-                if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); }
+                if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(persist: false); }
                 if (submitOnComplete && insertion.LastSubmissionAccepted) completedFeedback = FeedbackCue.Sent;
                 Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail + clipboardDetail;
+                if (pasteAttempted && insertion.LastClipboardRestorationFailed)
+                    StatusDetail.Text += " Windows could not restore all previous clipboard content.";
             }
-            else { Status.Text = "Draft ready"; StatusDetail.Text = (retainOnly ? "The five-minute recording limit was reached. Your draft is ready for review; nothing was pasted or sent." : liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
-            if (stopTimedOut) StatusDetail.Text = "The microphone did not confirm its stop; audio captured before the stall was used. " + StatusDetail.Text;
+            else { Status.Text = "Draft ready"; StatusDetail.Text = (recordingInterrupted ? "The microphone was interrupted. Audio captured so far was recovered for review; nothing was pasted or sent." : retainOnly ? "The five-minute recording limit was reached. Your draft is ready for review; nothing was pasted or sent." : liveDraft?.ManuallyEdited == true ? "Your edits are protected. Review the final original and cleaned suggestion below." : target == null ? recordingCapture?.Detail ?? "The destination could not be captured. Your draft stays in Sona." : destinationContext.DestinationChanged ? "Focus changed. Your draft stayed in Sona instead of going into another field." : "Review it here, or copy it when you are ready.") + clipboardDetail; }
             DescribeSessionMode();
             if (!retainOnly && !cancellation!.IsCancellationRequested && (preferences.AutoInsert || submitOnComplete) && liveDraft?.ManuallyEdited != true &&
                 (current.State == SessionState.Ready || pasteAttempted && (!insertion.LastPasteConfirmed || submitOnComplete && !insertion.LastSubmissionAccepted)))
@@ -374,6 +391,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            if (historyAdded) SaveHistory();
             ObserveDelivery(current, retainOnly, pasteAttempted, stoppedByEnter);
             pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
             if (!shutdownPending && current.State is SessionState.Ready or SessionState.Inserted &&
@@ -400,6 +418,8 @@ public partial class MainWindow : Window
             var result = preferences.PasteCompletedDraft ? await insertion.PasteAsync(destination, current.Draft, false, cancellation.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence) : await insertion.InsertAsync(destination, current.Draft, cancellation.Token);
             if (result.Inserted) { current.MarkInserted(); MarkHistoryInserted(); preparedInsertionTest = false; }
             Status.Text = result.Inserted ? "Draft inserted" : "Draft ready"; StatusDetail.Text = result.Detail;
+            if (preferences.PasteCompletedDraft && insertion.LastClipboardRestorationFailed)
+                StatusDetail.Text += " Windows could not restore all previous clipboard content.";
             if (!cancellation.IsCancellationRequested && (!result.Inserted || preferences.PasteCompletedDraft && !insertion.LastPasteConfirmed)) RecoverClipboard(current.Draft, recoverySequence, preferences.PasteCompletedDraft);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }

@@ -76,7 +76,8 @@ function Value([string]$Id){$taskField=ById $Id;if(!$taskField){throw 'Required 
 SelectTab 'DictationTab';$taskDraft=Value 'Draft'
 if(!(ById 'Original')){$taskExpanders=$taskRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Original transcript'));foreach($taskExpander in $taskExpanders){$taskPattern=$null;if($taskExpander.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$taskPattern)){$taskPattern.Expand();break}}}
 $taskOriginal=Value 'Original'
-if($taskDraft.Length-gt6000-or$taskOriginal.Length-gt6000){throw 'Draft exceeds bounded transfer; app preserved'}
+$taskTransferLimit=if([version]$taskOwned.Version -ge [version]'0.6.0'){32000}else{6000}
+if($taskDraft.Length-gt$taskTransferLimit-or$taskOriginal.Length-gt$taskTransferLimit){throw 'Draft exceeds the current version recovery limit; app preserved'}
 $taskPayload=[pscustomobject]@{Draft=$taskDraft;Original=$taskOriginal}|ConvertTo-Json -Compress
 if($taskPayload.Length-gt30000){throw 'Transfer exceeds environment bound; app preserved'}
 $taskRecoveryDirectory=Join-Path $env:LOCALAPPDATA 'Sona\recovery'

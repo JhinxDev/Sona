@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 - recording, delivery and recovery rework
+
+- Separate hands-free Enter stopping from text-field capture, and recheck an
+  initial same-window pane-to-editor focus race. Show draft-only capture early.
+- Preserve the previous clipboard after attempted paste, including withheld
+  Enter and uncertain readback. Use optional recovery only before a paste attempt;
+  retry temporary restoration locks without overwriting a newer owner copy.
+  Preserve browser/image formats and exclude temporary text from Windows
+  clipboard history and cloud sync.
+- Keep final microphone buffers and recover interrupted audio as a review-only
+  draft. A healthy in-flight preview can complete without an avoidable reload.
+- Support 32,000-character paste, history and saved-draft fields, retain explicit
+  file-size limits, and keep older-binary rollback within its supported limits.
+- Save recent history once after delivery and avoid unchanged saved-draft writes.
+- Stage and verify private installations before activation, and recover aliases
+  after caught publication failures so same-package retry remains safe.
+- Find uploaded public preview installers during optional update checks.
+
 ## 0.5.8 - clean dictation paragraphs
 
 - Clean joins sentence-by-sentence transcript and model lines into paragraphs,

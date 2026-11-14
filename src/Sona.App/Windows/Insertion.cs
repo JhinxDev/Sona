@@ -7,6 +7,8 @@ public sealed record DraftTarget(nint Window, int ProcessId, int[] RuntimeId, lo
 {
     public int OwnerProcessId => WindowProcessId > 0 ? WindowProcessId : ProcessId;
 }
+// Owning the stop gesture does not grant permission to type into a field.
+internal sealed record RecordingWindow(nint Window, int OwnerProcessId);
 public sealed partial class Insertion : IDisposable
 {
     private long focusEpoch;
@@ -81,6 +83,25 @@ public sealed partial class Insertion : IDisposable
             : null;
     }
     internal Func<(nint Window, int Owner)>? ForegroundForTests { get; set; }
+    internal RecordingWindow? CaptureRecordingWindow()
+    {
+        if (readTarget != null)
+        {
+            var current = ForegroundForTests?.Invoke();
+            if (current == null)
+            {
+                var field = readTarget();
+                current = (field?.Window ?? 0, field?.OwnerProcessId ?? 0);
+            }
+            return current.Value.Window != 0 && current.Value.Owner > 0
+                ? new(current.Value.Window, current.Value.Owner) : null;
+        }
+        var window = GetForegroundWindow();
+        return window != 0 && GetWindowThreadProcessId(window, out var owner) != 0 && owner != Environment.ProcessId
+            ? new(window, (int)owner) : null;
+    }
+    internal bool IsRecordingWindowForeground(RecordingWindow? window) =>
+        window != null && CaptureRecordingWindow() == window;
     // Gesture ownership is scoped to this exact window. Field/epoch checks still
     // authorize output independently, after the complete result is available.
     public bool IsForegroundWindow(DraftTarget? target)

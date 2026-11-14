@@ -1,3 +1,15 @@
+## 0.6.0 storage and delivery
+
+Recent history and saved drafts accept up to 32,000 characters in each original,
+draft and generated-text field. A file stays bounded to 200 records and 16 MiB.
+An invalid or oversized write reports failure and preserves the earlier readable
+file; the current session still retains its text. Display-only labels and previews
+are no longer duplicated in saved JSON. Older valid history still loads.
+
+Ordinary dictation updates history in memory before delivery, then saves once
+after paste/send. Unchanged saved drafts are not rewritten with each dictation.
+Editing or changing insertion status on a saved draft still persists that record.
+
 # History controls, 0.4.5
 
 The owner reported that Clear 14 recent did nothing. Actual native readback showed

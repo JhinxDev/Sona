@@ -8,9 +8,9 @@ public sealed class Recorder : IDisposable
     private readonly TimeProvider clock;
     private IWaveIn? input;
     private readonly MemoryStream data = new();
-    private readonly TaskCompletionSource stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<IOException?> stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object gate = new();
-    private bool disposed, stopRequested, unexpectedReported;
+    private bool disposed, stopRequested, captureEnded;
     private long startedAt, lastFrame, capturedBytes;
     public long CapturedBytes { get { lock (gate) return capturedBytes; } }
     public bool LimitReached => CapturedBytes >= RecordingLimits.MaximumPcmBytes;
@@ -28,7 +28,7 @@ public sealed class Recorder : IDisposable
         {
             lock (gate)
             {
-                if (disposed || stopRequested || e.BytesRecorded == 0) return;
+                if (disposed || captureEnded || e.BytesRecorded == 0) return;
                 lastFrame = clock.GetTimestamp();
                 var count = (int)Math.Min(e.BytesRecorded, RecordingLimits.MaximumPcmBytes - data.Length) & ~1;
                 if (count > 0) { data.Write(e.Buffer, 0, count); capturedBytes = data.Length; }
@@ -39,23 +39,27 @@ public sealed class Recorder : IDisposable
         };
         input.RecordingStopped += (_, e) =>
         {
-            bool unexpected; lock (gate) { if (disposed) return; unexpected = !stopRequested; }
-            if (unexpected) ReportUnexpected("The microphone stopped or became unavailable.", e.Exception);
-            else if (e.Exception != null) { stopped.TrySetException(new IOException("The microphone became unavailable.", e.Exception)); _ = stopped.Task.Exception; }
-            else stopped.TrySetResult();
+            FinishCapture(e.Exception == null ? null : new IOException("The microphone became unavailable.", e.Exception));
         };
         try { input.StartRecording(); } catch { Dispose(); throw; }
     }
     public void CheckHealth()
     {
-        lock (gate) { if (disposed || stopRequested || unexpectedReported || input == null || clock.GetElapsedTime(lastFrame).TotalSeconds < 5) return; }
-        ReportUnexpected("The microphone stopped delivering audio. Check the connection and try again.");
+        lock (gate) { if (disposed || stopRequested || captureEnded || input == null || clock.GetElapsedTime(lastFrame).TotalSeconds < 5) return; }
+        FinishCapture(new IOException("The microphone stopped delivering audio. Check the connection and try again."));
     }
-    private void ReportUnexpected(string message, Exception? cause = null)
+    private void FinishCapture(IOException? error)
     {
-        lock (gate) { if (disposed || unexpectedReported) return; unexpectedReported = true; }
-        stopped.TrySetException(new IOException(message, cause)); _ = stopped.Task.Exception;
-        UnexpectedStop?.Invoke(message);
+        bool unexpected;
+        lock (gate)
+        {
+            if (disposed || captureEnded) return;
+            captureEnded = true;
+            unexpected = !stopRequested;
+        }
+        if (unexpected) error ??= new IOException("The microphone stopped or became unavailable.");
+        stopped.TrySetResult(error);
+        if (unexpected) UnexpectedStop?.Invoke(error!.Message);
     }
     // Independent, bounded in-memory copy. Never pauses or restarts capture.
     // A quiet buffer yields no recognition request, avoiding silence hallucinations.
@@ -65,7 +69,7 @@ public sealed class Recorder : IDisposable
         lock (gate)
         {
             captured = capturedBytes;
-            if (disposed || stopRequested || data.Length < 32000) return null;
+            if (disposed || stopRequested || captureEnded || data.Length < 32000) return null;
             var pcm = data.GetBuffer(); var length = (int)data.Length;
             double energy = 0;
             for (var i = 0; i + 1 < length; i += 2) { var sample = BitConverter.ToInt16(pcm, i) / 32768.0; energy += sample * sample; }
@@ -76,16 +80,40 @@ public sealed class Recorder : IDisposable
         }
     }
     public bool StopTimedOut { get; private set; }
+    public bool StopInterrupted { get; private set; }
     public async Task<byte[]> StopAsync()
     {
         IWaveIn? capture; lock (gate) { ObjectDisposedException.ThrowIf(disposed, this); stopRequested = true; capture = input; }
-        // A device that never acknowledges the stop must not throw away audio that
-        // was already captured. After the bounded wait, use the captured PCM and
-        // tell the caller that the stop was not clean.
-        try { capture?.StopRecording(); await stopped.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+        // Drivers may deliver their last PCM buffer before acknowledging Stop.
+        // Device errors and stalls still leave the earlier PCM available.
+        try
+        {
+            capture?.StopRecording();
+            StopInterrupted = await stopped.Task.WaitAsync(TimeSpan.FromSeconds(3)) != null;
+        }
         catch (TimeoutException) { StopTimedOut = true; }
-        finally { capture?.Dispose(); lock (gate) { if (ReferenceEquals(input, capture)) input = null; } }
-        byte[] pcm; lock (gate) pcm = data.ToArray();
+        catch (Exception ex) when (ex is IOException or NAudio.MmException) { StopInterrupted = true; }
+        finally
+        {
+            bool ownsCapture;
+            lock (gate)
+            {
+                captureEnded = true;
+                ownsCapture = ReferenceEquals(input, capture);
+                if (ownsCapture) input = null;
+            }
+            if (ownsCapture)
+            {
+                try { capture?.Dispose(); }
+                catch (Exception ex) when (ex is IOException or NAudio.MmException) { StopInterrupted = true; }
+            }
+        }
+        byte[] pcm;
+        lock (gate)
+        {
+            if (disposed) throw new OperationCanceledException();
+            pcm = data.ToArray();
+        }
         try
         {
             if (pcm.Length < 9600) throw new IOException("Recording was too short. Hold the shortcut while you speak.");

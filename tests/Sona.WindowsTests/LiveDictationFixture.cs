@@ -93,6 +93,29 @@ internal static class LiveDictationFixture
                     window.CancelForTests(); await Wait(() => window.SessionForTests == SessionState.Cancelled && capture.Disposed);
                     pending.SetResult("Late words must not appear"); await window.LiveOperationForTests;
                     Check(draft.Text == "" && window.SessionForTests == SessionState.Cancelled, "Cancellation rejects a late recognizer result and clears no external content");
+                    capture = new FakeCapture(); pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    calls = 0; CancellationToken previewToken = default;
+                    window.RecognitionForTests = (_, token) => { calls++; previewToken = token; return pending.Task.WaitAsync(token); };
+                    window.CleanupForTests = (text, _) => Task.FromResult(text);
+                    Check(await window.BeginForTestsAsync(), "An in-flight-preview stop case starts only fake capture");
+                    capture.Emit(pcm); await Wait(() => calls == 1);
+                    var completingPreview = window.StopForTestsAsync();
+                    Check(!previewToken.IsCancellationRequested, "Stopping cancels future polling without aborting a healthy in-flight speech request");
+                    pending.SetResult("The exact final audio was already being recognized.");
+                    await completingPreview;
+                    Check(calls == 1 && original.Text == "The exact final audio was already being recognized." && window.SessionForTests == SessionState.Ready,
+                        "A preview covering the exact final audio becomes the final transcript without a duplicate speech request");
+                    capture = new FakeCapture(); calls = 0;
+                    window.RecognitionForTests = async (_, token) =>
+                    {
+                        if (++calls == 1) await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                        return "A stalled preview still gets final recognition.";
+                    };
+                    Check(await window.BeginForTestsAsync(), "Stalled-preview scenario starts only fake capture");
+                    capture.Emit(pcm); await Wait(() => calls == 1);
+                    await window.StopForTestsAsync();
+                    Check(calls == 2 && window.SessionForTests == SessionState.Ready && original.Text.Contains("stalled preview"),
+                        "A stalled preview is cancelled at the bounded stop drain and final recognition still completes");
                     Check(!File.Exists(Path.Combine(profile, "history.json")), "Live updates never create saved history when disabled");
                     window.Width = 740; window.Height = 530; Capture("live-compact.png");
                 }

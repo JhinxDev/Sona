@@ -86,6 +86,29 @@ internal static class ResponsivenessFixture
                     input=new Capture(); calls=0; Check(await window.BeginForTestsAsync(),"Tail-change fixture starts independent capture"); input.Emit(pcm); await WaitPreview();
                     input.Emit(pcm); beforeStop=calls; await window.StopForTestsAsync();
                     Check(calls==beforeStop+1,"Newly captured tail always receives final recognition");
+                    var tailPcm = pcm.Select(value => (byte)(value * 2)).ToArray();
+                    foreach (var failure in new Exception?[] { null, new IOException("Simulated device error") })
+                    {
+                        var stoppingInput = new Capture { StopTail = tailPcm, StopError = failure };
+                        using var stoppingRecorder = new Recorder(_ => stoppingInput);
+                        stoppingRecorder.Start(-1);
+                        stoppingInput.Emit(pcm);
+                        try
+                        {
+                            var recorded = await stoppingRecorder.StopAsync();
+                            using var wavReader = new WaveFileReader(new MemoryStream(recorded));
+                            var received = new byte[pcm.Length + tailPcm.Length];
+                            var length = wavReader.Read(received, 0, received.Length);
+                            Check(length == received.Length && received.SequenceEqual(pcm.Concat(tailPcm)),
+                                failure == null ? "Stop retains the exact PCM delivered before the stop acknowledgement" : "An error acknowledgement retains all available PCM");
+                            Check(stoppingRecorder.StopInterrupted == (failure != null) && !stoppingRecorder.StopTimedOut,
+                                "The recorder distinguishes a device error from a normal stop and a timeout");
+                        }
+                        catch (IOException) when (failure != null)
+                        {
+                            Check(false, "An error acknowledgement retains all available PCM");
+                        }
+                    }
                     var capInput=new Capture(); using(var bounded=new Recorder(_=>capInput)){
                         bounded.Start(-1); var longPcm=new byte[32000*300+64000];for(var i=1;i<longPcm.Length;i+=2)longPcm[i]=8;
                         capInput.Emit(longPcm); Check(bounded.LimitReached && bounded.CapturedBytes==32000*300,"Recorder keeps all five minutes and bounds an oversize final audio callback");
@@ -143,7 +166,7 @@ internal static class ResponsivenessFixture
                     Check(!pendingIntent.TryRequest(),"Late send intent cannot be attached after completion");
                     paste=new FakeDelivery();insertion.PasteTransportForTests=paste;paste.AfterPaste=()=>destination=destination! with{RuntimeId=[9]};
                     recognition=new(TaskCreationOptions.RunContinuationsAsynchronously);input=new Capture();await window.BeginForTestsAsync();input.Emit(pcm);stopping=window.StopForTestsAsync();await Task.Delay(10);pendingIntent.TryRequest();recognition.SetResult("Keep the complete recovery draft.");await stopping;
-                    Check(paste.Pastes==1 && paste.Enters==0 && paste.Clipboard=="Keep the complete recovery draft.","Changed destination blocks send and leaves complete text for ordinary Ctrl+V");
+                    Check(paste.Pastes==1 && paste.Enters==0 && paste.Clipboard=="fixture prior clipboard","Changed destination after a paste blocks send and restores the previous clipboard");
                     destination=new DraftTarget(12345,Environment.ProcessId,[1,2,3],0);
                     paste=new FakeDelivery();insertion.PasteTransportForTests=paste;paste.AfterPaste=()=>{paste.Clipboard="newer owner copy";paste.Sequence++;};
                     recognition=new(TaskCreationOptions.RunContinuationsAsynchronously);input=new Capture();await window.BeginForTestsAsync();input.Emit(pcm);stopping=window.StopForTestsAsync();await Task.Delay(10);pendingIntent.TryRequest();recognition.SetResult("This draft must not replace a newer copy.");await stopping;
@@ -180,13 +203,21 @@ internal static class ResponsivenessFixture
     private sealed class Clock:TimeProvider{long now;public override long TimestampFrequency=>1000;public override long GetTimestamp()=>now;public void Advance(double seconds)=>now+=(long)(seconds*1000);}
     private sealed class FakeDelivery:ICompletedDraftTransport {
         public int Pastes,Enters;public uint Sequence=1;public string Clipboard="fixture prior clipboard",Payload="";public Action? AfterPaste;public Func<int,Task>? OnDelay;
-        public object SaveClipboard()=>Clipboard;public uint SetClipboard(string text){Clipboard=Payload=text;return ++Sequence;}public uint ClipboardSequence=>Sequence;
-        public void RestoreClipboard(object? previous){Clipboard=(string?)previous??"";Sequence++;}
+        public object SaveClipboard()=>Clipboard;public ClipboardChange SetClipboard(object? previous,string text){Clipboard=Payload=text;return new(ClipboardChangeStatus.Staged,++Sequence);}public uint ClipboardSequence=>Sequence;
+        public ClipboardChange RestoreClipboard(object? previous,uint expectedSequence){Clipboard=(string?)previous??"";return new(ClipboardChangeStatus.Restored,++Sequence);}
         public bool Paste(){Pastes++;AfterPaste?.Invoke();return true;}public bool Enter(){Enters++;return true;}public bool EnterHeld=>false;
         public string? ReadText(DraftTarget target)=>Pastes>0?Payload:"";public Task Delay(int milliseconds)=>OnDelay?.Invoke(milliseconds)??Task.CompletedTask;
     }
     private sealed class Capture:IWaveIn{
         public bool Started,Disposed;public WaveFormat WaveFormat{get;set;}=new(16000,16,1);public event EventHandler<WaveInEventArgs>? DataAvailable;public event EventHandler<StoppedEventArgs>? RecordingStopped;
-        public void StartRecording()=>Started=true;public void StopRecording()=>RecordingStopped?.Invoke(this,new StoppedEventArgs());public void Dispose()=>Disposed=true;public void Emit(byte[] bytes)=>DataAvailable?.Invoke(this,new WaveInEventArgs(bytes,bytes.Length));
+        public byte[]? StopTail { get; init; }
+        public Exception? StopError { get; init; }
+        public void StartRecording()=>Started=true;
+        public void StopRecording()
+        {
+            if (StopTail != null) Emit(StopTail);
+            RecordingStopped?.Invoke(this, new StoppedEventArgs(StopError));
+        }
+        public void Dispose()=>Disposed=true;public void Emit(byte[] bytes)=>DataAvailable?.Invoke(this,new WaveInEventArgs(bytes,bytes.Length));
     }
 }

@@ -14,7 +14,7 @@ public partial class MainWindow
         var prior = historyEntries.FirstOrDefault(x => x.Id == historySelection);
         if (prior?.Saved != true && historyEntries.Count(x => x.Saved) >= HistoryStore.Capacity) { DraftReviewResult.Text = "You have 200 saved drafts. Remove one before saving another."; return; }
         var item = new HistoryItem(prior?.Id ?? Guid.NewGuid(), prior?.CreatedAt ?? DateTimeOffset.Now, Original.Text, Draft.Text, prior?.Inserted ?? false, true, reviewBaseline);
-        if (item.Draft.Length > 6000 || item.Original.Length > 6000 || item.Generated?.Length > 6000) { DraftReviewResult.Text = "Keep a saved draft within 6,000 characters."; return; }
+        if (item.Draft.Length > DraftLimits.MaximumCharacters || item.Original.Length > DraftLimits.MaximumCharacters || item.Generated?.Length > DraftLimits.MaximumCharacters) { DraftReviewResult.Text = "Keep a saved draft within 32,000 characters."; return; }
         var saved = historyEntries.Where(x => x.Saved && x.Id != item.Id).Prepend(item).ToArray();
         try
         {

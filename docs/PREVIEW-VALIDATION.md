@@ -1,3 +1,33 @@
+## November 13 recording and delivery rework, 0.6.0
+
+The initial failure was reproduced with a noneditable Codex-style pane whose
+focus changed while the foreground window remained stable. The fixture proves
+that Enter can stop hands-free recording even without a captured field, while
+paste and send remain restricted to the exact verified composer. It also tests
+different windows/owners, clipboard preservation when sending is withheld,
+interrupted microphones and the order of history persistence after delivery.
+
+Qualification includes 446 Core checks, 60 Windows lifecycle checks,
+capture-readiness 65, Enter delivery 95, responsiveness 56, live preview 33,
+history controls 24 each with retention on and off, model loading 40 and native
+layout 18. The consolidated gate and affected follow-up checks cover the
+clipboard ownership 48, completed-paste 40, per-app delivery 22 and saved-draft
+reopen 9 checks, alongside the
+remaining capture, protection, startup, update and presentation paths. Release
+builds have zero warnings/errors and the dependency audit found no known
+vulnerable packages in the configured feed.
+
+Clipboard ownership checks use a fake native boundary; they never read or write
+the user's clipboard. They exercise format preservation, copies made while a
+write is waiting, rollback after partial staging, partial restoration, resource
+ownership and bounded refusals. The 17 installer staging checks use a separate
+rehearsal root and leave the installed app/profile untouched.
+
+These are source and isolated fixture qualifications. Live version/hash and
+data-preservation checks, installer rehearsal and public-download verification
+are recorded separately in the release receipt. Real microphone use and
+hands-free Enter in the owner's Codex composer remain an owner-started check.
+
 ## November 10 clean prose layout, 0.5.8
 
 The local cleanup model reproduced the reported sentence-per-line output on

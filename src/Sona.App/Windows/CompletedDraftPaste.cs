@@ -1,15 +1,16 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
+using Sona.Core;
 
 namespace Sona.App.Windows;
 
 internal interface ICompletedDraftTransport
 {
     object? SaveClipboard();
-    uint SetClipboard(string text);
+    ClipboardChange SetClipboard(object? previous, string text);
     uint ClipboardSequence { get; }
-    void RestoreClipboard(object? previous);
+    ClipboardChange RestoreClipboard(object? previous, uint expectedSequence);
     bool Paste();
     bool Enter();
     bool EnterHeld { get; }
@@ -29,15 +30,16 @@ public sealed partial class Insertion
     internal int LastPasteCaptureGaps { get; private set; }
     internal bool LastPasteRequested => LastPasteReadback != PasteReadback.NotRequested;
     internal bool LastDraftOnClipboard { get; private set; }
+    internal bool LastClipboardRestorationFailed { get; private set; }
     internal uint LastDraftClipboardSequence { get; private set; }
     internal ICompletedDraftTransport? PasteTransportForTests { get; set; }
     public async Task<(bool Inserted, string Detail)> PasteAsync(DraftTarget? target, string text, bool submit, CancellationToken cancellation = default, bool keepOnFailure = false, uint? recoverySequence = null, Func<bool>? requestSubmission = null)
     {
-        LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = false;
+        LastSubmissionAccepted = LastPasteConfirmed = LastDraftOnClipboard = LastClipboardRestorationFailed = false;
         LastPasteReadback = PasteReadback.NotRequested;
         LastPasteCaptureRejection = null;
         LastPasteCaptureGaps = 0;
-        if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > 6000 || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
+        if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > DraftLimits.MaximumCharacters || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
             return (false, "No supported draft or focused composer. Your text stays in Sona.");
         var transport = PasteTransportForTests ?? new NativeDraftTransport();
         for (var i = 0; i < 40 && (ModifiersDown() || transport.EnterHeld); i++) await transport.Delay(20);
@@ -64,7 +66,14 @@ public sealed partial class Insertion
             var documentBefore = transport.ReadDocumentText(target);
             cancellation.ThrowIfCancellationRequested();
             if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != initialSequence) return (false, "Focus, keys or clipboard changed before paste. Your draft stays in Sona.");
-            sequence = transport.SetClipboard(text); changed = true;
+            var staged = transport.SetClipboard(previous, text);
+            sequence = staged.Sequence;
+            changed = staged.Status is ClipboardChangeStatus.Staged or ClipboardChangeStatus.FailedOwnedPartial;
+            if (staged.Status != ClipboardChangeStatus.Staged)
+            {
+                allowRecovery = false;
+                return (false, "Clipboard could not be safely prepared. Your complete draft stays in Sona.");
+            }
             if (!Same(target, CapturePasteTarget(target).Target) || ModifiersDown() || transport.ClipboardSequence != sequence || cancellation.IsCancellationRequested)
                 return (false, "Paste cancelled because focus, keys or clipboard changed. Your draft stays in Sona.");
             // Exactly one paste gesture, never per-character typing or retries.
@@ -147,10 +156,30 @@ public sealed partial class Insertion
             // A newer owner copy always wins. Never restore across a clipboard change.
             if (changed && transport.ClipboardSequence == sequence)
             {
-                if (allowRecovery && !cancellation.IsCancellationRequested && (!pasted || !confirmed || submit && !LastSubmissionAccepted)) { LastDraftOnClipboard = true; LastDraftClipboardSequence = sequence; }
-                else try { transport.RestoreClipboard(previous); }
-                catch (Exception ex) when (ex is ExternalException or InvalidOperationException) { /* The complete draft remains on clipboard; never erase it on failed restoration. */ }
+                // Recovery is for an insertion that could not be attempted.
+                // A missing send acknowledgement is not a failed paste. Even
+                // uncertain pastes restore the prior clipboard and ask for review.
+                if (allowRecovery && !cancellation.IsCancellationRequested && !LastPasteRequested) { LastDraftOnClipboard = true; LastDraftClipboardSequence = sequence; }
+                else for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    if (transport.ClipboardSequence != sequence) { LastClipboardRestorationFailed = false; break; }
+                    try
+                    {
+                        var restored = transport.RestoreClipboard(previous, sequence);
+                        if (restored.Status is ClipboardChangeStatus.Restored or ClipboardChangeStatus.OwnershipChanged)
+                        { LastClipboardRestorationFailed = false; break; }
+                        if (restored.Status == ClipboardChangeStatus.FailedOwnedPartial) sequence = restored.Sequence;
+                        LastClipboardRestorationFailed = true;
+                        if (attempt < 2) await transport.Delay(40);
+                    }
+                    catch (Exception ex) when (ex is ExternalException or InvalidOperationException)
+                    {
+                        LastClipboardRestorationFailed = true;
+                        if (attempt < 2) await transport.Delay(40);
+                    }
+                }
             }
+            (previous as IDisposable)?.Dispose();
         }
     }
     private TargetCaptureResult CapturePasteTarget(DraftTarget target)
@@ -206,10 +235,12 @@ public sealed partial class Insertion
 
     private sealed class NativeDraftTransport : ICompletedDraftTransport
     {
-        public object? SaveClipboard() => Clipboard.GetDataObject();
-        public uint SetClipboard(string text) { Clipboard.SetText(text, TextDataFormat.UnicodeText); return ClipboardSequence; }
-        public uint ClipboardSequence => GetClipboardSequenceNumber();
-        public void RestoreClipboard(object? previous) { if (previous == null) Clipboard.Clear(); else Clipboard.SetDataObject(previous, true); }
+        private readonly OwnedClipboard clipboard = new(() => Application.Current?.MainWindow is { } window
+            ? new System.Windows.Interop.WindowInteropHelper(window).Handle : 0);
+        public object SaveClipboard() => clipboard.Capture();
+        public ClipboardChange SetClipboard(object? previous, string text) => clipboard.TrySetText((OwnedClipboard.Snapshot)previous!, text);
+        public uint ClipboardSequence => clipboard.Sequence;
+        public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence) => clipboard.Restore((OwnedClipboard.Snapshot)previous!, expectedSequence);
         public bool EnterHeld => (GetAsyncKeyState(0x0D) & 0x8000) != 0;
         public Task Delay(int milliseconds) => Task.Delay(milliseconds);
         public bool Paste() => SendKeys([Key(0x11), Key(0x56), Key(0x56, true), Key(0x11, true)]);
@@ -226,7 +257,7 @@ public sealed partial class Insertion
             return sent == keys.Length;
         }
         public string? ReadText(DraftTarget target) => Read(target, ValuePattern.Pattern, pattern => ((ValuePattern)pattern).Current.Value);
-        public string? ReadDocumentText(DraftTarget target) => Read(target, TextPattern.Pattern, pattern => ((TextPattern)pattern).DocumentRange.GetText(24001));
+        public string? ReadDocumentText(DraftTarget target) => Read(target, TextPattern.Pattern, pattern => ((TextPattern)pattern).DocumentRange.GetText(DraftLimits.MaximumCharacters * 2 + 1));
         private static string? Read(DraftTarget target, AutomationPattern pattern, Func<object, string?> getText)
         {
             try
@@ -234,10 +265,9 @@ public sealed partial class Insertion
                 var element = AutomationElement.FocusedElement;
                 if (element == null || element.Current.IsPassword || element.Current.ProcessId != target.ProcessId || !element.GetRuntimeId().SequenceEqual(target.RuntimeId)) return null;
                 var text = element.TryGetCurrentPattern(pattern, out var provider) ? getText(provider) : null;
-                return text?.Length <= 24000 ? text : null;
+                return text?.Length <= DraftLimits.MaximumCharacters * 2 ? text : null;
             }
             catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException or UnauthorizedAccessException) { return null; }
         }
-        [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     }
 }

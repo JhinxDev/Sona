@@ -25,7 +25,7 @@ internal static class CompletedDraftPasteChecks
         var target = new DraftTarget(1, 10, [1, 2], 0); DraftTarget? current = target; bool modifiers = false;
         using var insertion = new Insertion(() => current, () => modifiers, _ => throw new Exception("Unicode fallback must not run"));
         var transport = new FakePaste(); insertion.PasteTransportForTests = transport;
-        var longDraft = string.Join("\n", Enumerable.Repeat("Bonjour Codex, keep every word of this complete draft.", 90));
+        var longDraft = string.Join("\n", Enumerable.Repeat("Bonjour Codex, keep every word of this complete draft.", 180));
         var result = await insertion.PasteAsync(target, longDraft, true);
         Check(result.Inserted && transport.Pastes == 1 && transport.Enters == 1 && transport.Restores == 1 && transport.Payload == longDraft, "Long multiline draft pastes exactly once, confirms full text, sends one Enter and restores clipboard");
         transport = new() { UnsupportedReadback = true }; insertion.PasteTransportForTests = transport;
@@ -105,7 +105,7 @@ internal static class CompletedDraftPasteChecks
         transport = new(); insertion.PasteTransportForTests = transport; current = target with { RuntimeId = [4] };
         Check(!(await insertion.PasteAsync(target, "hello", true)).Inserted && transport.Saves == 0, "Wrong field refuses even a clipboard write"); current = target;
         transport = new(); insertion.PasteTransportForTests = transport;
-        Check(!(await insertion.PasteAsync(target, new string('x', 6001), true)).Inserted && transport.Saves == 0, "Oversize paste has no side effects");
+        Check(!(await insertion.PasteAsync(target, new string('x', Sona.Core.DraftLimits.MaximumCharacters + 1), true)).Inserted && transport.Saves == 0, "Oversize paste has no side effects");
         transport = new() { AfterPaste = () => modifiers = true }; insertion.PasteTransportForTests = transport;
         await insertion.PasteAsync(target, "hello", true);
         Check(transport.Enters == 0, "Modifier change before final Enter prevents submission"); modifiers = false;
@@ -117,7 +117,11 @@ internal static class CompletedDraftPasteChecks
         Check(!result.Inserted && transport.Payload == "" && transport.Restores == 0, "Copy during destination readback is preserved before any Sona clipboard write");
         transport=new(){UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
         await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true);
-        Check(transport.Enters==0 && transport.Restores==0 && insertion.LastDraftOnClipboard && transport.Payload=="finished draft","Unconfirmed send keeps opted-in draft in the ordinary clipboard");
+        Check(transport.Enters==0 && transport.Restores==1 && !insertion.LastDraftOnClipboard,"Unconfirmed paste restores prior clipboard instead of replacing it with a speculative recovery copy");
+        transport = new(); transport.AfterPaste = () => modifiers = true; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "pasted but not sent", true, keepOnFailure: true);
+        Check(insertion.LastPasteConfirmed && transport.Enters == 0 && transport.Restores == 1 && !insertion.LastDraftOnClipboard,
+            "Confirmed paste restores prior clipboard even when sending is withheld and recovery is enabled"); modifiers = false;
         transport=new();transport.AfterPaste=()=>transport.Sequence++;insertion.PasteTransportForTests=transport;
         await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true);
         Check(transport.Restores==0 && !insertion.LastDraftOnClipboard,"New owner clipboard content wins over opted-in recovery");
@@ -127,6 +131,26 @@ internal static class CompletedDraftPasteChecks
         transport=new();insertion.PasteTransportForTests=transport;
         await insertion.PasteAsync(target,"complete draft",true,keepOnFailure:true);
         Check(transport.Enters==1 && transport.Restores==1 && !insertion.LastDraftOnClipboard && insertion.LastPasteConfirmed,"Verified successful send restores the prior clipboard");
+        transport = new() { RestoreErrors = 2 }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "complete draft", false, keepOnFailure: true);
+        Check(transport.Restores == 1 && transport.RestoreAttempts == 3 && !insertion.LastClipboardRestorationFailed,
+            "A briefly busy clipboard is restored within the bounded retry budget");
+        transport = new() { RestoreErrors = 3 }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "complete draft", false, keepOnFailure: true);
+        Check(transport.Restores == 0 && transport.RestoreAttempts == 3 && insertion.LastClipboardRestorationFailed,
+            "Persistent clipboard restoration failure is reported instead of silently claimed successful");
+        transport = new() { NewCopyAtRestore = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "complete draft", false);
+        Check(transport.Restores == 0 && transport.RestoreAttempts == 1 && !insertion.LastClipboardRestorationFailed,
+            "A copy made inside the restoration boundary is preserved without a retry");
+        transport = new() { StagePartial = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "complete draft", true, keepOnFailure: true);
+        Check(transport.Pastes == 0 && transport.Enters == 0 && transport.Restores == 1 && !insertion.LastDraftOnClipboard,
+            "Partial staging is restored and never mistaken for a ready recovery draft");
+        transport = new() { RestorePartial = true }; insertion.PasteTransportForTests = transport;
+        await insertion.PasteAsync(target, "complete draft", false);
+        Check(transport.Restores == 1 && transport.RestoreAttempts == 2 && !insertion.LastClipboardRestorationFailed,
+            "Partial restoration retries only with its new owned sequence");
         transport=new(){Sequence=2,UnsupportedReadback=true};insertion.PasteTransportForTests=transport;
         await insertion.PasteAsync(target,"finished draft",true,keepOnFailure:true,recoverySequence:1);
         Check(transport.Enters==0 && transport.Restores==1 && !insertion.LastDraftOnClipboard,"A newer copy before paste is restored instead of retained over by recovery");
@@ -140,16 +164,25 @@ internal static class CompletedDraftPasteChecks
     }
     private sealed class FakePaste : ICompletedDraftTransport
     {
-        public int Saves, Pastes, Enters, Restores; public uint Sequence = 1;
-        public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue;
+        public int Saves, Pastes, Enters, Restores, RestoreErrors, RestoreAttempts; public uint Sequence = 1;
+        public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue, NewCopyAtRestore, StagePartial, RestorePartial;
         public string? DocumentBefore, DocumentAfter, DocumentFinal;
         private int documentReadsAfterPaste;
         public Action? AfterPaste, BeforePasteRead;
         public Action<int>? OnDelay;
         public object SaveClipboard() { Saves++; return "private prior formats"; }
-        public uint SetClipboard(string text) { Payload = text; return ++Sequence; }
+        public ClipboardChange SetClipboard(object? previous, string text) { Payload = text; return new(StagePartial ? ClipboardChangeStatus.FailedOwnedPartial : ClipboardChangeStatus.Staged, ++Sequence); }
         public uint ClipboardSequence => Sequence;
-        public void RestoreClipboard(object? previous) { if ((string?)previous != "private prior formats") throw new Exception("Clipboard snapshot changed"); Restores++; }
+        public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence)
+        {
+            RestoreAttempts++;
+            if (expectedSequence != Sequence) throw new Exception("Stale restore sequence");
+            if (NewCopyAtRestore) return new(ClipboardChangeStatus.OwnershipChanged, ++Sequence);
+            if (RestorePartial) { RestorePartial = false; return new(ClipboardChangeStatus.FailedOwnedPartial, ++Sequence); }
+            if (RestoreErrors-- > 0) throw new System.Runtime.InteropServices.COMException("Synthetic clipboard lock");
+            if ((string?)previous != "private prior formats") throw new Exception("Clipboard snapshot changed");
+            Restores++; return new(ClipboardChangeStatus.Restored, Sequence);
+        }
         public bool Paste() { Pastes++; AfterPaste?.Invoke(); return true; }
         public bool Enter() { Enters++; return true; }
         public bool EnterHeld => false;

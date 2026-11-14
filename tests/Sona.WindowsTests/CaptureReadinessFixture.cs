@@ -47,6 +47,20 @@ internal static class CaptureReadinessFixture
                     int calls = 0, waits = 0;
                     var ready = await Acquire(() => { calls++; return Ready(); }, wait: _ => { waits++; return Task.CompletedTask; });
                     Check(ready.Target != null && calls == 1 && waits == 0, "An immediately ready field has no readiness delay or duplicate capture");
+                    var settlingPane = Insertion.EvaluateCapture(field, 101, 31001, true, 3, 4);
+                    calls = 0;
+                    ready = await Acquire(() => ++calls == 1 ? settlingPane : Ready());
+                    Check(ready.Target != null && calls == 2 && ready.InitialStatus == TargetCaptureStatus.FocusChanged,
+                        "An initial pane-to-editor focus race can settle once inside the same proven window");
+                    foreach (var unsafePane in new[] {
+                        settlingPane with { WindowStable = false }, settlingPane with { Password = true },
+                        settlingPane with { Enabled = false }, settlingPane with { ReadOnly = true },
+                        settlingPane with { ControlTypeId = ControlType.Edit.Id }
+                    })
+                    {
+                        calls = 0; var result = await Acquire(() => ++calls == 1 ? unsafePane : Ready());
+                        Check(result.Target == null && calls == 1, "Protected fields, changed windows and uncertain editable identities cannot be re-acquired");
+                    }
                     for (var at = 2; at <= 4; at++)
                     {
                         calls = waits = 0; var eligibleAt = at;

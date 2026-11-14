@@ -39,6 +39,17 @@ internal static class HistoryPreservationChecks
             var updated = draft with { Draft = "An intentional synthetic correction" };
             HistoryStore.Save(path, [updated]);
             check(HistoryStore.Load(path).Single() == updated, "An intact history file still accepts an intentional update");
+            var longDraft = draft with { Original = new string('a', 24000), Draft = new string('b', 24100), Generated = new string('c', 24100) };
+            HistoryStore.Save(path, [longDraft]);
+            check(HistoryStore.Load(path).SequenceEqual([longDraft]), "History reloads the full long recognition result and formatted draft");
+            var priorBytes = File.ReadAllBytes(path);
+            var denseText = new string('語', DraftLimits.MaximumCharacters);
+            var oversizedHistory = Enumerable.Range(0, HistoryStore.Capacity)
+                .Select(_ => longDraft with { Id = Guid.NewGuid(), Original = denseText, Draft = denseText, Generated = denseText });
+            var refusedBudget = false;
+            try { HistoryStore.Save(path, oversizedHistory); }
+            catch (IOException ex) when (ex.Message.Contains("16 MiB", StringComparison.Ordinal)) { refusedBudget = true; }
+            check(refusedBudget && File.ReadAllBytes(path).SequenceEqual(priorBytes), "Oversized UTF-8 history cannot replace a readable file");
         }
         finally
         {

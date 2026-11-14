@@ -20,9 +20,21 @@ public partial class MainWindow
     private string HistoryPath => Path.Combine(Path.GetDirectoryName(preferencesPath)!, "history.json");
     private void RetainCurrentDraft()
     {
-        if (preferences.HistoryPaused || suppressCurrentDraftHistory || preparedInsertionTest || string.IsNullOrWhiteSpace(Draft.Text) || Draft.Text.Length > 6000 || Original.Text.Length > 6000) return;
+        if (preferences.HistoryPaused || suppressCurrentDraftHistory || preparedInsertionTest || string.IsNullOrWhiteSpace(Draft.Text)) return;
+        if (Draft.Text.Length > DraftLimits.MaximumCharacters || Original.Text.Length > DraftLimits.MaximumCharacters)
+        { HistoryResult.Text = "This draft exceeds the history text limit. Use Copy draft to keep the full text."; return; }
         var index = historyEntries.FindIndex(x => x.Id == historySelection);
-        if (index >= 0) { historyEntries[index] = historyEntries[index] with { Original = Original.Text, Draft = Draft.Text }; SaveHistory(); RefreshHistory(); return; }
+        if (index >= 0)
+        {
+            var previous = historyEntries[index];
+            var edited = previous with { Original = Original.Text, Draft = Draft.Text };
+            if (edited == previous) return;
+            historyEntries[index] = edited;
+            if (edited.Saved) SaveEditedDrafts();
+            else SaveHistory();
+            RefreshHistory();
+            return;
+        }
         if (historyEntries.Any(x => x.Original == Original.Text && x.Draft == Draft.Text)) return;
         var retained = new DictationSession(); retained.Begin(); retained.Stop(); retained.Complete(Original.Text, Draft.Text);
         if (session?.State == SessionState.Inserted) retained.MarkInserted();
@@ -38,7 +50,7 @@ public partial class MainWindow
         { historyStorageFailed = true; HistoryResult.Text = "Saved history could not be read. The existing file was preserved."; }
         RefreshHistory();
     }
-    private void AddHistory(DictationSession current)
+    private void AddHistory(DictationSession current, bool persist = true)
     {
         if (preferences.HistoryPaused || suppressedHistorySession == current.Id) { suppressCurrentDraftHistory = true; suppressedHistorySession = current.Id; return; }
         if (string.IsNullOrWhiteSpace(current.Draft)) return;
@@ -47,28 +59,47 @@ public partial class MainWindow
         historyEntries.RemoveAll(x => x.Id == item.Id); historyEntries.Insert(0, item);
         while (historyEntries.Count(x => !x.Saved) > HistoryStore.Capacity)
             historyEntries.RemoveAt(historyEntries.FindLastIndex(x => !x.Saved));
-        historySelection = item.Id; SaveHistory(); RefreshHistory();
+        historySelection = item.Id;
+        if (persist) SaveHistory();
+        RefreshHistory();
     }
+    internal Action? HistorySaveForTests { get; set; }
     private void SaveHistory()
     {
-        if (!savedDraftStorageFailed && historyEntries.Any(x => x.Saved))
-        {
-            try { HistoryStore.Save(SavedDraftPath, historyEntries.Where(x => x.Saved)); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            { savedDraftStorageFailed = true; DraftReviewResult.Text = "Saved draft storage failed. Your current draft is still here; the saved file was preserved."; }
-        }
         if (preferences.HistoryPaused || !preferences.KeepHistory || historyStorageFailed) return;
-        try { HistoryStore.Save(HistoryPath, historyEntries.Where(x => !x.Saved)); }
+        try
+        {
+            if (arguments.Contains("--test-ui")) HistorySaveForTests?.Invoke();
+            HistoryStore.Save(HistoryPath, historyEntries.Where(x => !x.Saved));
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { historyStorageFailed = true; HistoryResult.Text = "History is still available in this session. Saving failed; existing records were preserved."; }
+        {
+            historyStorageFailed = true;
+            HistoryResult.Text = "History is still available in this session. " + ex.Message;
+        }
     }
-    private void MarkHistoryInserted()
+    private void SaveEditedDrafts()
+    {
+        if (savedDraftStorageFailed) return;
+        try { HistoryStore.Save(SavedDraftPath, historyEntries.Where(x => x.Saved)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            savedDraftStorageFailed = true;
+            DraftReviewResult.Text = "Saved draft storage failed. Your current draft is still here; the saved file was preserved.";
+        }
+    }
+    private void MarkHistoryInserted(bool persist = true)
     {
         if (preferences.HistoryPaused || suppressCurrentDraftHistory) return;
         var index = historyEntries.FindIndex(x => x.Id == historySelection);
         if (index < 0) return;
         historyEntries[index] = historyEntries[index] with { Inserted = true };
-        SaveHistory(); RefreshHistory();
+        if (persist)
+        {
+            if (historyEntries[index].Saved) SaveEditedDrafts();
+            else SaveHistory();
+        }
+        RefreshHistory();
     }
     private HistoryFilter CurrentHistoryFilter()
     {

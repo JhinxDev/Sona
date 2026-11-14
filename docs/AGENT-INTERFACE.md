@@ -1,3 +1,11 @@
+## 0.6.0 diagnostics
+
+`destinationCapture.windowStable` reports whether capture proved the same native
+window throughout its inspection. Delivery can report `InterruptedRetained`
+and `clipboardRestorationFailed`. These remain in-memory classifications without
+transcript, clipboard content, field label or window title. Reading status never
+starts recording or output.
+
 # Sona agent interface
 
 0.5.7 adds `enterTargetReconfirmed` to delivery status. It records whether an

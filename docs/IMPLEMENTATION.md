@@ -1,3 +1,39 @@
+## November 13 reliability rework, 0.6.0
+
+RecordingWindow owns the stop gesture independently of DraftTarget, which owns
+output permission. Both bind an exact HWND and process. Initial pane readiness
+can settle one observed focus transition inside its proven window; an existing
+editable identity is never rebased by readiness. No field is invented at Stop.
+
+Recorder keeps final device buffers through the stop acknowledgement. Faults
+and timeouts return useful PCM with interruption flags; the app retains the
+result without output. Live polling and its current inference have separate
+cancellation: Stop drains a healthy request for at most four seconds, then
+cancels a stall before final recognition. Exact final byte count and session
+identity are required for preview reuse. Cancel and Quit still cancel inference.
+
+History updates in memory before delivery and persists once afterward. Saved
+drafts are written only when changed. Shared DraftLimits permits 32,000 characters
+per field; serialized history stays below 16 MiB and failed writes preserve the
+previous file. Draft recovery accepts the same text bound. The updater keeps a
+6,000-character limit when the old binary predates 0.6.0 so rollback can restore
+that binary's supported draft size.
+
+Completed paste restores prior clipboard contents after every attempted paste,
+regardless of send verification. Only a refusal before a paste can retain an
+opted-in recovery copy. New clipboard ownership always wins. Clipboard locks
+receive two bounded restoration retries and expose a failure flag if unresolved.
+
+Private installation verifies a GUID-named sibling directory and receipt before
+a same-volume rename. Existing mismatched version folders remain refused. The
+current junction changes before the shortcut, with old-junction rollback on a
+caught alias failure. Separate alias writes are not a single atomic operation;
+an abrupt termination may require a safe same-package retry.
+
+Preview update discovery uses the bounded public release list and requires an
+uploaded installer with the exact Sona download URL. Stable versions exclude
+previews. No authenticated request, download or automatic installation is added.
+
 # Local dictation implementation gates
 
 Reliability repairs and acceptance limits: [DAILY-USE-AUDIT.md](DAILY-USE-AUDIT.md). Current draft, insertion and history behavior: [PERSONALIZATION.md](PERSONALIZATION.md). Earlier daily-use repair and live-draft behavior: [DAILY-USE.md](DAILY-USE.md).
@@ -12,7 +48,7 @@ The primary owner integrates the app changes and a scoped independent review. Ex
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current source candidate identity is Sona 0.5.8; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.6.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 0.5.0 adds native per-app modes (ordered app identity to draft style and cleanup
 tone rules applied only to the captured session) and first-run Home guidance with

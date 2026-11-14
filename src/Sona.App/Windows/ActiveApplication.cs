@@ -85,7 +85,7 @@ internal sealed class RecordingDestinationContext
     public string DestinationName { get; private set; } = "No focused text field";
     public bool DestinationChanged { get; private set; }
     public bool IsRecordingContext { get; private set; }
-    public string Label => !IsRecordingContext ? "Active app: " + ActiveAppName : Destination == null ? ActiveAppName
+    public string Label => !IsRecordingContext ? "Active app: " + ActiveAppName : Destination == null ? "Draft only · " + ActiveAppName
         : DestinationChanged ? "Draft stays in Sona · " + (ActiveAppName == DestinationName ? DestinationName + " focus changed" : DestinationName + " → " + ActiveAppName) : DestinationName;
     public void Observe(ActiveApplication app)
     {

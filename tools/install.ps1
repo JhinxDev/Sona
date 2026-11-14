@@ -1,6 +1,7 @@
 param([Parameter(Mandatory)][string]$PackageDirectory, [switch]$Launch, [string]$RehearsalRoot, [switch]$NextLaunch)
 $ErrorActionPreference='Stop'
 if($NextLaunch -and $Launch){throw 'NextLaunch never starts or restarts Sona.'}
+if ($Launch -and $RehearsalRoot) { throw 'Launch an isolated test with its explicit profile and --test-ui instead.' }
 $taskPackage=[IO.Path]::GetFullPath($PackageDirectory)
 $taskReceipt=Get-Content -LiteralPath (Join-Path $taskPackage 'package.json') | ConvertFrom-Json
 if ($taskReceipt.Version -notmatch '^0\.[0-9]+\.[0-9]+$' -or $taskReceipt.SourceHead -notmatch '^[a-f0-9]{40}$') { throw 'The package receipt is not a recognized candidate.' }
@@ -28,24 +29,144 @@ if($NextLaunch){
     }
 }
 
+$taskExeHash = $null
+$taskFiles = @{}
 foreach ($taskFile in $taskReceipt.Files) {
     $taskSource = [IO.Path]::GetFullPath((Join-Path $taskPackage $taskFile.Path))
     if (!$taskSource.StartsWith($taskPackage + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Package path escapes its root.' }
     if ((Get-FileHash -LiteralPath $taskSource).Hash.ToLowerInvariant() -ne $taskFile.SHA256) { throw "Package file hash differs: $($taskFile.Path)" }
+    $taskRelative = $taskSource.Substring($taskPackage.Length + 1)
+    if ($taskRelative -eq 'installation.json' -or $taskFiles.ContainsKey($taskRelative)) {
+        throw "Package contains a reserved or duplicate installation path: $taskRelative"
+    }
+    $taskFiles.Add($taskRelative, $taskFile.SHA256)
+    if ($taskRelative -eq 'Sona.exe') { $taskExeHash = $taskFile.SHA256 }
 }
-foreach ($taskFile in $taskReceipt.Files) {
-    $taskDestination = [IO.Path]::GetFullPath((Join-Path $taskInstall $taskFile.Path))
-    if (!$taskDestination.StartsWith($taskInstall + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Install path escapes its version directory.' }
-    New-Item -ItemType Directory -Path (Split-Path $taskDestination -Parent) -Force | Out-Null
-    if ((Test-Path -LiteralPath $taskDestination) -and (Get-FileHash -LiteralPath $taskDestination).Hash.ToLowerInvariant() -ne $taskFile.SHA256) { throw "Preserving a different existing version file: $taskDestination" }
-    Copy-Item -LiteralPath (Join-Path $taskPackage $taskFile.Path) -Destination $taskDestination -Force
-    if ((Get-FileHash -LiteralPath $taskDestination).Hash.ToLowerInvariant() -ne $taskFile.SHA256) { throw 'Installed file verification failed.' }
-}
+if (!$taskExeHash) { throw 'The package receipt must include Sona.exe.' }
+
 $taskMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sona.lnk'
 if($RehearsalRoot){$taskMenu=Join-Path $RehearsalRoot 'Sona.lnk'}
 $taskShell=New-Object -ComObject WScript.Shell
 if (Test-Path -LiteralPath $taskMenu) { $taskExisting=$taskShell.CreateShortcut($taskMenu); if (!$taskExisting.TargetPath.StartsWith($taskProgramRoot + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated Sona shortcut was preserved. Choose a different shortcut name.' } }
-$taskShortcut=$taskShell.CreateShortcut($taskMenu); $taskShortcut.TargetPath=Join-Path $taskInstall 'Sona.exe'; $taskShortcut.WorkingDirectory=$taskInstall; $taskShortcut.IconLocation=(Join-Path $taskInstall 'Sona.exe') + ',0'; $taskShortcut.Description='Intentional local dictation for an unsent draft'; $taskShortcut.Save()
+
+$taskCurrent = Join-Path $taskProgramRoot 'current'
+$taskOldTarget = $null
+$taskPublishCurrent = $taskFiles.ContainsKey('sona-agent.exe')
+if ($taskPublishCurrent) {
+    $taskCurrentItem = Get-Item -LiteralPath $taskCurrent -Force -ErrorAction SilentlyContinue
+    if ($taskCurrentItem) {
+        if ($taskCurrentItem.LinkType -ne 'Junction' -or -not $taskCurrentItem.Target) { throw 'An unrelated current directory was preserved.' }
+        $taskCurrentTargets = @($taskCurrentItem.Target)
+        $taskOldTarget = [IO.Path]::GetFullPath([string]$taskCurrentTargets[0])
+        if (!$taskOldTarget.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated current junction was preserved.' }
+        $taskOldReceipt = Join-Path $taskOldTarget 'installation.json'
+        if (!(Test-Path -LiteralPath $taskOldReceipt)) { throw 'Unreceipted current junction was preserved.' }
+        $taskOwnedReceipt = Get-Content -LiteralPath $taskOldReceipt -Raw | ConvertFrom-Json
+        if ($taskOwnedReceipt.Path -ne (Join-Path $taskOldTarget 'Sona.exe') -or
+            (Get-FileHash -LiteralPath $taskOwnedReceipt.Path).Hash.ToLowerInvariant() -ne $taskOwnedReceipt.SHA256) { throw 'Current junction ownership did not verify.' }
+    }
+}
+
+$taskInstalled = @{
+    Version = $taskReceipt.Version
+    SourceHead = $taskReceipt.SourceHead
+    Path = Join-Path $taskInstall 'Sona.exe'
+    SHA256 = $taskExeHash
+    StartMenu = $taskMenu
+    StartupChanged = $false
+    InstalledAt = [DateTimeOffset]::Now.ToString('o')
+    Files = $taskReceipt.Files
+}
+$taskExistingInstall = Get-Item -LiteralPath $taskInstall -Force -ErrorAction SilentlyContinue
+if ($taskExistingInstall) {
+    if (!$taskExistingInstall.PSIsContainer -or ($taskExistingInstall.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Preserving an unrelated existing version path: $taskInstall"
+    }
+    foreach ($taskRelative in $taskFiles.Keys) {
+        $taskDestination = Join-Path $taskInstall $taskRelative
+        if (!(Test-Path -LiteralPath $taskDestination -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $taskDestination).Hash.ToLowerInvariant() -ne $taskFiles[$taskRelative]) {
+            throw "Preserving a different existing version file: $taskDestination"
+        }
+    }
+    $taskExistingReceipt = Join-Path $taskInstall 'installation.json'
+    if (!(Test-Path -LiteralPath $taskExistingReceipt -PathType Leaf)) { throw "Preserving an unreceipted existing version: $taskInstall" }
+    $taskExistingOwned = Get-Content -LiteralPath $taskExistingReceipt -Raw | ConvertFrom-Json
+    if ($taskExistingOwned.Version -ne $taskInstalled.Version -or $taskExistingOwned.SourceHead -ne $taskInstalled.SourceHead -or
+        $taskExistingOwned.Path -ne $taskInstalled.Path -or $taskExistingOwned.SHA256 -ne $taskInstalled.SHA256) {
+        throw "Preserving an existing version with a different installation receipt: $taskInstall"
+    }
+    if ($taskExistingOwned.InstalledAt -is [datetime]) {
+        $taskInstalled.InstalledAt = $taskExistingOwned.InstalledAt.ToString('o')
+    } else {
+        $taskInstalled.InstalledAt = $taskExistingOwned.InstalledAt
+    }
+} else {
+    New-Item -ItemType Directory -Path $taskProgramRoot -Force | Out-Null
+    $taskStage = Join-Path $taskProgramRoot ('.install-staging-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $taskStage | Out-Null
+    $taskPromoted = $false
+    try {
+        foreach ($taskRelative in $taskFiles.Keys) {
+            $taskDestination = Join-Path $taskStage $taskRelative
+            New-Item -ItemType Directory -Path (Split-Path $taskDestination -Parent) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $taskPackage $taskRelative) -Destination $taskDestination -Force
+            if ((Get-FileHash -LiteralPath $taskDestination).Hash.ToLowerInvariant() -ne $taskFiles[$taskRelative]) {
+                throw "Installed file verification failed: $taskRelative"
+            }
+        }
+        $taskStageReceipt = Join-Path $taskStage 'installation.json'
+        $taskReceiptJson = $taskInstalled | ConvertTo-Json -Depth 5
+        Set-Content -LiteralPath $taskStageReceipt -Value $taskReceiptJson -NoNewline
+        if ((Get-Content -LiteralPath $taskStageReceipt -Raw) -cne $taskReceiptJson) { throw 'Installation receipt verification failed.' }
+        # Same-parent rename exposes the complete version and fails if the final path already exists.
+        [IO.Directory]::Move($taskStage, $taskInstall)
+        $taskPromoted = $true
+    } finally {
+        if (!$taskPromoted) {
+            # This invocation created this GUID-named sibling. Never remove a preexisting version or stage.
+            $taskStageItem = Get-Item -LiteralPath $taskStage -Force -ErrorAction SilentlyContinue
+            if ($taskStageItem -and $taskStageItem.Parent.FullName -eq $taskProgramRoot -and
+                $taskStageItem.Name -match '^\.install-staging-[a-f0-9]{32}$' -and
+                !($taskStageItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                Remove-Item -LiteralPath $taskStageItem.FullName -Recurse -Force
+            }
+        }
+    }
+}
+
+$taskRemovedCurrent = $false
+$taskCreatedCurrent = $false
+try {
+    if ($taskPublishCurrent -and $taskOldTarget -ne $taskInstall) {
+        if ($taskOldTarget) {
+            $taskCurrentItem = Get-Item -LiteralPath $taskCurrent -Force
+            if ($taskCurrentItem.LinkType -ne 'Junction' -or [string]@($taskCurrentItem.Target)[0] -ne $taskOldTarget) { throw 'Current junction changed during installation.' }
+            # Nonrecursive removal of the verified junction only; its version directory remains.
+            [IO.Directory]::Delete($taskCurrent)
+            $taskRemovedCurrent = $true
+        }
+        New-Item -ItemType Junction -Path $taskCurrent -Value $taskInstall | Out-Null
+        $taskCreatedCurrent = $true
+    }
+    $taskShortcut = $taskShell.CreateShortcut($taskMenu)
+    $taskShortcut.TargetPath = Join-Path $taskInstall 'Sona.exe'
+    $taskShortcut.WorkingDirectory = $taskInstall
+    $taskShortcut.IconLocation = $taskShortcut.TargetPath + ',0'
+    $taskShortcut.Description = 'Intentional local dictation for an unsent draft'
+    $taskShortcut.Save()
+} catch {
+    $taskCurrentItem = Get-Item -LiteralPath $taskCurrent -Force -ErrorAction SilentlyContinue
+    if ($taskCreatedCurrent -and $taskCurrentItem.LinkType -eq 'Junction' -and [string]@($taskCurrentItem.Target)[0] -eq $taskInstall) {
+        [IO.Directory]::Delete($taskCurrent)
+        $taskCurrentItem = $null
+    }
+    if ($taskRemovedCurrent -and !$taskCurrentItem) {
+        New-Item -ItemType Junction -Path $taskCurrent -Value $taskOldTarget | Out-Null
+    }
+    throw
+}
+
 # Remove only the legacy shortcut verified by its own installed receipt. Keep
 # versioned recovery binaries and the existing preferences directory intact.
 $taskLegacyMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Murmur.lnk'
@@ -60,32 +181,11 @@ if (!$NextLaunch -and !$RehearsalRoot -and (Test-Path -LiteralPath $taskLegacyMe
         }
     }
 }
-$taskInstalled=@{Version=$taskReceipt.Version; SourceHead=$taskReceipt.SourceHead; Path=(Join-Path $taskInstall 'Sona.exe'); SHA256=(Get-FileHash -LiteralPath (Join-Path $taskInstall 'Sona.exe')).Hash.ToLowerInvariant(); StartMenu=$taskMenu; StartupChanged=$false; InstalledAt=[DateTimeOffset]::Now.ToString('o'); Files=$taskReceipt.Files}
-$taskInstalled | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskInstall 'installation.json')
-if(Test-Path -LiteralPath (Join-Path $taskInstall 'sona-agent.exe')) {
-    $taskCurrent=Join-Path $taskProgramRoot 'current'
-    if(Test-Path -LiteralPath $taskCurrent) {
-        $taskCurrentItem=Get-Item -LiteralPath $taskCurrent
-        if($taskCurrentItem.LinkType -ne 'Junction' -or -not $taskCurrentItem.Target) { throw 'An unrelated current directory was preserved.' }
-        $taskCurrentTargets=@($taskCurrentItem.Target)
-        $taskOldTarget=[IO.Path]::GetFullPath([string]$taskCurrentTargets[0])
-        if(-not $taskOldTarget.StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'An unrelated current junction was preserved.' }
-        $taskOldReceipt=Join-Path $taskOldTarget 'installation.json'
-        if(-not(Test-Path -LiteralPath $taskOldReceipt)){throw 'Unreceipted current junction was preserved.'}
-        $taskOwnedReceipt=Get-Content -LiteralPath $taskOldReceipt -Raw | ConvertFrom-Json
-        if($taskOwnedReceipt.Path -ne (Join-Path $taskOldTarget 'Sona.exe') -or (Get-FileHash -LiteralPath $taskOwnedReceipt.Path).Hash.ToLowerInvariant() -ne $taskOwnedReceipt.SHA256){throw 'Current junction ownership did not verify.'}
-        # Nonrecursive removal of the verified junction only; its version directory remains.
-        Remove-Item -LiteralPath $taskCurrent -Force
-    }
-    if(-not [IO.Path]::GetFullPath($taskInstall).StartsWith($taskProgramRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'CLI alias target escapes the Sona installation.'}
-    New-Item -ItemType Junction -Path $taskCurrent -Value $taskInstall | Out-Null
-    if(!$RehearsalRoot){
+if ($taskPublishCurrent -and !$RehearsalRoot) {
     $taskUserPath=[Environment]::GetEnvironmentVariable('Path','User')
     $taskPathEntries=@($taskUserPath -split ';' | Where-Object{$_})
     if(-not @($taskPathEntries | Where-Object{$_.TrimEnd('\').Equals($taskCurrent,[StringComparison]::OrdinalIgnoreCase)}).Count){[Environment]::SetEnvironmentVariable('Path',(($taskPathEntries+$taskCurrent)-join ';'),'User')}
-    }
 }
-if ($Launch -and $RehearsalRoot) { throw 'Launch an isolated test with its explicit profile and --test-ui instead.' }
 if ($Launch) { & (Join-Path $PSScriptRoot 'start-sona.ps1') -FilePath (Join-Path $taskInstall 'Sona.exe') -Hidden | Out-Null }
 if($NextLaunch){
     foreach($taskPreserved in $taskPreservedProcesses){

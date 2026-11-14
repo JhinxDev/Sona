@@ -6,6 +6,7 @@ using Sona.App.Windows;
 using NAudio.Wave;
 
 var executable = Environment.ProcessPath!;
+if (args.Length == 1 && args[0] == "--owned-clipboard-checks") { Console.WriteLine($"{OwnedClipboardChecks.Run()} owned-clipboard checks passed."); return; }
 if (args.Length == 2 && args[0] == "--model-loading-fixture")
 {
     var report = ModelLoadingFixture.Run(args[1]); Console.WriteLine(JsonSerializer.Serialize(report));

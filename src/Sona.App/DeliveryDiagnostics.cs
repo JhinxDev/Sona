@@ -8,7 +8,7 @@ internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Out
     bool DestinationChanged, long CapturedFocusEpoch, long FinalFocusEpoch,
     bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
     bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts,
-    string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed);
+    string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed, bool ClipboardRestorationFailed);
 
 public partial class MainWindow
 {
@@ -19,7 +19,7 @@ public partial class MainWindow
         var requested = submitOnComplete || pendingSubmission.IsRequested;
         var outcome = current.State == SessionState.Cancelled ? "Cancelled"
             : current.State == SessionState.Failed ? "Failed"
-            : retainOnly ? "LimitRetained"
+            : retainOnly ? recordingInterrupted ? "InterruptedRetained" : "LimitRetained"
             : liveDraft?.ManuallyEdited == true ? "ManualEditRetained"
             : target == null ? "NoCapturedField"
             : pasteAttempted && insertion.LastSubmissionAccepted ? "Sent"
@@ -40,7 +40,8 @@ public partial class MainWindow
             recordingCapture?.ControlTypeId, recordingCapture?.CaptureAttempts,
             pasteAttempted ? insertion.LastPasteCaptureRejection?.ToString() : null,
             pasteAttempted ? insertion.LastPasteCaptureGaps : 0,
-            stoppedByEnter && capturedEpoch >= 0 && target is { } deliveryTarget && deliveryTarget.FocusEpoch != capturedEpoch);
+            stoppedByEnter && capturedEpoch >= 0 && target is { } deliveryTarget && deliveryTarget.FocusEpoch != capturedEpoch,
+            pasteAttempted && insertion.LastClipboardRestorationFailed);
         if ((preferences.AutoInsert || requested) && outcome is
             ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld"))
             lastRetainedDelivery = lastDelivery;

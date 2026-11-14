@@ -7,11 +7,11 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.5.6/Sona-Setup-0.5.6.exe)**
+**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.6.0/Sona-Setup-0.6.0.exe)**
 
-The published Windows installer is **v0.5.6**, an unsigned early preview.
-[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.5.6) ·
-[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.5.6/SHA256SUMS.txt)
+The published Windows installer is **v0.6.0**, an unsigned early preview.
+[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.6.0) ·
+[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.6.0/SHA256SUMS.txt)
 
 See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
 instructions. Build-from-source instructions are below.
@@ -26,7 +26,7 @@ narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.5.6),
+Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.6.0),
 or compile the current source with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
@@ -36,102 +36,26 @@ from the Dictation Models page. There is no macOS or Linux build: the app uses W
 and Windows-only capture, hotkey, insertion and model-runtime APIs, so another
 platform would be a separate native app rather than a repackage.
 
-## New in 0.5.8 source
+## New in 0.6.0
 
-Clean mode turns sentence-by-sentence output into readable paragraphs and splits
-long prose at sentence boundaries. Lists, code, intentional paragraphs and exact
-snippets retain their layout. Say “new paragraph” or “new line” for an explicit
-break (also available in French). Written measurements stay protected during
-local cleanup. The original remains available in Home.
+- **Reliable hands-free stopping.** Enter can stop recording in the original
+  app window even when Windows could not identify its editor. Sona briefly
+  rechecks an initial pane-to-editor transition; actual paste and send still
+  require the exact verified field.
+- **Your clipboard stays yours.** A completed or uncertain paste restores what
+  you had copied, even if sending is withheld. Optional Ctrl+V recovery is used
+  when no paste could be attempted. A newer copy you make always takes priority.
+- **Complete audio and longer drafts.** Final microphone buffers survive Stop.
+  Interrupted audio is recovered for review without automatic output. Paste,
+  history and saved drafts support up to 32,000 characters per text field.
+- **Less work before delivery.** History saves once after paste/send and leaves
+  unchanged saved drafts alone. Live preview can finish its current request and
+  reuse the result when it covers the exact final audio.
+- **Recoverable installs and working preview checks.** Private version installs
+  are staged and verified before activation. Optional update checks find public
+  preview installers and still never download or install automatically.
 
-## New in 0.5.7 source
-
-If you return to the original text field while dictating hands-free, press Enter
-there to finish. Sona rechecks the exact field, pastes the finished draft once,
-and sends after verifying the paste. [Enter-to-send behavior](docs/ENTER-DELIVERY.md)
-
-## New in 0.5.6
-
-Sona can identify deeply embedded editors by the Windows handle of their
-container. This helps hold-to-talk paste into the active Codex composer.
-**Check the draft** asks you to look in the field when Sona has already
-requested a paste and cannot verify the result.
-
-## New in 0.5.5
-
-Sona can briefly recheck the original composer when Windows accessibility
-cannot identify it. After one paste, the recheck can verify the complete draft
-in that field. If the field was temporarily unavailable during readback, review
-the confirmed draft and send it yourself. [Delivery behavior](docs/ENTER-DELIVERY.md)
-
-## New in 0.5.4
-
-- Sona can verify a paste through a second Windows accessibility text view when
-  the first stays stale or is unavailable. Enter-to-send still requires the
-  complete draft in the same focused field.
-- **Draft copied** means Sona kept the draft for manual paste without requesting
-  one. If Sona requested a paste and could not verify the result, check the
-  field before pasting again. [Delivery behavior](docs/ENTER-DELIVERY.md)
-
-## New in 0.5.3
-
-- **Loading feedback is real.** When a model genuinely loads, Sona names it and
-  shows the actual stage and measured time, for example
-  "Checking Whisper Large v3 Turbo files · 1.2 s · Esc cancels" then
-  "Loading Whisper Large v3 Turbo · 2.8 s · Esc cancels". Warm dictation shows no
-  preparation text, and a completed cold load reports its measured duration.
-- **Measured load times on the model pages.** Dictation Models and Text cleanup
-  show the last real load time. With **Keep until quit** selected they also say
-  the model stays loaded until Sona quits.
-- **Keep both models resident.** **Unload after inactivity → Keep until quit** is
-  available for the speech model (Dictation Models) and the text-polish model
-  (Text cleanup). Dictation then starts without a reload wait; Quit still releases
-  both workers.
-- **Residency settings save reliably.** Changing the Dictation Models idle choice
-  while a model is warming now saves and applies immediately instead of being
-  rejected.
-
-## New in 0.5.2
-
-Task Manager and Process Explorer now make Sona's background workers obvious:
-**Sona Speech Engine** is the speech model process and **Sona Text Polish** is the
-optional local cleanup model process, instead of upstream names such as
-`whisper-server.exe` and `llama-server.exe`. The one-shot WAV worker appears as
-**Sona Transcription**. These are byte-identical copies of the verified engines,
-launched under clear names; the pinned originals remain untouched and keep their
-integrity checks. Task Manager will show the new names after the workers next
-start.
-
-## New in 0.5.1
-
-- **Dictation works while Discord is deafened.** Discord turns the microphone off
-  when you deafen and refuses a separate mute command. Sona now treats a deafened
-  call as microphone protection, keeps your deafen choice untouched, and records
-  normally instead of stopping with "Discord did not acknowledge microphone
-  protection."
-- **More forgiving Discord acknowledgements.** If Discord answers with stale voice
-  settings, Sona verifies the real state and retries once. A real failure now
-  explains the next step: undeafen, reconnect in Settings, or turn call
-  protection off to dictate.
-
-## New in 0.5.0
-
-- **Per-app modes.** Give a specific app its own draft style and cleanup tone.
-  Dictate into Codex with Verbatim, into Discord with Casual tone, and keep
-  everything else on your default mode. The first matching rule wins and is
-  applied only to that dictation. See [modes](docs/MODES.md).
-- **First-run guidance.** A new profile sees a short welcome card that explains
-  the shortcut and local privacy promise, links to model and settings setup, and
-  can be dismissed. If the local runtime or model is missing, Home shows the
-  exact next step instead of a dead Record button.
-- **A live draft word count** on Home, so long dictations are easy to size up.
-- **Reliability repairs.** Esc cancellation now runs on its own listener thread
-  so a busy interface cannot silently drop the cancel hook; a microphone that
-  stalls while stopping keeps the audio captured so far instead of losing the
-  dictation; a faulted stop or quit path can no longer strand the session or
-  leave the window disabled; Windows startup registration is only changed from
-  an installed build; and preferences, history and saved Discord setup are
-  flushed to disk before atomic replacement.
+[All changes](CHANGELOG.md) · [Delivery and clipboard behavior](docs/ENTER-DELIVERY.md)
 
 ## The app
 
@@ -170,7 +94,7 @@ identity. Voice, audio and transcripts stay on this PC.
 - **A reviewable draft by default.** Home keeps the original transcript and an
   editable result. A focus change preserves the draft instead of inserting it
   into a different field. A retained-draft notice opens review or copy, and
-  optional clipboard recovery enables normal Ctrl+V after an unconfirmed paste.
+  optional clipboard recovery enables normal Ctrl+V when no paste could be attempted.
 - **Per-app modes.** Ordered rules map a captured app name, executable or package
   identity to a draft style (Clean, Verbatim, Notes) and a cleanup tone
   (Polished, Casual, Lowercase). Unmatched apps use the default mode.
@@ -335,7 +259,7 @@ For the maintained regression checks, from the same PowerShell session:
 ```
 
 `tools/build.ps1` runs the consolidated local gate: warning-free Release builds,
-421 Core checks, 60 Windows checks, isolated native fixtures (including
+Core and Windows regression checks, isolated native fixtures (including
 model-loading, professional polish, setup guidance and residency checks) and the
 updater checks. The
 owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2 build on

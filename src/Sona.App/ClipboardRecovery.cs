@@ -18,6 +18,11 @@ public partial class MainWindow
             return;
         }
         var pasteRequested = usedPaste && insertion.LastPasteRequested;
+        if (pasteRequested)
+        {
+            StatusDetail.Text += " Check the composer first. If the text is missing, open Sona and use Copy draft.";
+            return;
+        }
         var guidance = pasteRequested ? " Check the composer before pasting again." : " Press Ctrl+V in the intended field.";
         if (usedPaste && insertion.LastDraftOnClipboard && ClipboardSequence() == insertion.LastDraftClipboardSequence)
         {
@@ -30,7 +35,22 @@ public partial class MainWindow
         try
         {
             if (arguments.Contains("--test-ui")) { if (ClipboardForTests == null) return; ClipboardForTests(text); }
-            else Clipboard.SetText(text);
+            else
+            {
+                var clipboard = new OwnedClipboard(() => new System.Windows.Interop.WindowInteropHelper(this).Handle);
+                using var previous = clipboard.Capture();
+                if (previous.Sequence != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }
+                var copied = clipboard.TrySetText(previous, text);
+                if (copied.Status != ClipboardChangeStatus.Staged)
+                {
+                    for (var attempt = 0; attempt < 3 && copied.Status == ClipboardChangeStatus.FailedOwnedPartial; attempt++)
+                        copied = clipboard.Restore(previous, copied.Sequence);
+                    StatusDetail.Text += copied.Status == ClipboardChangeStatus.FailedOwnedPartial
+                        ? " Windows could not restore all previous clipboard formats. Your draft remains in Sona."
+                        : " Clipboard recovery could not safely replace the current copy. Use Copy draft if needed.";
+                    return;
+                }
+            }
             fallbackCopied = true; StatusDetail.Text += " Finished text copied to the normal clipboard." + guidance;
         }
         catch (Exception ex) when (ex is ExternalException or InvalidOperationException) { StatusDetail.Text += " Clipboard is busy. Use Copy draft to retry."; }

@@ -140,7 +140,7 @@ Check(HistoryStore.Load(historyPath).Count == 0 && !File.Exists(historyPath), "A
 HistoryStore.Save(historyPath, new[] { h });
 Check(HistoryStore.Load(historyPath).Single() == h, "Opt-in history preserves original, draft and insertion state");
 Check(HistoryStore.Search(new[] { h }, "  BONJOUR ").Single() == h && HistoryStore.Search(new[] { h }, "absent").Count == 0, "History search includes original and cleaned text, ignoring case and query padding");
-Check(HistoryStore.Bounded(new[] { h, h, h with { Id = Guid.Empty }, h with { Id = Guid.NewGuid(), Draft = new string('x',6001) } }).Count == 1, "Duplicate identities and malformed or overlong records are excluded");
+Check(HistoryStore.Bounded(new[] { h, h, h with { Id = Guid.Empty }, h with { Id = Guid.NewGuid(), Draft = new string('x',100_000) } }).Count == 1, "Duplicate identities and malformed or overlong records are excluded");
 Check(HistoryStore.Bounded(Enumerable.Range(0,250).Select(_ => h with { Id = Guid.NewGuid() })).Count == 200, "History retention has a finite 200 entry capacity");
 File.WriteAllText(historyPath, "{malformed"); var invalidHistory = false;
 try { HistoryStore.Load(historyPath); } catch (System.Text.Json.JsonException) { invalidHistory = true; }

@@ -1,3 +1,57 @@
+# Current behavior in 0.6.0
+
+Hold Ctrl+Windows, speak, and release to paste an unsent draft. Double-tap for
+hands-free recording. With Enter-to-send enabled, a bare Enter in the original
+app window stops capture and requests delivery. If the editor was unavailable
+at the start, Enter still stops capture, but the result stays in Sona.
+
+Initial capture may recheck a noneditable pane whose focus changed while the
+same foreground window remained proven. It uses that first capture's final
+focus stamp. Later window, process, field or focus changes still refuse output.
+This does not acquire a new editor at the end of a failed recording capture.
+The pill says **Draft only** as soon as recording has no verified destination.
+
+## Clipboard rules
+
+Keep **Always replace the clipboard with completed dictation** off to preserve
+what you copied before speaking. This optional explicit override remains off
+by default. The completed-paste path temporarily stages the draft, then restores
+the previous clipboard, including when Enter is withheld or readback is uncertain.
+Temporary text opts out of Windows clipboard history and cloud clipboard sync.
+A newer clipboard copy made during processing or restoration always wins.
+Restoration retries a temporary clipboard lock at most twice; a persistent
+failure is reported instead of being silently treated as success.
+
+Clipboard writes check ownership while holding the Windows clipboard lock.
+The previous text, rich-text/HTML, file lists and common bitmap formats are
+preserved together, including browser HTML/source metadata. The snapshot is
+bounded to 64 MiB and 128 formats. An unsupported application-specific format or an oversized
+clipboard causes a refusal before modification; review the draft in Sona and
+use Copy draft explicitly if needed. Temporary paste does not promise support
+for every application's private clipboard objects.
+
+With recovery enabled, **Draft copied** means no paste was attempted and normal
+Ctrl+V can recover the result. **Check the draft** means a paste was attempted;
+look in the field first, and use Sona's Copy draft only if the text is missing.
+**Draft pasted** means paste was verified but sending was withheld. Press Enter
+yourself after reviewing it. A missing send acknowledgement never justifies
+replacing the clipboard with an already-pasted draft.
+
+Completed clipboard paste accepts up to 32,000 characters. Full before/after
+readback, unchanged field/window identity, released keys and clipboard ownership
+still guard automatic Enter. Unicode typing retains its smaller single-line limit.
+
+## Interrupted audio
+
+Stop includes the last audio buffers delivered before the device acknowledges
+stopping. A device error, unexpected disconnect or stop timeout uses the audio
+already captured to make a reviewable draft, without automatic copying, paste or
+send. **Draft recovered** identifies an interruption; the five-minute recording
+limit has its own message. Silent or too-short recordings still fail clearly.
+
+The older dated sections below describe historical releases. These current
+clipboard and interruption rules supersede their recovery descriptions.
+
 # Enter completion and full-draft delivery
 
 ## Hold and release

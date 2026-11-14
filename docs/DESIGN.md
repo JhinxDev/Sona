@@ -1,3 +1,17 @@
+## November 13 reliability rework, 0.6.0
+
+The existing palette, typography, native layout and recording geometry remain.
+The recording target line says `Draft only · <active app>` immediately when no
+editor was captured. A recovered interrupted recording uses the retained notice
+`Draft recovered` with `Microphone interrupted. Review first.`
+
+Audio & typing now labels recovery `Copy a recovery draft when insertion cannot
+start`. Its wrapping description distinguishes an unattempted paste from an
+uncertain attempted paste. The independent override is explicitly labeled
+`Always replace the clipboard with completed dictation`. Automatic update text
+labels preview releases. These controls use the existing semantic text and row
+styles; no new colors, assets or fonts were introduced.
+
 ## November 10 clean dictation layout, 0.5.8
 
 Clean treats ordinary transcript and model line endings as flowing prose. Blank

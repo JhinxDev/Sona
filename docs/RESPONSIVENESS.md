@@ -1,3 +1,14 @@
+## 0.6.0 completion work
+
+Final delivery no longer waits for history disk writes. A completed entry is saved
+once after paste/send; unchanged saved drafts are left alone. This is verified
+ordering, not a measured disk-latency improvement across machines.
+
+Stopping live transcription cancels the next polling wait without immediately
+aborting the current speech request. The app waits up to four seconds for that
+request, reuses an exact final-audio result, or cancels a stalled request before
+final recognition. New final audio always requires recognition of the full audio.
+
 # Responsiveness and delivery qualification, 0.4.8
 
 The recording capsule now acknowledges preparation before waiting for call protection,

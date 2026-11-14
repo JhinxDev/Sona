@@ -17,6 +17,7 @@ public partial class MainWindow
     private LiveDraft? liveDraft;
     private Task liveOperation = Task.CompletedTask;
     private CancellationTokenSource? livePolling;
+    private CancellationTokenSource? liveInference;
     private bool liveVisible;
     private long previewAudioBytes = -1;
     private string? previewOriginal;
@@ -55,14 +56,18 @@ public partial class MainWindow
                 if (capture.CapturedBytes == previewAudioBytes) continue;
                 var wav = capture.Snapshot(out var snapshotBytes);
                 if (wav == null) continue;
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+                deadline.CancelAfter(TimeSpan.FromSeconds(12));
+                liveInference = deadline;
                 try
                 {
-                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token, polling);
-                    deadline.CancelAfter(TimeSpan.FromSeconds(12));
                     var raw = await RecognizeAsync(wav, deadline.Token);
                     token.ThrowIfCancellationRequested();
-                    if (!ReferenceEquals(session, current) || !ReferenceEquals(liveDraft, review) || current.State != SessionState.Recording) break;
+                    if (!ReferenceEquals(session, current) || !ReferenceEquals(liveDraft, review) || current.State is not (SessionState.Recording or SessionState.Transcribing)) break;
                     previewAudioBytes = snapshotBytes; previewOriginal = raw;
+                    // Stop may reuse this result only if no final audio arrived.
+                    // Keep the current completion UI while that proof is pending.
+                    if (current.State != SessionState.Recording) break;
                     if (review.Preview(++liveRevision, raw))
                     {
                         rendering = true; Original.Text = raw; if (!review.ManuallyEdited) Draft.Text = review.Draft; rendering = false;
@@ -70,7 +75,7 @@ public partial class MainWindow
                         overlay.UpdateTranscript(raw, "Provisional · final recognition may change these words");
                     }
                 }
-                finally { Array.Clear(wav); }
+                finally { if (ReferenceEquals(liveInference, deadline)) liveInference = null; Array.Clear(wav); }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested || polling.IsCancellationRequested) { }

@@ -45,6 +45,13 @@ $taskEnterEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-enter-delivery-
 if ($LASTEXITCODE -ne 0) { throw 'Isolated Enter delivery regressions failed' }
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --completed-paste-fixture
 if ($LASTEXITCODE -ne 0) { throw 'Completed-paste verification regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --owned-clipboard-checks
+if ($LASTEXITCODE -ne 0) { throw 'Clipboard ownership regressions failed' }
+$taskPersonalEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-personalization-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --personalization-fixture $taskPersonalEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Per-app delivery regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --personalization-reopen $taskPersonalEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Saved draft reopen regressions failed' }
 $taskPolishEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-professional-polish-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --professional-polish-fixture $taskPolishEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Professional polish fixture failed' }
@@ -54,6 +61,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Setup guidance fixture failed' }
 $taskLoadingEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-model-loading-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --model-loading-fixture $taskLoadingEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Model loading feedback regressions failed' }
+$taskLiveEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-live-draft-' + [Guid]::NewGuid().ToString('N'))
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --live-draft-fixture $taskLiveEvidence
+if ($LASTEXITCODE -ne 0) { throw 'Live preview completion regressions failed' }
+& (Join-Path $taskRepo 'tools\install-staging-checks.ps1') -OutputRoot (Join-Path ([IO.Path]::GetTempPath()) ('sona-upgrade-rehearsal-' + [Guid]::NewGuid().ToString('N')))
+if (!$?) { throw 'Installer staging regressions failed' }
 & (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
 if (!$?) { throw 'Updater status regressions failed' }
 & (Join-Path $taskRepo 'tools\owned-startup-checks.ps1')

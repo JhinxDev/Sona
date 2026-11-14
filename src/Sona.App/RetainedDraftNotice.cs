@@ -7,6 +7,7 @@ internal sealed record RetainedDraftNotice(string Title, string Hint)
         bool pasteRequested, bool pasteConfirmed, bool sendAccepted, string? outcome)
     {
         if (limitReached) return new("Draft ready", "Recording limit reached.");
+        if (outcome == "InterruptedRetained") return new("Draft recovered", "Microphone interrupted. Review first.");
         if (pasteConfirmed && !sendAccepted) return new("Draft pasted", "Check the chat before sending.");
         if (pasteRequested && !pasteConfirmed) return new("Check the draft", "Look before pasting again.");
         if (clipboardRecovery) return new("Draft copied", outcome switch

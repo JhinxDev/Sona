@@ -49,6 +49,9 @@ internal static class EnterDeliveryFixture
                         var recognition=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                         window.RecognitionForTests=(_,token)=>recognition.Task.WaitAsync(token);
                         Check(await window.BeginForTestsAsync(),change+": begins only fake capture");input.Emit(pcm);
+                        var historyWrites = 0; var historyBeforeSend = false;
+                        settings.KeepHistory = change == "valid";
+                        window.HistorySaveForTests = () => { historyWrites++; historyBeforeSend |= paste.Enters == 0; };
                         if(change=="epoch")current=original with{FocusEpoch=1};
                         if(change=="field")current=original with{RuntimeId=[7]};
                         if(change=="unavailable")current=null;
@@ -67,6 +70,7 @@ internal static class EnterDeliveryFixture
                         if(change is "pasted-send-held" or "pasted-focus-changed")
                         {
                             Check(paste.Pastes==1&&paste.Enters==0&&insertion.LastPasteConfirmed,"Full paste is distinct from withheld send");
+                            Check(paste.Clipboard == "fixture prior clipboard", "A completed paste preserves the previous clipboard even if Enter is withheld");
                             Check(((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("CapsuleLabel")).Text=="Draft pasted"&& !((System.Windows.Controls.TextBlock)window.FindName("StatusDetail")).Text.Contains("Ctrl+V")&& !((System.Windows.Controls.TextBlock)window.OverlayForTests.FindName("CapsuleHint")).Text.Contains("Ctrl+V"),"Confirmed pasted draft never tells the owner to paste it a second time");
                         }
                         else if(change=="unconfirmed-no-backup")
@@ -77,6 +81,7 @@ internal static class EnterDeliveryFixture
                         else if(change=="valid")
                         {
                             Check(paste.Pastes==1&&paste.Enters==1&&paste.Payload=="The complete final fixture draft.","Unchanged field receives one complete draft and one send");
+                            Check(historyWrites == 1 && !historyBeforeSend, "History persists once after paste and Enter instead of delaying delivery");
                             var lastIssue=typeof(MainWindow).GetField("lastRetainedDelivery",BindingFlags.Instance|BindingFlags.NonPublic)?.GetValue(window);
                             Check(JsonSerializer.Serialize(lastIssue).Contains("PasteUnconfirmed"),"A successful send preserves the previous failed delivery classification");
                         }
@@ -86,6 +91,7 @@ internal static class EnterDeliveryFixture
                             Check(ShowsNotice("Draft copied"),"A refusal before any paste gives copy guidance without a duplicate-paste warning: "+change);
                         }
                     }
+                    window.HistorySaveForTests = null; settings.KeepHistory = false;
                     current=original;foreground=(67890,original.OwnerProcessId);
                     Check(admission?.Invoke(window,null) == null,"Different foreground HWND leaves native Enter alone");
                     foreground=(original.Window,original.OwnerProcessId+1);
@@ -174,6 +180,58 @@ internal static class EnterDeliveryFixture
                             Check(paste.Pastes == 0 && paste.Enters == 0 && window.SessionForTests == SessionState.Ready,
                                 change + ": no automatic delivery after losing the recording destination");
                     }
+                    // The real failure starts with an unavailable field, not a
+                    // captured field that disappears later. Stopping belongs to
+                    // the recording window; output still needs a proven editor.
+                    original = original with { FocusEpoch = insertion.FocusEpoch };
+                    current = original; foreground = (original.Window, original.OwnerProcessId);
+                    window.TargetCaptureForTests = () => new(null, TargetCaptureStatus.FocusChanged)
+                    {
+                        ForegroundWindow = original.Window.ToInt64(), WindowProcessId = original.OwnerProcessId,
+                        ControlTypeId = 50033, FocusEpochBefore = insertion.FocusEpoch - 1,
+                        FocusEpochAfter = insertion.FocusEpoch
+                    };
+                    input = new Capture();
+                    var missingTargetResult = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    window.RecognitionForTests = (_, token) => missingTargetResult.Task.WaitAsync(token);
+                    var missingTargetPaste = new FakeDelivery(); insertion.PasteTransportForTests = missingTargetPaste;
+                    Check(await window.BeginForTestsAsync(), "Initial capture failure still starts intentional draft-only recording");
+                    input.Emit(pcm);
+                    var missingTargetEpoch = admission?.Invoke(window, null) as long?;
+                    Check(missingTargetEpoch.HasValue, "Enter can stop hands-free recording when the initial editor capture failed");
+                    foreground = (67890, original.OwnerProcessId);
+                    Check(admission?.Invoke(window, null) == null, "Draft-only recording never consumes Enter in a different window");
+                    foreground = (original.Window, original.OwnerProcessId + 1);
+                    Check(admission?.Invoke(window, null) == null, "Draft-only recording requires the original window owner");
+                    foreground = (original.Window, original.OwnerProcessId);
+                    finish.Invoke(window, [missingTargetEpoch ?? -1]);
+                    missingTargetResult.SetResult("The safely retained complete draft.");
+                    await ((Task)operation.GetValue(window)!);
+                    Check(input.Disposed && window.SessionForTests == SessionState.Ready && missingTargetPaste.Pastes == 0 && missingTargetPaste.Enters == 0,
+                        "Missing initial field stops capture and retains text without inventing a paste destination");
+                    window.TargetCaptureForTests = null;
+                    foreach (var unsolicited in new[] { false, true })
+                    {
+                        input = new Capture { StopError = new IOException("Synthetic device disconnect") };
+                        current = original; foreground = (original.Window, original.OwnerProcessId); copied = "";
+                        var recoveredPaste = new FakeDelivery(); insertion.PasteTransportForTests = recoveredPaste;
+                        window.RecognitionForTests = (_, _) => Task.FromResult("Audio captured before the device stopped.");
+                        Check(await window.BeginForTestsAsync(), "Device-interruption scenario starts only fake capture");
+                        input.Emit(pcm);
+                        if (unsolicited)
+                        {
+                            input.Disconnect();
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            await ((Task)operation.GetValue(window)!);
+                        }
+                        else
+                        {
+                            finish.Invoke(window, [admission?.Invoke(window, null) as long? ?? -1]);
+                            await ((Task)operation.GetValue(window)!);
+                        }
+                        Check(window.SessionForTests == SessionState.Ready && input.Disposed && recoveredPaste.Pastes == 0 && recoveredPaste.Enters == 0 && copied == "" && ShowsNotice("Draft recovered"),
+                            "A device error recovers audio for review without paste, clipboard overwrite or send, including an unsolicited disconnect");
+                    }
                     Check(!window.IsVisible&&!window.OverlayForTests.IsVisible,"All Enter regression windows and pills stay suppressed");Array.Clear(pcm);
                 }catch(Exception error){failures.Add(error.ToString());}
                 finally{window?.CancelForTests();window?.RequestQuit();app.Shutdown();}
@@ -187,14 +245,16 @@ internal static class EnterDeliveryFixture
     private sealed class Clock:TimeProvider{long now;public override long TimestampFrequency=>1000;public override long GetTimestamp()=>now;public void Advance(double seconds)=>now+=(long)(seconds*1000);}
     private sealed class FakeDelivery:ICompletedDraftTransport {
         public int Pastes,Enters;public uint Sequence=1;public string Clipboard="fixture prior clipboard",Payload="";
-        public object SaveClipboard()=>Clipboard;public uint SetClipboard(string text){Clipboard=Payload=text;return ++Sequence;}public uint ClipboardSequence=>Sequence;
-        public void RestoreClipboard(object? previous){Clipboard=(string?)previous??"";Sequence++;}
+        public object SaveClipboard()=>Clipboard;public ClipboardChange SetClipboard(object? previous,string text){Clipboard=Payload=text;return new(ClipboardChangeStatus.Staged,++Sequence);}public uint ClipboardSequence=>Sequence;
+        public ClipboardChange RestoreClipboard(object? previous,uint expectedSequence){Clipboard=(string?)previous??"";return new(ClipboardChangeStatus.Restored,++Sequence);}
         public bool Paste(){Pastes++;return true;}public bool Enter(){Enters++;return true;}public bool HoldAfterPaste{get;set;}public bool EnterHeld=>HoldAfterPaste&&Pastes>0;
         public bool Unreadable{get;set;}
         public Action? AfterPastedRead{get;set;}public string? ReadText(DraftTarget target){if(Pastes>0)AfterPastedRead?.Invoke();return Unreadable?null:Pastes>0?Payload:"";}public Task Delay(int milliseconds)=>Task.CompletedTask;
     }
     private sealed class Capture:IWaveIn{
         public bool Started,Disposed;public WaveFormat WaveFormat{get;set;}=new(16000,16,1);public event EventHandler<WaveInEventArgs>? DataAvailable;public event EventHandler<StoppedEventArgs>? RecordingStopped;
-        public void StartRecording()=>Started=true;public void StopRecording()=>RecordingStopped?.Invoke(this,new StoppedEventArgs());public void Dispose()=>Disposed=true;public void Emit(byte[] bytes)=>DataAvailable?.Invoke(this,new WaveInEventArgs(bytes,bytes.Length));
+        public Exception? StopError { get; init; }
+        public void StartRecording()=>Started=true;public void StopRecording()=>RecordingStopped?.Invoke(this,new StoppedEventArgs(StopError));public void Dispose()=>Disposed=true;public void Emit(byte[] bytes)=>DataAvailable?.Invoke(this,new WaveInEventArgs(bytes,bytes.Length));
+        public void Disconnect() => RecordingStopped?.Invoke(this, new StoppedEventArgs(StopError));
     }
 }

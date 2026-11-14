@@ -119,12 +119,15 @@ internal static class PersonalizationFixture
                         startCue.SetResult();
                         Check(await starting, "Native send-flow starts only a fake microphone");
                         var pcm = new byte[64000]; for(int i = 1; i < pcm.Length; i += 2) pcm[i] = 8; capture.Emit(pcm);
-                        Invoke("FinishAndSendShortcut");
+                        Invoke("FinishAndSendShortcut", 0L);
                         await Task.Delay(50);
                         Check(fakePaste.Pastes == 0 && fakePaste.Enters == 0, "No partial external text while final recognition is pending");
                         recognized.SetResult(complete);
                         for(var i = 0; i < 100 && fakePaste.Enters == 0; i++) await Task.Delay(20);
-                        Check(fakePaste.Pastes == 1 && fakePaste.Enters == 1 && fakePaste.Text == complete, "Actual native Stop pipeline pastes one complete multiline draft and sends once after explicit Enter intent");
+                        Check(fakePaste.Pastes == 1 && fakePaste.Enters == 1 &&
+                            System.Text.RegularExpressions.Regex.Replace(fakePaste.Text, @"\s+", " ").Trim() ==
+                            System.Text.RegularExpressions.Regex.Replace(complete, @"\s+", " ").Trim(),
+                            "Actual native Stop pipeline pastes the complete wording and sends once after explicit Enter intent, allowing Clean paragraph layout");
                         for(var i = 0; i < 100 && window.SessionForTests != SessionState.Inserted; i++) await Task.Delay(20);
                         Check(window.SessionForTests == SessionState.Inserted, "Native send-flow reaches inserted terminal state without duplicate retries");
                         for(var i = 0; i < 30 && !cues.Contains(FeedbackCue.Sent); i++) await Task.Delay(10);
@@ -149,9 +152,9 @@ internal static class PersonalizationFixture
     {
         public int Pastes, Enters; public string Text = "";
         public object? SaveClipboard() => null;
-        public uint SetClipboard(string text) { Text = text; return 1; }
+        public ClipboardChange SetClipboard(object? previous, string text) { Text = text; return new(ClipboardChangeStatus.Staged, 1); }
         public uint ClipboardSequence => 1;
-        public void RestoreClipboard(object? previous) { }
+        public ClipboardChange RestoreClipboard(object? previous, uint expectedSequence) => new(ClipboardChangeStatus.Restored, 1);
         public bool Paste() { Pastes++; return true; }
         public bool Enter() { Enters++; return true; }
         public bool EnterHeld => false;

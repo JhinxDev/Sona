@@ -25,6 +25,9 @@ public sealed record TargetCaptureResult(DraftTarget? Target, TargetCaptureStatu
     public long FocusEpochBefore { get; init; }
     public long FocusEpochAfter { get; init; }
     public bool Stable { get; init; }
+    public bool WindowStable { get; init; }
+    public bool? Password { get; init; }
+    public bool? Enabled { get; init; }
     public bool? FieldInForegroundWindow { get; init; }
     public string? RuntimeIdentityHash { get; init; }
     internal static string? HashRuntimeId(int[] runtimeId) => runtimeId.Length == 0 ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join(",", runtimeId))));
@@ -81,7 +84,8 @@ public sealed partial class Insertion
             var sameElement = finalElement != null && finalElement.Current.ProcessId == field.ProcessId && finalElement.GetRuntimeId().SequenceEqual(field.RuntimeId);
             var sameWindow = window == GetForegroundWindow() && GetWindowThreadProcessId(window, out var finalOwner) != 0 && owner == finalOwner;
             var result = EvaluateCapture(field, window, (int)owner, contained, epoch, FocusEpoch);
-            return sameElement && sameWindow ? result : result with { Target = null, Status = TargetCaptureStatus.FocusChanged, Stable = false };
+            return (sameElement && sameWindow ? result : result with { Target = null, Status = TargetCaptureStatus.FocusChanged, Stable = false })
+                with { WindowStable = sameWindow };
         }
         catch (Exception error) when (error is ElementNotAvailableException or InvalidOperationException or COMException or UnauthorizedAccessException)
         { return new(null, TargetCaptureStatus.ProviderUnavailable); }
@@ -94,7 +98,8 @@ public sealed partial class Insertion
         {
             ReadOnly = field.ReadOnly, ControlTypeId = field.ControlTypeId, ProviderProcessId = field.ProcessId, WindowProcessId = owner,
             ForegroundWindow = window.ToInt64(), FocusEpochBefore = firstEpoch, FocusEpochAfter = finalEpoch,
-            Stable = stable, FieldInForegroundWindow = contained, RuntimeIdentityHash = TargetCaptureResult.HashRuntimeId(field.RuntimeId)
+            Stable = stable, WindowStable = true, Password = field.Password, Enabled = field.Enabled,
+            FieldInForegroundWindow = contained, RuntimeIdentityHash = TargetCaptureResult.HashRuntimeId(field.RuntimeId)
         };
         // Rejection reasons also need exact scope and stable identity. An early
         // unsupported-type result must not be mistaken for target-app evidence.
