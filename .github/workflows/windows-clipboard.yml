@@ -10,11 +10,7 @@ on:
       - 'Directory.Build.props'
       - '.github/workflows/windows-clipboard.yml'
   pull_request:
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'Directory.Build.props'
-      - '.github/workflows/windows-clipboard.yml'
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -30,21 +26,43 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
+      - name: Check whether clipboard tests are needed
+        id: scope
+        shell: pwsh
+        run: |
+          $runTests = $true
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+              # The first parent of the checked-out PR merge commit is its base.
+              # Unknown files and comparisons that fail still run the tests.
+              git diff --quiet --no-ext-diff --no-renames 'HEAD^1' HEAD -- . `
+                ':(exclude,top)README.md' ':(exclude,top)AGENTS.md' `
+                ':(exclude,top)CONTRIBUTING.md' ':(exclude,top,glob)docs/**/*.md'
+              $runTests = $LASTEXITCODE -ne 0
+          }
+          if (-not $runTests) { Write-Host 'Markdown documentation only. Skipping clipboard tests.' }
+          $value = $runTests.ToString().ToLowerInvariant()
+          "run_tests=$value" >> $env:GITHUB_OUTPUT
+          exit 0
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        if: steps.scope.outputs.run_tests == 'true'
         with:
           dotnet-version: '8.0.x'
       - name: Build the isolated Windows checks
+        if: steps.scope.outputs.run_tests == 'true'
         shell: pwsh
         run: |
           dotnet build tests/Sona.WindowsTests -c Release --disable-build-servers -p:UseSharedCompilation=false
           if ($LASTEXITCODE -ne 0) { throw 'Windows test build failed' }
       - name: Exercise actual Windows and WPF clipboard on the disposable runner
+        if: steps.scope.outputs.run_tests == 'true'
         shell: pwsh
         run: |
           & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --native-clipboard-hosted-checks
           if ($LASTEXITCODE -ne 0) { throw 'Native clipboard regression failed' }
       - name: Exercise ownership races and complete paste verification
+        if: steps.scope.outputs.run_tests == 'true'
         shell: pwsh
         run: |
           & ./tests/Sona.WindowsTests/bin/Release/net8.0-windows/Sona.WindowsTests.exe --owned-clipboard-checks
