@@ -246,6 +246,12 @@ updater checks. The
 owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2 build on
 October 15, 2026. That is one target-app smoke test; the automated checks do not
 establish broad microphone, other-app or live-call acceptance.
+
+GitHub reports a `clipboard` check on every pull request into `main`. The job
+runs the Windows clipboard tests when code, build inputs, or other files outside
+the Markdown documentation change. Documentation-only pull requests complete
+after the scope check. Use the preview validation guide for target-app acceptance.
+
 [Preview validation](docs/PREVIEW-VALIDATION.md) · [Contributing](CONTRIBUTING.md)
 · [Verification](docs/VERIFICATION.md) · [Design](docs/DESIGN.md) ·
 [Implementation](docs/IMPLEMENTATION.md) · [Alternatives](docs/ALTERNATIVES.md)
