@@ -3,12 +3,22 @@ name: Windows clipboard regression
 on:
   workflow_dispatch:
   push:
-    branches: [codex/local-dictation, codex/sona-reliability-rework]
+    branches: [main]
     paths:
       - 'src/**'
       - 'tests/**'
       - 'Directory.Build.props'
       - '.github/workflows/windows-clipboard.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/windows-clipboard.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
