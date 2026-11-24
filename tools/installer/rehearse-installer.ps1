@@ -15,6 +15,7 @@ $failures = [System.Collections.Generic.List[string]]::new()
 function Check([bool]$ok, [string]$name) { if ($ok) { $checks.Add($name) } else { $failures.Add($name) } }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+. (Join-Path $repoRoot 'tools\resolve-sona-window.ps1')
 $exe = Join-Path $InstallDir 'Sona.exe'
 $agent = Join-Path $InstallDir 'sona-agent.exe'
 $receiptPath = Join-Path $InstallDir 'installation.json'
@@ -78,7 +79,7 @@ try {
     try { $agentOutput = (& $agent status 2>&1 | Select-Object -First 1) } catch { $agentOutput = '' }
     Check ($agentOutput -match '^\s*\{') 'Installed CLI starts without a separately installed .NET runtime'
     if (-not $app.HasExited) {
-        $null = $app.CloseMainWindow()
+        $null = Close-SonaMainWindow $app.Id
         if (-not $app.WaitForExit(10000)) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue; $null = $app.WaitForExit(5000) }
     }
     Remove-Item Env:\SONA_DATA -ErrorAction SilentlyContinue

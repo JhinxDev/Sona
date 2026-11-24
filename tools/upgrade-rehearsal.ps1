@@ -1,11 +1,13 @@
-param([Parameter(Mandatory)][string]$OutputRoot)
+﻿param([Parameter(Mandatory)][string]$OutputRoot)
 $ErrorActionPreference='Stop';Add-Type -AssemblyName UIAutomationClient
 if(Test-Path -LiteralPath $OutputRoot){throw 'Use a fresh rehearsal root'}
 $OutputRoot=[IO.Path]::GetFullPath($OutputRoot)
 if((Split-Path $OutputRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$'){throw 'Rehearsal root must have a unique guarded name'}
 New-Item -ItemType Directory -Path $OutputRoot|Out-Null
 Set-Content -LiteralPath (Join-Path $OutputRoot '.sona-rehearsal') -Value 'synthetic only; no production profile'
-$taskRepo=Split-Path $PSScriptRoot -Parent;$taskRuntime='E:\DevelopmentTools\local-dictation'
+$taskRepo=Split-Path $PSScriptRoot -Parent
+$taskRuntime=if($env:SONA_RUNTIME){$env:SONA_RUNTIME}else{'E:\DevelopmentTools\local-dictation'}
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 $taskPriorData=$env:SONA_DATA;$env:SONA_DATA=Join-Path $OutputRoot 'profile'
 $taskProductionAgent=Join-Path $env:LOCALAPPDATA 'Programs\Sona\current\sona-agent.exe'
 $taskProductionBefore=(& $taskProductionAgent status)-join "`n"
@@ -17,7 +19,7 @@ $taskMenu=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sona.lnk
 $taskChecks=[Collections.Generic.List[string]]::new()
 function Proof([bool]$Value,[string]$Name){if(!$Value){throw $Name};$taskChecks.Add($Name)}
 function ScopedProcess{ return @(Get-Process -Name Sona -ErrorAction SilentlyContinue|Where-Object{$_.Path-and$_.Path.StartsWith((Join-Path $OutputRoot 'Programs\Sona')+'\',[StringComparison]::OrdinalIgnoreCase)}) }
-function Root($Process){for($taskTry=0;$taskTry-lt100;$taskTry++){$Process.Refresh();if($Process.MainWindowHandle-ne0){return [System.Windows.Automation.AutomationElement]::FromHandle($Process.MainWindowHandle)};if($Process.HasExited){throw 'Isolated process exited early'};Start-Sleep -Milliseconds 50};throw 'Isolated window unavailable'}
+function Root($Process){for($taskTry=0;$taskTry-lt100;$taskTry++){if($Process.HasExited){throw 'Isolated process exited early'};$hwnd=Get-SonaMainWindowHandle $Process.Id;if($hwnd-ne[IntPtr]::Zero){return [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)};Start-Sleep -Milliseconds 50};throw 'Isolated window unavailable'}
 function Field($Window,[string]$Id){return $Window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))}
 function ReadField($Window,[string]$Id){
     $taskField=$null;for($taskFieldTry=0;$taskFieldTry-lt40;$taskFieldTry++){$taskField=Field $Window $Id;if($taskField){break};Start-Sleep -Milliseconds 50}
@@ -28,11 +30,17 @@ function SelectPage($Window,[string]$Id){(Field $Window $Id).GetCurrentPattern([
 function Recovery($Path){$taskBytes=[Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($Path),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);try{return ([Text.Encoding]::UTF8.GetString($taskBytes)|ConvertFrom-Json)}finally{[Array]::Clear($taskBytes,0,$taskBytes.Length)}}
 function PrivateLaunch([string]$Path,[string]$Payload){$taskInfo=[Diagnostics.ProcessStartInfo]::new($Path);$taskInfo.UseShellExecute=$false;$taskInfo.ArgumentList.Add('--test-ui');$taskInfo.ArgumentList.Add('--test-transfer');$taskInfo.Environment['SONA_DATA']=$env:SONA_DATA;$taskInfo.Environment['MURMUR_DATA']=$env:SONA_DATA;$taskInfo.Environment['SONA_DRAFT_TRANSFER']=$Payload;return [Diagnostics.Process]::Start($taskInfo)}
 try{
-    $env:DOTNET_CLI_HOME=Join-Path $taskRuntime 'dotnet-home';$env:NUGET_PACKAGES=Join-Path $taskRuntime 'nuget';$env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
+    $sdkDotnet=Join-Path $taskRuntime 'sdk\dotnet.exe'
+    if(Test-Path -LiteralPath $sdkDotnet){
+        if(-not $env:DOTNET_CLI_HOME){$env:DOTNET_CLI_HOME=Join-Path $taskRuntime 'dotnet-home'}
+        if(-not $env:NUGET_PACKAGES){$env:NUGET_PACKAGES=Join-Path $taskRuntime 'nuget'}
+        $dotnet=$sdkDotnet
+    }else{$dotnet='dotnet'}
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
     $taskBuilt=Join-Path $OutputRoot 'built'
-    & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Sona.App\Sona.App.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
+    & $dotnet publish (Join-Path $taskRepo 'src\Sona.App\Sona.App.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
     if($LASTEXITCODE-ne0){throw 'Isolated app publish failed'}
-    & (Join-Path $taskRuntime 'sdk\dotnet.exe') publish (Join-Path $taskRepo 'src\Sona.Agent\Sona.Agent.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
+    & $dotnet publish (Join-Path $taskRepo 'src\Sona.Agent\Sona.Agent.csproj') -c Release -o $taskBuilt --no-restore --disable-build-servers -p:UseSharedCompilation=false|Out-Null
     if($LASTEXITCODE-ne0){throw 'Isolated agent publish failed'}
     $taskVersion=[Reflection.AssemblyName]::GetAssemblyName((Join-Path $taskBuilt 'Sona.dll')).Version.ToString(3)
     $taskFiles=@(Get-ChildItem -LiteralPath $taskBuilt -File -Recurse|ForEach-Object{@{Path=[IO.Path]::GetRelativePath($taskBuilt,$_.FullName);SHA256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();Bytes=$_.Length}})

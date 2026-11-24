@@ -39,40 +39,6 @@ public sealed class Transcriber
         if (!AvailableFor(preferences)) { Array.Clear(wav); throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1."); }
         return resident.RunAsync(wav, preferences, cancellation);
     }
-    private async Task<string> RunOnceAsync(byte[] wav, Preferences preferences, CancellationToken cancellation)
-    {
-        if (!AvailableFor(preferences)) throw new IOException("The selected local transcription engine is missing. Run setup-runtime.ps1.");
-        var modelId = SelectedModel(preferences);
-        if (!await Models.VerifyAsync(modelId, cancellation).ConfigureAwait(false)) throw new IOException("Selected model integrity check failed. Your draft was left untouched.");
-        var useCuda = preferences.Engine != "FastCpu" && CudaEngineAvailable;
-        var work = Path.Combine(ScratchRoot, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(work);
-        try
-        {
-            await File.WriteAllTextAsync(Path.Combine(work, "owner.marker"), AppPaths.ScratchMarker, cancellation).ConfigureAwait(false);
-            var audio = Path.Combine(work, "audio.wav");
-            await File.WriteAllBytesAsync(audio, wav, cancellation).ConfigureAwait(false);
-            var info = new ProcessStartInfo(WorkerBranding.PathFor(Path.Combine(RuntimeRoot, useCuda ? "whisper-cuda" : "whisper", "Release", "whisper-cli.exe")));
-            var args = new[] { "-m", Models.PathFor(modelId), "-f", audio, "-l", preferences.Language, "-t", "6", "-bs", useCuda ? "5" : "1", "-bo", useCuda ? "5" : "1", "-nf", "-sns", "-oj", "-of", Path.Combine(work, "result") };
-            foreach (var arg in args) info.ArgumentList.Add(arg);
-            if (!useCuda) info.ArgumentList.Add("-ng");
-            var prompt = string.Join(", ", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Written)).Distinct().Take(30));
-            if (!string.IsNullOrEmpty(prompt)) { info.ArgumentList.Add("--prompt"); info.ArgumentList.Add(prompt); }
-            using var worker = new BoundedProcess(info, useCuda ? 3072 : 1536);
-            var stdout = worker.Process.StandardOutput.ReadToEndAsync(cancellation);
-            var stderr = worker.Process.StandardError.ReadToEndAsync(cancellation);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            timeout.CancelAfter(TimeSpan.FromSeconds(90));
-            try { await worker.Process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { throw new IOException("Transcription reached the 90 second limit. Try a shorter recording."); }
-            await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-            if (worker.Process.ExitCode != 0) throw new IOException(useCuda ? "GPU transcription is unavailable. Choose Lightweight CPU in Dictation Models and try again. Your draft was left untouched." : "Local transcription failed. Your draft was left untouched.");
-            if (useCuda && !(await stderr.ConfigureAwait(false)).Contains("using CUDA0 backend", StringComparison.Ordinal)) throw new IOException("The GPU engine did not use your GPU. Choose Lightweight CPU in Dictation Models or repair its local runtime.");
-            using var result = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(work, "result.json"), cancellation).ConfigureAwait(false));
-            return string.Join("", result.RootElement.GetProperty("transcription").EnumerateArray().Select(x => x.GetProperty("text").GetString())).Trim();
-        }
-        finally { Array.Clear(wav); await CleanupOrRetainAsync(work).ConfigureAwait(false); }
-    }
     internal async Task CleanupOrRetainAsync(string directory)
     {
         try { await CleanupScratchAsync(directory).ConfigureAwait(false); lock (cleanupGate) retained.Remove(directory); }

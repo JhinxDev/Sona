@@ -60,33 +60,37 @@ internal sealed class DiscordVoiceTransport(ProtectedCredentials vault, string p
     }
     private async Task<DiscordCredentials> RefreshOrAuthorizeAsync(DiscordCredentials credentials, bool allowAuthorization, CancellationToken cancellation)
     {
-        var form = new Dictionary<string, string> { ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.ClientSecret };
-        if (credentials.RefreshToken.Length > 0) { form["grant_type"] = "refresh_token"; form["refresh_token"] = credentials.RefreshToken; }
-        else
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            if (!allowAuthorization) throw new IOException("Reconnect Discord from Sona to authorize protection.");
-            var auth = await CommandAsync("AUTHORIZE", new { client_id = credentials.ClientId, scopes = new[] { "rpc", "rpc.voice.write" } }, cancellation, timeoutSeconds: 60);
-            form["grant_type"] = "authorization_code"; form["code"] = auth.GetProperty("code").GetString()!; form["redirect_uri"] = "http://127.0.0.1";
+            var form = new Dictionary<string, string> { ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.ClientSecret };
+            if (credentials.RefreshToken.Length > 0) { form["grant_type"] = "refresh_token"; form["refresh_token"] = credentials.RefreshToken; }
+            else
+            {
+                if (!allowAuthorization) throw new IOException("Reconnect Discord from Sona to authorize protection.");
+                var auth = await CommandAsync("AUTHORIZE", new { client_id = credentials.ClientId, scopes = new[] { "rpc", "rpc.voice.write" } }, cancellation, timeoutSeconds: 60);
+                form["grant_type"] = "authorization_code"; form["code"] = auth.GetProperty("code").GetString()!; form["redirect_uri"] = "http://127.0.0.1";
+            }
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var response = await client.PostAsync("https://discord.com/api/oauth2/token", new FormUrlEncodedContent(form), cancellation);
+            if (!response.IsSuccessStatusCode)
+            {
+                if (attempt == 0 && allowAuthorization && form["grant_type"] == "refresh_token") { credentials.RefreshToken = ""; continue; }
+                throw new IOException("Discord authorization failed. Reconnect or update your local setup.");
+            }
+            await using var input = await response.Content.ReadAsStreamAsync(cancellation);
+            var bodyBuffer = new byte[65537]; var bodyLength = 0;
+            while (bodyLength < bodyBuffer.Length)
+            {
+                var read = await input.ReadAsync(bodyBuffer.AsMemory(bodyLength), cancellation); if (read == 0) break; bodyLength += read;
+            }
+            if (bodyLength > 65536) throw new IOException("Discord returned an invalid authorization response.");
+            var body = bodyBuffer.AsMemory(0, bodyLength);
+            using var token = JsonDocument.Parse(body);
+            credentials.AccessToken = token.RootElement.GetProperty("access_token").GetString()!;
+            if (token.RootElement.TryGetProperty("refresh_token", out var refresh)) credentials.RefreshToken = refresh.GetString()!;
+            credentials.ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + token.RootElement.GetProperty("expires_in").GetInt32(); vault.Save(credentials); return credentials;
         }
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        using var response = await client.PostAsync("https://discord.com/api/oauth2/token", new FormUrlEncodedContent(form), cancellation);
-        if (!response.IsSuccessStatusCode)
-        {
-            if (allowAuthorization && form["grant_type"] == "refresh_token") { credentials.RefreshToken = ""; return await RefreshOrAuthorizeAsync(credentials, true, cancellation); }
-            throw new IOException("Discord authorization failed. Reconnect or update your local setup.");
-        }
-        await using var input = await response.Content.ReadAsStreamAsync(cancellation);
-        var bodyBuffer = new byte[65537]; var bodyLength = 0;
-        while (bodyLength < bodyBuffer.Length)
-        {
-            var read = await input.ReadAsync(bodyBuffer.AsMemory(bodyLength), cancellation); if (read == 0) break; bodyLength += read;
-        }
-        if (bodyLength > 65536) throw new IOException("Discord returned an invalid authorization response.");
-        var body = bodyBuffer.AsMemory(0, bodyLength);
-        using var token = JsonDocument.Parse(body);
-        credentials.AccessToken = token.RootElement.GetProperty("access_token").GetString()!;
-        if (token.RootElement.TryGetProperty("refresh_token", out var refresh)) credentials.RefreshToken = refresh.GetString()!;
-        credentials.ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + token.RootElement.GetProperty("expires_in").GetInt32(); vault.Save(credentials); return credentials;
+        throw new IOException("Discord authorization failed. Reconnect or update your local setup.");
     }
     public async Task<VoiceState> ReadAsync(CancellationToken cancellation)
     {

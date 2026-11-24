@@ -9,7 +9,8 @@ internal sealed record DeliveryObservation(DateTimeOffset ObservedAt, string Out
     bool PasteAttempted, bool PasteConfirmed, bool SendAccepted, bool ClipboardRecovery,
     bool PasteRequested, string PasteReadback, int? CaptureControlTypeId, int? CaptureAttempts,
     string? PasteCaptureRejection, int PasteCaptureGaps, bool EnterTargetReconfirmed, bool ClipboardRestorationFailed, string ClipboardStatus,
-    string DeliveryRoute, bool UnicodeAttempted, bool UnicodeConfirmed, string DeliveryReadback, string? ClipboardFailureCode);
+    string DeliveryRoute, bool UnicodeAttempted, bool UnicodeConfirmed, string DeliveryReadback, string? ClipboardFailureCode,
+    string? ClipboardUnsupportedFormat = null);
 
 public partial class MainWindow
 {
@@ -50,7 +51,8 @@ public partial class MainWindow
             pasteAttempted ? insertion.LastDeliveryRoute : "None",
             pasteAttempted && insertion.LastUnicodeAttempted, pasteAttempted && insertion.LastUnicodeConfirmed,
             pasteAttempted ? insertion.LastPasteReadback.ToString() : "NotRequested",
-            pasteAttempted ? insertion.LastClipboardFailureCode : null);
+            pasteAttempted ? insertion.LastClipboardFailureCode : null,
+            pasteAttempted ? insertion.LastClipboardUnsupportedFormat : null);
         if ((preferences.AutoInsert || requested) && outcome is
             ("NoCapturedField" or "FocusChanged" or "InsertionRefused" or "PasteUnconfirmed" or "PasteConfirmedSendWithheld" or "UnicodeUnconfirmed" or "UnicodeConfirmedSendWithheld"))
             lastRetainedDelivery = lastDelivery;

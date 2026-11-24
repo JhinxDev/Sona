@@ -45,8 +45,20 @@ public sealed class BoundedProcess : IDisposable
     {
         if (disposed) return;
         if (job != 0) { CloseHandle(job); job = 0; }
-        if (!Process.HasExited && !Process.WaitForExit(3000)) throw new IOException("Windows has not confirmed worker termination.");
-        Process.Dispose(); disposed = true;
+        try
+        {
+            if (!Process.HasExited && !Process.WaitForExit(3000))
+            {
+                try { Process.Kill(entireProcessTree: true); }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException) { }
+                if (!Process.HasExited && !Process.WaitForExit(2000)) throw new IOException("Windows has not confirmed worker termination.");
+            }
+        }
+        finally
+        {
+            Process.Dispose();
+            disposed = true;
+        }
     }
     [StructLayout(LayoutKind.Sequential)] private struct BasicLimit { public long PerProcess, PerJob; public uint Flags; public nuint MinWorking, MaxWorking; public uint Active; public nuint Affinity; public uint Priority, Scheduling; }
     [StructLayout(LayoutKind.Sequential)] private struct IoCounters { public ulong ReadOps, WriteOps, OtherOps, ReadBytes, WriteBytes, OtherBytes; }

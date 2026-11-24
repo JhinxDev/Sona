@@ -53,6 +53,79 @@ public sealed class Preferences
     // its existing bounded surface; these are managed in the Sona UI.
     public List<AppMode> AppModes { get; set; } = [];
     public bool OnboardingDismissed { get; set; }
+
+    public Preferences Clone() => new()
+    {
+        LiveTranscription = LiveTranscription,
+        PasteCompletedDraft = PasteCompletedDraft,
+        EnterToSend = EnterToSend,
+        SoundEffects = SoundEffects,
+        Language = Language,
+        Engine = Engine,
+        Model = Model,
+        ModelIdleMinutes = ModelIdleMinutes,
+        RecordingDisplay = RecordingDisplay,
+        Theme = Theme,
+        ShortcutMode = ShortcutMode,
+        KeepHistory = KeepHistory,
+        HistoryPaused = HistoryPaused,
+        Style = Style,
+        CleanupEnabled = CleanupEnabled,
+        CleanupMode = CleanupMode,
+        CleanupTone = CleanupTone,
+        CleanupEngine = CleanupEngine,
+        CleanupIdleMinutes = CleanupIdleMinutes,
+        Device = Device,
+        AutoInsert = AutoInsert,
+        CopyToClipboard = CopyToClipboard,
+        CopyOnInsertionFailure = CopyOnInsertionFailure,
+        CheckForUpdates = CheckForUpdates,
+        CloseToTray = CloseToTray,
+        Startup = Startup,
+        ProtectionEnabled = ProtectionEnabled,
+        DiscordDisconnected = DiscordDisconnected,
+        SilenceIncoming = SilenceIncoming,
+        ProtectionReleaseDelayMs = ProtectionReleaseDelayMs,
+        ProtectionShortcut = ProtectionShortcut,
+        WatchedApps = [.. WatchedApps],
+        Terms = [.. Terms],
+        Vocabulary = [.. Vocabulary],
+        Snippets = [.. Snippets],
+        AppModes = AppModes.Select(m => new AppMode(m.App, m.Style, m.Tone)).ToList(),
+        OnboardingDismissed = OnboardingDismissed
+    };
+
+    public bool GeneralSettingsEqual(Preferences? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Language == other.Language &&
+            Engine == other.Engine &&
+            Style == other.Style &&
+            Device == other.Device &&
+            SoundEffects == other.SoundEffects &&
+            PasteCompletedDraft == other.PasteCompletedDraft &&
+            EnterToSend == other.EnterToSend &&
+            LiveTranscription == other.LiveTranscription &&
+            AutoInsert == other.AutoInsert &&
+            CopyToClipboard == other.CopyToClipboard &&
+            CopyOnInsertionFailure == other.CopyOnInsertionFailure &&
+            CheckForUpdates == other.CheckForUpdates &&
+            CloseToTray == other.CloseToTray &&
+            Startup == other.Startup &&
+            KeepHistory == other.KeepHistory &&
+            ShortcutMode == other.ShortcutMode &&
+            Theme == other.Theme &&
+            RecordingDisplay == other.RecordingDisplay &&
+            ModelIdleMinutes == other.ModelIdleMinutes &&
+            CleanupEnabled == other.CleanupEnabled &&
+            CleanupMode == other.CleanupMode &&
+            CleanupTone == other.CleanupTone &&
+            CleanupEngine == other.CleanupEngine &&
+            CleanupIdleMinutes == other.CleanupIdleMinutes &&
+            AppModes.SequenceEqual(other.AppModes);
+    }
+
     public static Preferences Load(string path) => LoadWithStatus(path).Value;
     public static PreferencesLoadResult LoadWithStatus(string path)
     {

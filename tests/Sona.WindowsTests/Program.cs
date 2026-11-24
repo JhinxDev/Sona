@@ -461,8 +461,27 @@ try
     var cleanupWorkers = Path.Combine(brandRoot, "workers");
     var brandedCleanup = WorkerBranding.PathFor(fakeCleanup, cleanupWorkers);
     Check(Path.GetFileName(brandedCleanup) == "Sona Text Polish.exe" && Path.GetDirectoryName(brandedCleanup) == cleanupWorkers, "Cleanup worker branding stays outside the hash-verified runtime directory");
+    var fakeParakeet = Path.Combine(brandRoot, "nemo-speech.exe"); File.WriteAllBytes(fakeParakeet, [3, 1, 4, 1]);
+    var parakeetWorkers = Path.Combine(brandRoot, "parakeet-workers");
+    var brandedParakeet = WorkerBranding.PathFor(fakeParakeet, parakeetWorkers);
+    Check(Path.GetFileName(brandedParakeet) == "Sona Speech Engine.exe" && Path.GetDirectoryName(brandedParakeet) == parakeetWorkers, "Parakeet worker branding maps nemo-speech.exe outside the verified runtime directory");
+    File.WriteAllBytes(brandedParakeet, [9, 9, 9, 9]);
+    File.SetLastWriteTimeUtc(brandedParakeet, DateTime.UtcNow.AddMinutes(5));
+    var rebrandedParakeet = WorkerBranding.PathFor(fakeParakeet, parakeetWorkers);
+    Check(File.ReadAllBytes(rebrandedParakeet).SequenceEqual(new byte[] { 3, 1, 4, 1 }), "Worker branding detects same-length tampered copy via SHA-256 and refreshes it");
     var unknown = Path.Combine(brandRoot, "mystery-worker.exe"); File.WriteAllBytes(unknown, [5]);
     Check(WorkerBranding.PathFor(unknown) == unknown, "Unknown worker names keep their upstream path");
+    var staleRoot = Path.Combine(brandRoot, "localappdata");
+    var staleExe = Path.Combine(staleRoot, "Programs", "Sona", "0.5.0-deadbeef", "Sona.exe");
+    Check(Startup.Owned($"\"{staleExe}\" --start-hidden", "Sona", staleRoot), "Startup allows reclaiming stale pruned Sona installation paths");
+    Check(!Startup.Owned("\"C:\\Temp\\OtherApp.exe\" --start-hidden", "Sona", staleRoot), "Startup refuses unrelated non-Sona startup entries");
+    var fakeWhisperDir = Path.Combine(brandRoot, "whisper-fake"); Directory.CreateDirectory(fakeWhisperDir);
+    File.WriteAllBytes(Path.Combine(fakeWhisperDir, "whisper-server.exe"), [1, 2]);
+    Check(!await WhisperAssets.VerifyAtAsync(fakeWhisperDir, false), "Whisper integrity verification rejects incomplete or unpinned runtime directories");
+    if (Transcriber.CpuEngineAvailable)
+        Check(await WhisperAssets.VerifyAsync(false), "Installed Whisper CPU engine passes full SHA-256 verification");
+    if (Transcriber.CudaEngineAvailable)
+        Check(await WhisperAssets.VerifyAsync(true), "Installed Whisper CUDA engine passes full SHA-256 verification");
 }
 finally { Directory.Delete(brandRoot, true); }
 Console.WriteLine(JsonSerializer.Serialize(new { Passed = passed.Count, Checks = passed, MicrophoneOpened = false, GlobalInputSent = false }));

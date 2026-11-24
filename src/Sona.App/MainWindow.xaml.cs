@@ -97,10 +97,14 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) => RecordingTick();
         SystemEvents.PowerModeChanged += PowerChanged;
         SystemEvents.SessionSwitch += SessionChanged;
-        Closed += (_, _) => { SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; Cancel(); windowClosed = true; soundFeedback.Dispose(); activeApplication?.Dispose(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); livePolling?.Dispose(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
+        Closed += (_, _) => { StopMicTest(); SystemEvents.PowerModeChanged -= PowerChanged; SystemEvents.SessionSwitch -= SessionChanged; protectionTimer.Stop(); Cancel(); windowClosed = true; _ = agentServer?.DisposeAsync(); agentServer = null; soundFeedback.Dispose(); activeApplication?.Dispose(); escape.Dispose(); hotkeys?.Dispose(); insertion.Dispose(); overlay.Close(); livePolling?.Dispose(); tray?.Dispose(); cancellation?.Dispose(); cancellation = null; };
         Loaded += (_, _) => { if (!arguments.Contains("--start-hidden") && !arguments.Contains("--start-minimized")) _ = PlayFeedbackAsync(FeedbackCue.Open); };
         Closing += ClosingWindow;
+        Pages.SelectionChanged += Pages_SelectionChanged;
+        Device.SelectionChanged += (_, _) => StopMicTest();
         InitializeSettingsActions();
+        UpdateDraftButtons();
+        RefreshDiagnostics();
         ProfileIdentity.Text = "Build " + AppVersion.BuildId + "\nPreferences: " + preferencesPath + "\n" + preferencesLoad.Status;
         if (!preferencesLoad.CanSave)
         {
@@ -126,16 +130,23 @@ public partial class MainWindow : Window
             catch (IOException ex) { Status.Text = "Shortcut unavailable"; StatusDetail.Text = ex.Message; ShortcutStatus.Text = ex.Message; }
             tray = new System.Windows.Forms.NotifyIcon { Text = "Sona local dictation", Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application, Visible = true };
             var menu = new System.Windows.Forms.ContextMenuStrip();
-            menu.Items.Add("Open Sona", null, (_, _) => Dispatcher.Invoke(() => { Show(); WindowState = WindowState.Normal; Activate(); _ = PlayFeedbackAsync(FeedbackCue.Open); }));
+            menu.Items.Add("Open Sona", null, (_, _) => Dispatcher.Invoke(() => { Show(); WindowState = WindowState.Normal; Activate(); RefreshSettingsActions(); RefreshDiagnostics(); _ = PlayFeedbackAsync(FeedbackCue.Open); }));
             menu.Items.Add("Quit", null, (_, _) => Dispatcher.Invoke(RequestQuit)); tray.ContextMenuStrip = menu;
-            tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => { Show(); WindowState = WindowState.Normal; Activate(); _ = PlayFeedbackAsync(FeedbackCue.Open); });
+            tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => { Show(); WindowState = WindowState.Normal; Activate(); RefreshSettingsActions(); RefreshDiagnostics(); _ = PlayFeedbackAsync(FeedbackCue.Open); });
         }
         var replayIndex = Array.IndexOf(arguments, "--replay");
         if (replayIndex >= 0 && replayIndex + 1 < arguments.Length) operation = ReplayAsync(arguments[replayIndex + 1]);
     }
+    private void Pages_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, Pages)) return;
+        if (!ReferenceEquals(Pages.SelectedItem, SettingsTabItem) || SettingsAudioNav?.IsChecked != true) StopMicTest();
+        if (Pages.SelectedIndex == 2) RefreshRecentApps();
+        if (ReferenceEquals(Pages.SelectedItem, SettingsTabItem) && SettingsAboutNav?.IsChecked == true) RefreshDiagnostics();
+    }
     private void ApplyActiveApplication(ActiveApplication app)
     {
-        destinationContext.Observe(app); SetValue(ActiveAppNamePropertyKey, app.Name); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
+        destinationContext.Observe(app); ObserveRecentApp(app.Name); SetValue(ActiveAppNamePropertyKey, app.Name); overlay.UpdateTarget(destinationContext.Label); overlay.UpdateAppIcon(destinationContext.Icon);
     }
     private async Task<bool> BeginShortcutAsync(bool hold)
     {
@@ -220,6 +231,7 @@ public partial class MainWindow : Window
         target = null; recordingCapture = null; recordingWindow = insertion.CaptureRecordingWindow(); destinationContext.End();
         ResetSessionMode();
         ResetModelLoadTracking();
+        StopMicTest();
         barPreview.Stop();
         RetainCurrentDraft(); historySelection = null;
         preparedInsertionTest = insertionTestHolding = false;
@@ -229,6 +241,7 @@ public partial class MainWindow : Window
         bool Admitted() => ReferenceEquals(session, captureSession) && ReferenceEquals(cancellation, captureCancellation) &&
             captureSession.State == SessionState.Recording && !shutdownPending && !windowClosed && (admission == null || admission());
         preparing = true;
+        RefreshSettingsActions();
         try
         {
             if (!arguments.Contains("--test-ui")) escape.Arm(true);
@@ -280,7 +293,7 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) { if (ReferenceEquals(session, captureSession)) Cancel(); return false; }
         catch (Exception ex) when (ex is IOException or NAudio.MmException or InvalidOperationException or System.Text.Json.JsonException) { if (ReferenceEquals(session, captureSession)) { recorder?.Dispose(); recorder = null; captureSession.Fail(ex.Message); ReportError(ex is IOException ? ex.Message : "Microphone or call protection unavailable. Check Settings and reconnect Discord."); } return false; }
-        finally { if (ReferenceEquals(cancellation, captureCancellation)) { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); } }
+        finally { if (ReferenceEquals(cancellation, captureCancellation)) { preparing = false; if (recorder == null) protectionReleaseOperation = ReleaseOwnProtectionAsync(); RefreshSettingsActions(); } }
     }
     private void StartStop() { if (!processing && session?.State == SessionState.Recording) { if (recorder == null) RequestCancel(); else operation = StopAsync(); } }
     private void RecordingTick()
@@ -309,7 +322,7 @@ public partial class MainWindow : Window
         if (retainOnly) submitOnComplete = false;
         FeedbackCue? completedFeedback = null;
         recorder = null; livePolling?.Cancel();
-        processing = true; pendingSubmission.Begin(!retainOnly && preferences.EnterToSend); RefreshQuickCleanup();
+        processing = true; pendingSubmission.Begin(!retainOnly && preferences.EnterToSend); RefreshQuickCleanup(); RefreshSettingsActions();
         var recoverySequence = ClipboardSequence(); var pasteAttempted = false; var historyAdded = false;
         timer.Stop(); RecordButton.Content = "Record";
         try
@@ -337,7 +350,7 @@ public partial class MainWindow : Window
                 // A healthy pending preview finishes without tearing down the
                 // resident worker. A stalled request is still cancelled before
                 // final recognition, which keeps the existing worker cleanup.
-                liveInference?.Cancel();
+                CancelLiveInference();
                 _ = liveOperation.ContinueWith(task => _ = task.Exception, TaskScheduler.Default);
             }
             catch (Exception) { _ = liveOperation.Exception; }
@@ -393,7 +406,7 @@ public partial class MainWindow : Window
         {
             if (historyAdded) SaveHistory();
             ObserveDelivery(current, retainOnly, pasteAttempted, stoppedByEnter);
-            pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End();
+            pendingSubmission.Complete(); active.Dispose(); await ReleaseOwnProtectionAsync(); processing = false; RefreshQuickCleanup(); escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); RefreshSettingsActions();
             if (!shutdownPending && current.State is SessionState.Ready or SessionState.Inserted &&
                 (current.State == SessionState.Ready || fallbackCopied ||
                  lastDelivery is { PasteRequested: true, PasteConfirmed: false } or { Outcome: "PasteConfirmedSendWithheld" or "UnicodeUnconfirmed" or "UnicodeConfirmedSendWithheld" }))
@@ -413,6 +426,7 @@ public partial class MainWindow : Window
         cancellation?.Dispose(); cancellation = new();
         try { escape.Arm(true); } catch (IOException ex) { StatusDetail.Text = ex.Message; return; }
         processing = true;
+        RefreshSettingsActions();
         try
         {
             var result = preferences.PasteCompletedDraft ? await insertion.PasteAsync(destination, current.Draft, false, cancellation.Token, keepOnFailure: preferences.CopyOnInsertionFailure, recoverySequence: recoverySequence) : await insertion.InsertAsync(destination, current.Draft, cancellation.Token);
@@ -423,7 +437,7 @@ public partial class MainWindow : Window
             if (!cancellation.IsCancellationRequested && (!result.Inserted || preferences.PasteCompletedDraft && !(insertion.LastPasteConfirmed || insertion.LastUnicodeConfirmed))) RecoverClipboard(current.Draft, recoverySequence, preferences.PasteCompletedDraft);
         }
         catch (OperationCanceledException) { current.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
-        finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); }
+        finally { processing = false; escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); destinationContext.End(); RefreshSettingsActions(); }
     }
     private void PrepareTest_Click(object sender, RoutedEventArgs e)
     {
@@ -441,6 +455,7 @@ public partial class MainWindow : Window
         ResetLiveReview(); RetainCurrentDraft(); historySelection = null;
         // Deterministic file test. Never captures a microphone or inserts into any destination.
         processing = true;
+        RefreshSettingsActions();
         cancellation = new(); var current = session = new(); current.Begin(); current.Stop();
         try
         {
@@ -460,21 +475,24 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) { session.Cancel(); Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted."; }
         catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException) { ReportError(ex.Message); }
-        finally { processing = false; escape.Arm(false); }
+        finally { processing = false; escape.Arm(false); RefreshSettingsActions(); }
     }
     private void Cancel()
     {
         if (windowClosed) return;
+        StopMicTest();
         barPreview.Stop();
         ResetSessionMode();
         preparedInsertionTest = insertionTestHolding = false;
         destinationContext.End();
         try { cancellation?.Cancel(); } catch (ObjectDisposedException) { }
+        CancelLiveInference();
         session?.Cancel(); liveDraft?.Cancel(); livePolling?.Cancel(); timer.Stop(); recorder?.Dispose(); recorder = null;
         protectionReleaseOperation = ReleaseOwnProtectionAsync();
         escape.Arm(false); hotkeys?.Recording(false); overlay.Hide(); RecordButton.Content = "Record";
         Status.Text = "Cancelled"; StatusDetail.Text = "Nothing was inserted.";
         if (liveDraft != null) DraftStage.Text = "Cancelled · review text retained";
+        RefreshSettingsActions();
     }
     private void RequestCancel()
     {
@@ -492,17 +510,26 @@ public partial class MainWindow : Window
         });
     }
     public void ReportError(string detail) { Cancel(); Status.Text = "Something needs attention"; StatusDetail.Text = detail; }
-    private void Render(DictationSession current) { reviewBaseline = CleanedSuggestion.Text.Length > 0 ? CleanedSuggestion.Text : current.Draft; CorrectionSuggestions.ItemsSource = null; rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; CopyButton.IsEnabled = !string.IsNullOrEmpty(current.Draft); rendering = false; UpdateDraftStats(); }
+    private void UpdateDraftButtons()
+    {
+        var hasDraft = !string.IsNullOrWhiteSpace(Draft?.Text);
+        var hasAnyText = !string.IsNullOrEmpty(Draft?.Text) || !string.IsNullOrEmpty(Original?.Text);
+        var hasDifferentOriginal = !string.IsNullOrEmpty(Original?.Text) && !string.Equals(Original.Text, Draft?.Text, StringComparison.Ordinal);
+        if (CopyButton != null) CopyButton.IsEnabled = hasDraft;
+        if (OriginalButton != null) OriginalButton.IsEnabled = hasDifferentOriginal;
+        if (ClearDraftButton != null) ClearDraftButton.IsEnabled = hasAnyText;
+    }
+    private void Render(DictationSession current) { reviewBaseline = CleanedSuggestion.Text.Length > 0 ? CleanedSuggestion.Text : current.Draft; CorrectionSuggestions.ItemsSource = null; rendering = true; Original.Text = current.Original; Draft.Text = current.Draft; rendering = false; UpdateDraftButtons(); UpdateDraftStats(); }
     private void Record_Click(object sender, RoutedEventArgs e) { if (session?.State == SessionState.Recording) StartStop(); else operation = BeginRecordingAsync(); }
     private void Draft_Changed(object sender, TextChangedEventArgs e) { if (!rendering)
         {
             session?.Edit(Draft.Text);
             if (liveDraft != null && session?.State is SessionState.Recording or SessionState.Transcribing)
             { liveDraft.Edit(Draft.Text); DraftStage.Text = "Your edits protected"; }
-        } if (CopyButton != null) CopyButton.IsEnabled = !string.IsNullOrWhiteSpace(Draft.Text); UpdateDraftStats(); }
+        } UpdateDraftButtons(); UpdateDraftStats(); }
     private void Copy_Click(object sender, RoutedEventArgs e) { try { Clipboard.SetText(Draft.Text); StatusDetail.Text = "Draft copied at your request."; } catch (System.Runtime.InteropServices.COMException) { StatusDetail.Text = "The clipboard is busy. Try again."; } }
     private void Original_Click(object sender, RoutedEventArgs e) { Draft.Text = Original.Text; }
-    private void Clear_Click(object sender, RoutedEventArgs e) { Cancel(); ResetLiveReview(); session = null; historySelection = null; Draft.Clear(); Original.Clear(); UpdateDraftStats(); Status.Text = "Ready to dictate"; StatusDetail.Text = "Your draft was cleared. History is still available."; }
+    private void Clear_Click(object sender, RoutedEventArgs e) { Cancel(); ResetLiveReview(); session = null; historySelection = null; Draft.Clear(); Original.Clear(); UpdateDraftButtons(); UpdateDraftStats(); Status.Text = "Ready to dictate"; StatusDetail.Text = "Your draft was cleared. History is still available."; }
     private void ShowShortcutNotice(string status, string detail) { Status.Text = status; StatusDetail.Text = detail; ShortcutStatus.Text = detail; barPreview.Stop(); overlay.Update(status, detail); overlay.ShowFor(0); barPreview.Start(); }
     private void Vocabulary_Click(object sender, RoutedEventArgs e) { if (processing || recorder != null) { VocabularyResult.Text = "Finish or cancel the current dictation before saving."; return; } try { SaveVocabulary(VocabularyRules.Parse(Vocabulary.Text)); VocabularyResult.Text = "Vocabulary saved on this device."; } catch (Exception ex) when (ex is FormatException or IOException) { VocabularyResult.Text = ex.Message; } }
     private void Snippets_Click(object sender, RoutedEventArgs e) { if (processing || recorder != null) { SnippetResult.Text = "Finish or cancel the current dictation before saving."; return; } try { SaveSnippets(SnippetRules.Parse(Snippets.Text)); SnippetResult.Text = "Snippets saved on this device."; } catch (Exception ex) when (ex is FormatException or IOException) { SnippetResult.Text = ex.Message; } }
@@ -587,7 +614,7 @@ public partial class MainWindow : Window
     }
     private async Task QuitCoreAsync()
     {
-        shutdownPending = true; IsEnabled = false; Cancel();
+        shutdownPending = true; IsEnabled = false; StopMicTest(); Cancel();
         modelLifetime.Cancel(); modelIdleTimer.Stop();
         try { await DrainForQuitAsync(liveOperation); }
         catch (TimeoutException) { ShowCleanupFailure("Waiting for live preview cleanup", "Try Quit again shortly."); return; }
@@ -641,7 +668,7 @@ public partial class MainWindow : Window
     {
         if (quitting) return;
         e.Cancel = true;
-        if (tray != null && preferences.CloseToTray && !arguments.Contains("--test-ui")) { if (recorder != null || processing || insertionTestHolding || preparing) Cancel(); else { barPreview.Stop(); overlay.Hide(); } Dispatcher.BeginInvoke(Hide); }
+        if (tray != null && preferences.CloseToTray && !arguments.Contains("--test-ui")) { StopMicTest(); if (recorder != null || processing || insertionTestHolding || preparing) Cancel(); else { barPreview.Stop(); overlay.Hide(); } Dispatcher.BeginInvoke(Hide); }
         else RequestQuit();
     }
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) => Dispatcher.BeginInvoke(() => { if (e.Mode == PowerModes.Suspend) Cancel(); hotkeys?.ResetBaseline(); });

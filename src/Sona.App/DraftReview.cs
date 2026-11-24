@@ -68,12 +68,49 @@ public partial class MainWindow
     private void ExportDraft_Click(object sender, RoutedEventArgs e)
     {
         if (SettingsBusy || string.IsNullOrWhiteSpace(Draft.Text)) return;
-        var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Export this draft for review", Filter = "Draft review (*.json)|*.json", FileName = "sona-draft-review.json", AddExtension = true, DefaultExt = ".json" };
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export this draft for review",
+            Filter = "Markdown (*.md)|*.md|Plain text (*.txt)|*.txt|Draft review (*.json)|*.json",
+            FileName = "sona-draft.md",
+            AddExtension = true,
+            DefaultExt = ".md"
+        };
         if (dialog.ShowDialog(this) != true) return;
         try
         {
-            var snapshot = new { Product = "Sona", Version = AppVersion.Number, BuildId = AppVersion.BuildId, ExportedAt = DateTimeOffset.Now, Original = Original.Text, Generated = reviewBaseline, Edited = Draft.Text, Model = Sona.App.Audio.Transcriber.SelectedModel(preferences), preferences.Language, preferences.CleanupEnabled, preferences.CleanupTone };
-            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }));
+            var extension = Path.GetExtension(dialog.FileName).ToLowerInvariant();
+            string content;
+            if (extension == ".json")
+            {
+                var snapshot = new { Product = "Sona", Version = AppVersion.Number, BuildId = AppVersion.BuildId, ExportedAt = DateTimeOffset.Now, Original = Original.Text, Generated = reviewBaseline, Edited = Draft.Text, Model = Sona.App.Audio.Transcriber.SelectedModel(preferences), preferences.Language, preferences.CleanupEnabled, preferences.CleanupTone };
+                content = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+            }
+            else if (extension == ".txt")
+            {
+                content = Draft.Text;
+            }
+            else
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("# Sona Draft");
+                sb.AppendLine();
+                sb.Append("Exported: ").AppendLine(DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append("Model: ").AppendLine(Sona.App.Audio.Transcriber.SelectedModel(preferences));
+                sb.AppendLine();
+                sb.AppendLine("## Draft");
+                sb.AppendLine();
+                sb.AppendLine(Draft.Text.TrimEnd());
+                if (!string.IsNullOrWhiteSpace(Original.Text) && !string.Equals(Original.Text, Draft.Text, StringComparison.Ordinal))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("## Original transcript");
+                    sb.AppendLine();
+                    sb.AppendLine(Original.Text.TrimEnd());
+                }
+                content = sb.ToString();
+            }
+            File.WriteAllText(dialog.FileName, content);
             DraftReviewResult.Text = "This draft was exported locally. Review the text before sharing the file; nothing was uploaded.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { DraftReviewResult.Text = "The draft could not be exported. Your draft remains here."; }

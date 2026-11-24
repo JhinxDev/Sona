@@ -168,12 +168,12 @@ internal static class CompletedDraftPasteChecks
         await insertion.PasteAsync(target, "retained draft", true);
         Check(transport.Pastes == 0 && transport.Enters == 0 && insertion.LastClipboardStatus == "CaptureFailed",
             "Clipboard capture refusal is visible in content-free delivery diagnostics");
-        transport = new() { RejectCapture = true, UnicodeAccepted = uint.MaxValue }; insertion.PasteTransportForTests = transport;
+        transport = new() { RejectCapture = true, RejectUnsupportedFormat = "0xC999:Embedded Object", UnicodeAccepted = uint.MaxValue }; insertion.PasteTransportForTests = transport;
         result = await insertion.PasteAsync(target, "Complete fallback draft", true, keepOnFailure: true);
         Check(result.Inserted && transport.UnicodeCalls == 1 && transport.Pastes == 0 && transport.Sets == 0 && transport.RestoreAttempts == 0 && transport.Enters == 1,
             "Capture failure sends one complete Unicode batch and one verified Enter without clipboard mutation");
-        Check(insertion.LastDeliveryRoute == "UnicodeBatch" && insertion.LastUnicodeAttempted && insertion.LastUnicodeConfirmed && !insertion.LastPasteRequested && !insertion.LastPasteConfirmed && !insertion.LastDraftOnClipboard && insertion.LastClipboardFailureCode == "UnsupportedFormat",
-            "Unicode route, confirmation and bounded capture reason do not claim clipboard paste");
+        Check(insertion.LastDeliveryRoute == "UnicodeBatch" && insertion.LastUnicodeAttempted && insertion.LastUnicodeConfirmed && !insertion.LastPasteRequested && !insertion.LastPasteConfirmed && !insertion.LastDraftOnClipboard && insertion.LastClipboardFailureCode == "UnsupportedFormat" && insertion.LastClipboardUnsupportedFormat == "0xC999:Embedded Object",
+            "Unicode route, confirmation and bounded capture reason do not claim clipboard paste and preserve unsupported format label");
         foreach (uint accepted in new uint[] { 0, 1, 6 })
         {
             transport = new() { RejectCapture = true, UnicodeAccepted = accepted }; insertion.PasteTransportForTests = transport;
@@ -227,10 +227,11 @@ internal static class CompletedDraftPasteChecks
         public uint? UnicodeAccepted;
         public bool HeldEnter;
         public string Payload = ""; public bool UnsupportedReadback, Partial, StaleValue, NewCopyAtRestore, StagePartial, RestorePartial, MaterializeOnCapture, RejectCapture;
-        public string? DocumentBefore, DocumentAfter, DocumentFinal;
+        public string? DocumentBefore, DocumentAfter, DocumentFinal, RejectUnsupportedFormat;
         private int documentReadsAfterPaste;
         public Action? AfterPaste, BeforePasteRead, OnCaptureFailure, AfterUnicode;
         public Action<int>? OnDelay;
+        public string? LastClipboardUnsupportedFormat => RejectCapture ? RejectUnsupportedFormat : null;
         public object SaveClipboard() { Saves++; if (RejectCapture) { OnCaptureFailure?.Invoke(); throw new System.Runtime.InteropServices.ExternalException("Clipboard contains a format that cannot be safely preserved."); } if (MaterializeOnCapture) Sequence++; return "private prior formats"; }
         public ClipboardChange SetClipboard(object? previous, string text) { Sets++; Payload = text; return new(StagePartial ? ClipboardChangeStatus.FailedOwnedPartial : ClipboardChangeStatus.Staged, ++Sequence); }
         public uint ClipboardSequence => Sequence;

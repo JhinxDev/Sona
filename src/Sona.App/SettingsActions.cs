@@ -1,7 +1,5 @@
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
 using Sona.App.Audio;
 using Sona.Core;
 
@@ -9,9 +7,8 @@ namespace Sona.App;
 
 public partial class MainWindow
 {
-    private readonly DispatcherTimer settingsActionTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private bool restoringIdleChoice;
-    private bool HasUnsavedGeneralSettings(Preferences? candidate = null) => JsonSerializer.Serialize(candidate ?? ReadGeneralPreferences()) != JsonSerializer.Serialize(preferences);
+    private bool HasUnsavedGeneralSettings(Preferences? candidate = null) => !(candidate ?? ReadGeneralPreferences()).GeneralSettingsEqual(preferences);
     private bool HasUnsavedProtectionSettings =>
         (ProtectionEnabled.IsChecked == true) != preferences.ProtectionEnabled ||
         (SilenceIncoming.IsChecked == true) != preferences.SilenceIncoming ||
@@ -25,7 +22,7 @@ public partial class MainWindow
     // and call-protection configuration, which retain their explicit save actions.
     private Preferences ReadGeneralPreferences()
     {
-        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var next = preferences.Clone();
         next.Language = (string)((ComboBoxItem)SpeechLanguage.SelectedItem).Tag;
         next.Engine = TranscriptionEngine.SelectedIndex == 1 ? "FastCpu" : "Auto";
         next.Style = (string)((ComboBoxItem)DraftStyle.SelectedItem).Content;
@@ -55,9 +52,10 @@ public partial class MainWindow
         PanelDisplay.Checked += (_, _) => RefreshSettingsActions(); CapsuleDisplay.Checked += (_, _) => RefreshSettingsActions();
         ProtectionEnabled.Checked += ProtectionToggleChanged; ProtectionEnabled.Unchecked += ProtectionToggleChanged;
         SilenceIncoming.Checked += ProtectionToggleChanged; SilenceIncoming.Unchecked += ProtectionToggleChanged;
+        WatchedApps.TextChanged += (_, _) => RefreshSettingsActions();
+        ProtectionDelay.TextChanged += (_, _) => RefreshSettingsActions();
+        ProtectionShortcutInput.TextChanged += (_, _) => RefreshSettingsActions();
         ModelIdleChoice.SelectionChanged += ModelIdleChanged;
-        settingsActionTimer.Tick += (_, _) => RefreshSettingsActions();
-        Loaded += (_, _) => settingsActionTimer.Start(); Closed += (_, _) => settingsActionTimer.Stop();
         RefreshSettingsActions();
     }
 
@@ -68,6 +66,11 @@ public partial class MainWindow
         PreferencesSaveBar.Visibility = HasUnsavedGeneralSettings(next) ? Visibility.Visible : Visibility.Collapsed;
 
         SavePreferencesButton.IsEnabled = !SettingsBusy;
+        if (TestMicrophoneButton != null)
+        {
+            TestMicrophoneButton.IsEnabled = !arguments.Contains("--test-ui") && !SettingsBusy;
+            if (SettingsBusy && micTestActive) StopMicTest();
+        }
         RefreshHistoryActions(); RefreshQuickCleanup();
         // Programmatic initialization is guarded; deliberate switch changes save directly.
         ProtectionEnabled.IsEnabled = !SettingsBusy && !discordConnectionBusy;
@@ -111,7 +114,7 @@ public partial class MainWindow
         if (restoringIdleChoice || ModelIdleChoice.SelectedItem is not ComboBoxItem item || !int.TryParse((string)item.Tag, out var minutes) || minutes == preferences.ModelIdleMinutes) return;
         // Memory residency is a simple saved preference; a warm operation must not reject it.
         if (shutdownPending || processing || recorder != null || preparing || session?.State == SessionState.Recording) { RestoreModelIdle(); ModelResult.Text = "Finish or cancel the current dictation before changing the memory preference."; return; }
-        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var next = preferences.Clone();
         next.ModelIdleMinutes = minutes;
         try { next.Save(preferencesPath); preferences.ModelIdleMinutes = minutes; transcriber.UpdateModelIdle(minutes); ModelResult.Text = minutes == 0 ? "Saved. This model stays loaded until you quit Sona." : $"Saved. The model unloads after {minutes} minutes idle."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)

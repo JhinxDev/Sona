@@ -7,6 +7,7 @@ namespace Sona.App;
 public partial class MainWindow
 {
     private readonly List<AppMode> pendingAppModes = [];
+    private readonly List<string> recentObservedApps = [];
 
     private sealed record AppModeRow(AppMode Mode)
     {
@@ -20,6 +21,34 @@ public partial class MainWindow
         pendingAppModes.Clear();
         pendingAppModes.AddRange(preferences.AppModes);
         RefreshAppModes();
+        RefreshRecentApps();
+    }
+
+    private void ObserveRecentApp(string? name)
+    {
+        var trimmed = (name ?? "").Trim();
+        if (trimmed.Length == 0 || !AppModes.ValidName(trimmed)) return;
+        if (trimmed is "Sona" or "No focused text field" or "No active app" or "Unknown app" or "Captured app" or "Checking destination") return;
+        if (recentObservedApps.Count > 0 && recentObservedApps[0].Equals(trimmed, StringComparison.OrdinalIgnoreCase)) return;
+        recentObservedApps.RemoveAll(existing => existing.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        recentObservedApps.Insert(0, trimmed);
+        if (recentObservedApps.Count > 8) recentObservedApps.RemoveRange(8, recentObservedApps.Count - 8);
+        if (Pages?.SelectedIndex == 2 || RecentAppsList?.ItemsSource == null) RefreshRecentApps();
+    }
+
+    private void RefreshRecentApps()
+    {
+        if (RecentAppsPanel == null || RecentAppsList == null) return;
+        RecentAppsPanel.Visibility = recentObservedApps.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        RecentAppsList.ItemsSource = recentObservedApps.Count == 0 ? null : recentObservedApps.ToArray();
+    }
+
+    private void UseRecentApp_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string app }) return;
+        AppModeApp.Text = app;
+        AppModeApp.Focus();
+        AppModeApp.CaretIndex = app.Length;
     }
 
     private void RefreshAppModes()

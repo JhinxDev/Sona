@@ -15,11 +15,20 @@ internal sealed class OwnedClipboard
 {
     internal const int MaximumBytes = 64 * 1024 * 1024;
     internal const int MaximumFormats = 128;
+    private static readonly HashSet<string> BlockedRegisteredFormats = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Embedded Object", "Embed Source", "Object Descriptor", "Link Source", "Link Source Descriptor",
+        "Link", "ObjectLink", "OwnerLink", "Native", "FileContents", "FileGroupDescriptor",
+        "FileGroupDescriptorW", "RichEdit Text and Objects", "EnhancedMetafile", "MetaFilePict",
+        "DragContext", "DragImageBits", "UsingDefaultDragImage", "InShellDragLoop",
+        "Shell Object Offsets", "AsyncFlag", "UntrustedDragDrop", "IsShowingLayered", "IsComputingImage"
+    };
     private readonly IClipboardNative native;
     private readonly Func<nint> owner;
     internal OwnedClipboard(Func<nint> owner, IClipboardNative? native = null)
     { this.owner = owner; this.native = native ?? new ClipboardNative(); }
     internal uint Sequence => native.Sequence;
+    internal string? LastUnsupportedFormat { get; private set; }
     internal readonly record struct Content(uint Format, byte[] Bytes, nint Bitmap = 0, int BitmapBytes = 0, bool Marker = false);
 
     internal sealed class Snapshot : IDisposable
@@ -44,6 +53,7 @@ internal sealed class OwnedClipboard
 
     internal Snapshot Capture()
     {
+        LastUnsupportedFormat = null;
         var hwnd = owner();
         if (hwnd == 0 || !native.Open(hwnd)) throw new ExternalException("Clipboard is unavailable.");
         var snapshot = new Snapshot(this);
@@ -62,19 +72,33 @@ internal sealed class OwnedClipboard
             // OleDuplicateData does not turn those into bounded, portable bytes.
             // https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats
             foreach (var format in formats)
-                if (!Supported(format)) throw new ExternalException("Clipboard contains a format that cannot be safely preserved.");
+            {
+                if (!Supported(format))
+                {
+                    LastUnsupportedFormat = FormatLabel(format);
+                    throw new ExternalException("Clipboard contains a format that cannot be safely preserved.");
+                }
+            }
             var remaining = MaximumBytes;
             foreach (var format in formats)
             {
-                if (format == 2)
+                try
                 {
-                    var bitmap = native.ReadBitmap(remaining);
-                    snapshot.Formats.Add(new(format, [], bitmap.Handle, bitmap.Bytes));
-                    remaining -= bitmap.Bytes;
-                    continue;
+                    if (format == 2)
+                    {
+                        var bitmap = native.ReadBitmap(remaining);
+                        snapshot.Formats.Add(new(format, [], bitmap.Handle, bitmap.Bytes));
+                        remaining -= bitmap.Bytes;
+                        continue;
+                    }
+                    var bytes = native.Read(format, remaining);
+                    snapshot.Formats.Add(new(format, bytes, Marker: bytes.Length == 0)); remaining -= bytes.Length;
                 }
-                var bytes = native.Read(format, remaining);
-                snapshot.Formats.Add(new(format, bytes, Marker: bytes.Length == 0)); remaining -= bytes.Length;
+                catch (ExternalException)
+                {
+                    LastUnsupportedFormat ??= FormatLabel(format);
+                    throw;
+                }
             }
             // Delayed renderers may add formats while answering GetClipboardData.
             // Refuse an incomplete snapshot instead of silently dropping them.
@@ -90,19 +114,50 @@ internal sealed class OwnedClipboard
     // These exact OLE bookkeeping formats describe the original IDataObject's
     // owner/FORMATETC transport, not user payload. Replaying the original HWND
     // or marshalled object descriptor after taking ownership would be invalid.
-    // Materialize all supported payloads; unknown real OLE object formats still
-    // refuse. OleGetClipboard builds a data object over the restored formats.
+    // Materialize all supported payloads; blocked OLE/framework/pointer formats
+    // still refuse. OleGetClipboard builds a data object over restored formats.
     // https://learn.microsoft.com/en-us/windows/win32/api/ole2/nf-ole2-olegetclipboard
     // https://github.com/wine-mirror/wine/blob/master/dlls/ole32/tests/clipboard.c
     private bool IsOleBookkeeping(uint format) => format >= 0xC000 &&
         native.FormatName(format) is "DataObject" or "Ole Private Data";
 
-    private bool Supported(uint format) => format is 1 or 2 or 4 or 5 or 6 or 7 or 8 or 11 or 13 or 15 or 16 or 17 ||
-        format >= 0xC000 && native.FormatName(format) is
-            "HTML Format" or "Rich Text Format" or "Rich Text Format Without Objects" or "PNG" or
-            "Chromium internal source URL" or "WebKit Smart Paste Format" or
-            "Preferred DropEffect" or "Performed DropEffect" or "Paste Succeeded" or
-            "ExcludeClipboardContentFromMonitorProcessing" or "CanIncludeInClipboardHistory" or "CanUploadToCloudClipboard";
+    private bool Supported(uint format)
+    {
+        if (format is 1 or 2 or 4 or 5 or 6 or 7 or 8 or 11 or 13 or 15 or 16 or 17) return true;
+        if (format < 0xC000) return false;
+        var name = native.FormatName(format);
+        return !string.IsNullOrWhiteSpace(name) && !IsBlockedRegisteredFormat(name);
+    }
+
+    private static bool IsBlockedRegisteredFormat(string name)
+    {
+        foreach (var ch in name)
+            if (char.IsControl(ch)) return true;
+        return name.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Windows.", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Microsoft.VisualStudio.", StringComparison.OrdinalIgnoreCase) ||
+            BlockedRegisteredFormats.Contains(name);
+    }
+
+    private string FormatLabel(uint format)
+    {
+        var raw = format >= 0xC000 ? native.FormatName(format) : StandardFormatName(format);
+        var sanitized = new string(raw.Where(c => c >= ' ' && c <= '~').Take(72).ToArray()).Trim();
+        return string.IsNullOrEmpty(sanitized) ? $"0x{format:X}" : $"0x{format:X}:{sanitized}";
+    }
+
+    private static string StandardFormatName(uint format) => format switch
+    {
+        3 => "CF_METAFILEPICT",
+        9 => "CF_PALETTE",
+        10 => "CF_PENDATA",
+        12 => "CF_WAVE",
+        14 => "CF_ENHMETAFILE",
+        0x80 => "CF_OWNERDISPLAY",
+        >= 0x0200 and <= 0x02FF => "CF_PRIVATE",
+        >= 0x0300 and <= 0x03FF => "CF_GDIOBJ",
+        _ => ""
+    };
 
     internal ClipboardChange TrySetText(Snapshot snapshot, string text)
     {

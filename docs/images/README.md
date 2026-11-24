@@ -1,5 +1,15 @@
 # README image provenance
 
+## 0.7.0 interface captures
+
+`home-070.png`, `modes-070.png`, `history-070.png`, `settings-diagnostics-070.png`, and `models-070.png` were captured November 24, 2026 from the Sona 0.7.0 UI using isolated offscreen `--test-ui` WPF client renders (`RenderTargetBitmap` at 2x DPI scale) against a synthetic `SONA_DATA` profile in the Amethyst palette. No live microphone, owner profile, clipboard, credentials, or global input were used, and demo identity text was sanitized so no local username path appears.
+
+- `home-070.png` (2452 x 1565 px, 1225.6 x 782.4 DIP) SHA-256: `eb6c0631a3fce3d406931e00278b441d1521d1629886c4df0c2e21f1fa1c953e`
+- `modes-070.png` (2452 x 1565 px, 1225.6 x 782.4 DIP) SHA-256: `036a37bce7fa685e7a331960f088ec0accf9b287ff8f441d667954763df8a28f`
+- `history-070.png` (2452 x 1565 px, 1225.6 x 782.4 DIP) SHA-256: `029dcc84e6508f17ecc4250dd843ff65f6807af3989c98327afcae34f9e964fe`
+- `settings-diagnostics-070.png` (2452 x 1565 px, 1225.6 x 782.4 DIP) SHA-256: `581e8390c2f64d316bed48dd769aa323cfd1103c85c4ff18658e6d64c71a1271`
+- `models-070.png` (2532 x 1725 px, 1265.6 x 862.4 DIP) SHA-256: `006237f1e22d6ee264749ad6a5b43734995a187c1b8a8cbb635434b11a4c34a0`
+
 ## 0.5.0 welcome and per-app modes captures
 
 `sona-welcome-050.png` and `sona-modes-050.png` were captured November 6, 2026

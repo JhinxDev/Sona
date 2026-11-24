@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Windows;
 using Sona.Core;
 
@@ -44,7 +43,7 @@ public partial class MainWindow
         try
         {
             // Persist only committed values, never unsaved form edits from another page.
-            var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+            var next = preferences.Clone();
             next.OnboardingDismissed = true;
             next.Save(preferencesPath);
             preferences.OnboardingDismissed = true;

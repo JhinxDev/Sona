@@ -1,7 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Sona.Core;
 namespace Sona.App;
@@ -116,28 +120,36 @@ public partial class MainWindow
             var filter = CurrentHistoryFilter(); var now = DateTimeOffset.Now;
             var visible = HistoryFiltering.Visible(historyEntries, filter, HistorySearch.Text, now, TimeZoneInfo.Local);
             var view = new ListCollectionView(visible);
-            view.GroupDescriptions.Add(new PropertyGroupDescription { Converter = new HistoryDayGroupConverter() });
+            view.GroupDescriptions.Add(new PropertyGroupDescription { Converter = DayGroupConverter });
             History.IsSynchronizedWithCurrentItem = false;
             History.ItemsSource = view;
             History.SelectedItem = null;
             HistoryDay.Visibility = filter.Range == Sona.Core.HistoryRange.SpecificDay ? Visibility.Visible : Visibility.Collapsed;
             HistoryEmpty.Text = historyEntries.Count == 0 ? "No history yet. Your dictations will appear here." : "No dictations match this range and search.";
             HistoryEmpty.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (ClearHistorySearchButton != null)
+                ClearHistorySearchButton.Visibility = string.IsNullOrEmpty(HistorySearch.Text) ? Visibility.Collapsed : Visibility.Visible;
             HistoryLabel.Text = preferences.KeepHistory ? "Your past dictations, stored locally on this device." : "New dictations stay in this session. Previously stored history and explicitly saved drafts remain on this device.";
-            var ids = HistoryFiltering.ClearableIds(historyEntries, filter, HistorySearch.Text, now, TimeZoneInfo.Local);
+            var ids = visible.Where(item => !item.Saved).Select(item => item.Id).Distinct().ToArray();
             var saved = historyEntries.Count(item => item.Saved);
             HistoryCountPreview.Text = $"{ids.Length} recent {(ids.Length == 1 ? "record" : "records")} in {HistoryFiltering.RangeLabel(filter)}{(string.IsNullOrWhiteSpace(HistorySearch.Text) ? "" : " matching your search")}. {saved} saved {(saved == 1 ? "draft stays" : "drafts stay")} separate.";
             ClearHistoryButton.Content = "Clear recent history";
-            RefreshHistoryActions();
+            RefreshHistoryActions(ids.Length, visible.Count);
             if (pendingHistoryClear != null && pendingHistoryClear.Any(id => !ids.Contains(id))) ResetHistoryClear();
         }
         finally { historyRefreshing = false; }
     }
-    private void RefreshHistoryActions()
+    private void RefreshHistoryActions(int? clearableCount = null, int? visibleCount = null)
     {
         if (ClearHistoryButton == null || PauseHistoryButton == null || HistoryRange == null || HistoryDay == null || HistorySearch == null) return;
-        var count = HistoryFiltering.ClearableIds(historyEntries, CurrentHistoryFilter(), HistorySearch.Text, DateTimeOffset.Now, TimeZoneInfo.Local).Length;
-        ClearHistoryButton.IsEnabled = !SettingsBusy && count > 0;
+        if (clearableCount == null || visibleCount == null)
+        {
+            var visible = HistoryFiltering.Visible(historyEntries, CurrentHistoryFilter(), HistorySearch.Text, DateTimeOffset.Now, TimeZoneInfo.Local);
+            clearableCount ??= visible.Count(item => !item.Saved);
+            visibleCount ??= visible.Count;
+        }
+        ClearHistoryButton.IsEnabled = !SettingsBusy && clearableCount.Value > 0;
+        if (ExportHistoryButton != null) ExportHistoryButton.IsEnabled = !SettingsBusy && visibleCount.Value > 0;
         ConfirmHistoryClear.IsEnabled = !SettingsBusy && pendingHistoryClear != null;
         PauseHistoryButton.IsEnabled = preferencesLoad.CanSave && !preferencesApplying && !shutdownPending;
         PauseHistoryButton.Content = preferences.HistoryPaused ? "Resume history" : "Pause history";
@@ -150,7 +162,7 @@ public partial class MainWindow
     private void PauseHistory_Click(object sender, RoutedEventArgs e)
     {
         if (!preferencesLoad.CanSave || preferencesApplying || shutdownPending) { HistoryResult.Text = "History pause is unavailable until preferences can be saved."; return; }
-        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var next = preferences.Clone();
         next.HistoryPaused = !preferences.HistoryPaused;
         try
         {
@@ -188,16 +200,100 @@ public partial class MainWindow
         ResetHistoryClear(); RefreshHistory();
     }
     private void HistoryDay_Changed(object sender, SelectionChangedEventArgs e) { ResetHistoryClear(); RefreshHistory(); }
+    private static readonly HistoryDayGroupConverter DayGroupConverter = new();
     private sealed class HistoryDayGroupConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is HistoryItem item ? HistoryFiltering.GroupLabel(item, TimeZoneInfo.Local, culture) : "Recent dictations";
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
     }
 
-    private void History_Changed(object sender, SelectionChangedEventArgs e)
+    private void History_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (historyRefreshing) return;
-        if (History.SelectedItem is HistoryItem item) RestoreHistoryDraft(item);
+        if (historyRefreshing || e.OriginalSource is not DependencyObject source) return;
+        for (var current = source; current != null && !ReferenceEquals(current, History); current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is ButtonBase) return;
+            if (current is ListBoxItem { DataContext: HistoryItem item })
+            {
+                RestoreHistoryDraft(item);
+                e.Handled = true;
+                return;
+            }
+        }
+    }
+    private void History_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && History.SelectedItem is HistoryItem item)
+        {
+            RestoreHistoryDraft(item);
+            e.Handled = true;
+        }
+    }
+    private void CopyHistoryDraft_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: HistoryItem item }) return;
+        try
+        {
+            Clipboard.SetText(item.Draft);
+            HistoryResult.Text = "History draft copied to clipboard.";
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            HistoryResult.Text = "The clipboard is busy. Try again.";
+        }
+    }
+    private void ClearHistorySearch_Click(object sender, RoutedEventArgs e)
+    {
+        if (HistorySearch.Text.Length > 0) HistorySearch.Clear();
+        HistorySearch.Focus();
+    }
+    private void ExportHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (SettingsBusy) { HistoryResult.Text = "Finish dictation before exporting history."; return; }
+        var filter = CurrentHistoryFilter();
+        var visible = HistoryFiltering.Visible(historyEntries, filter, HistorySearch.Text, DateTimeOffset.Now, TimeZoneInfo.Local);
+        if (visible.Count == 0) { HistoryResult.Text = "No visible history records to export."; return; }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export visible history",
+            Filter = "Markdown (*.md)|*.md",
+            FileName = $"sona-history-{DateTime.Now:yyyy-MM-dd}.md",
+            AddExtension = true,
+            DefaultExt = ".md"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# Sona Dictation History");
+            sb.AppendLine();
+            sb.Append("Exported: ").AppendLine(DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+            sb.Append("Filter: ").AppendLine(HistoryFiltering.RangeLabel(filter) + (string.IsNullOrWhiteSpace(HistorySearch.Text) ? "" : $" (search: {HistorySearch.Text.Trim()})"));
+            sb.AppendLine();
+            string? currentGroup = null;
+            foreach (var item in visible)
+            {
+                var group = HistoryFiltering.GroupLabel(item, TimeZoneInfo.Local, CultureInfo.CurrentCulture);
+                if (!string.Equals(group, currentGroup, StringComparison.Ordinal))
+                {
+                    currentGroup = group;
+                    sb.Append("## ").AppendLine(group);
+                    sb.AppendLine();
+                }
+                sb.Append("### ").Append(item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+                if (item.Saved) sb.Append(" (Saved)");
+                sb.AppendLine();
+                sb.AppendLine();
+                sb.AppendLine(item.Draft.TrimEnd());
+                sb.AppendLine();
+            }
+            File.WriteAllText(dialog.FileName, sb.ToString());
+            HistoryResult.Text = $"Exported {visible.Count} {(visible.Count == 1 ? "record" : "records")} locally. Review before sharing; nothing was uploaded.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            HistoryResult.Text = "History could not be exported. Existing records are preserved.";
+        }
     }
     private void OpenHistoryDraft_Click(object sender, RoutedEventArgs e)
     {

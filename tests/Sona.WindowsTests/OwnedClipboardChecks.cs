@@ -111,11 +111,21 @@ internal static class OwnedClipboardChecks
             var (n, c) = Create(); using var snapshot = c.Capture(); var staged = c.TrySetText(snapshot, "draft"); n.FailEmpty = true;
             Check(c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Unavailable && n.Owned.Count == 0, "Failed EmptyClipboard must retain current clipboard and release preparation.");
         }
-        foreach (uint format in new uint[] { 3, 9, 14, 0x80, 0x201, 0xC999 })
+        foreach (uint format in new uint[] { 3, 9, 14, 0x80, 0x201, 0xC999, 0xC99A, 0xC99B, 0xC99C, 0xC99D, 0xC99E })
         {
             var (n, c) = Create(); n.Contents[format] = [1];
             bool refused = false; try { using var snapshot = c.Capture(); } catch (ExternalException) { refused = true; }
-            Check(refused && n.EmptyCalls == 0 && n.OpenCount == n.CloseCount, "Unsupported formats must refuse before any mutation.");
+            Check(refused && !string.IsNullOrEmpty(c.LastUnsupportedFormat) && n.EmptyCalls == 0 && n.OpenCount == n.CloseCount, "Unsupported formats must refuse before any mutation and record a content-free format label.");
+        }
+        {
+            var (n, c) = Create();
+            n.UserCopy((13u, new byte[] { 65, 0, 0, 0 }), (0xC101u, [1, 2]), (0xC102u, [3]), (0xC103u, [4, 5]), (0xC104u, [6, 7]), (0xC105u, [8, 9]), (0xC106u, [10]), (0xC107u, [11]), (0xC108u, [12]), (0xC109u, [13]), (0xC10Au, [14]), (0xC10Bu, [15]));
+            var original = n.CopyContents();
+            using var snapshot = c.Capture();
+            Check(c.LastUnsupportedFormat == null, "Supported registered formats clear LastUnsupportedFormat.");
+            var staged = c.TrySetText(snapshot, "modern formats");
+            Check(staged.Status == ClipboardChangeStatus.Staged && c.Restore(snapshot, staged.Sequence).Status == ClipboardChangeStatus.Restored && n.SameContents(original),
+                "Modern safe registered formats (Chromium, VS Code, Explorer IDList/FileNameW, GIF/JFIF/CSV) preserve and restore byte-for-byte.");
         }
         {
             var (n, c) = Create(); n.FailRead = true;
@@ -244,7 +254,13 @@ internal static class OwnedClipboardChecks
         {
             0xC001 => "HTML Format", 0xC002 => "CanIncludeInClipboardHistory", 0xC003 => "CanUploadToCloudClipboard",
             0xC004 => "Chromium internal source URL", 0xC005 => "WebKit Smart Paste Format",
-            0xC006 => "DataObject", 0xC007 => "Ole Private Data", _ => "unknown owner-specific format"
+            0xC006 => "DataObject", 0xC007 => "Ole Private Data",
+            0xC101 => "org.chromium.web-custom-data", 0xC102 => "chromium/x-renderer-taint", 0xC103 => "vscode-editor-data",
+            0xC104 => "Shell IDList Array", 0xC105 => "FileNameW", 0xC106 => "UniformResourceLocatorW",
+            0xC107 => "GIF", 0xC108 => "JFIF", 0xC109 => "CSV", 0xC10A => "text/html", 0xC10B => "text/plain",
+            0xC999 => "Embedded Object", 0xC99A => "System.Windows.Media.Imaging.BitmapSource",
+            0xC99B => "Object Descriptor", 0xC99C => "Link Source", 0xC99D => "OwnerLink", 0xC99E => "FileContents",
+            _ => "unknown owner-specific format"
         };
         public uint RegisterFormat(string name) => FailRegistration ? 0u : name switch
         { "CanIncludeInClipboardHistory" => 0xC002u, "CanUploadToCloudClipboard" => 0xC003u, _ => throw new InvalidOperationException("Unexpected registration.") };

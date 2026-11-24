@@ -22,9 +22,9 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $runtimeRoot = if ($env:SONA_RUNTIME) { $env:SONA_RUNTIME } else { 'E:\DevelopmentTools\local-dictation' }
 $sdk = Join-Path $runtimeRoot 'sdk'
 if (Test-Path (Join-Path $sdk 'dotnet.exe')) {
-    $env:DOTNET_ROOT = $sdk
-    $env:DOTNET_CLI_HOME = Join-Path $runtimeRoot 'dotnet-home'
-    $env:NUGET_PACKAGES = 'E:\DevelopmentCaches\nuget'
+    if (-not $env:DOTNET_ROOT) { $env:DOTNET_ROOT = $sdk }
+    if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = Join-Path $runtimeRoot 'dotnet-home' }
+    if (-not $env:NUGET_PACKAGES) { $env:NUGET_PACKAGES = Join-Path $runtimeRoot 'nuget' }
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
     $dotnet = Join-Path $sdk 'dotnet.exe'
 } else {

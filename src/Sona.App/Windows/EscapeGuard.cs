@@ -13,6 +13,7 @@ public sealed class EscapeGuard : IDisposable
     private readonly Thread listener;
     private readonly ManualResetEventSlim ready = new();
     private readonly object requestGate = new();
+    private readonly object requestSync = new();
     private nint hook;
     private uint listenerId;
     private int disposed;
@@ -67,16 +68,27 @@ public sealed class EscapeGuard : IDisposable
             if (Volatile.Read(ref disposed) != 0) return;
             if (listenerId == 0 || !listener.IsAlive) throw new IOException("Windows could not enable cancellation. Recording was not started.");
             using var done = new ManualResetEventSlim();
-            requestError = null;
-            requestDone = done;
+            lock (requestSync)
+            {
+                requestError = null;
+                requestDone = done;
+            }
             try
             {
                 if (!PostThreadMessage(listenerId, message, 0, 0)) throw new IOException("Windows could not enable cancellation. Recording was not started.");
                 if (!done.Wait(TimeSpan.FromSeconds(2))) throw new IOException("Windows did not confirm cancellation availability.");
             }
-            finally { requestDone = null; }
+            finally
+            {
+                lock (requestSync) requestDone = null;
+            }
             if (requestError != null) throw new IOException("Windows could not enable cancellation. Recording was not started.", requestError);
         }
+    }
+
+    private void CompleteRequest()
+    {
+        lock (requestSync) { requestDone?.Set(); }
     }
 
     private void Listen()
@@ -102,7 +114,7 @@ public sealed class EscapeGuard : IDisposable
             armed = false;
             if (hook != 0) { UnhookWindowsHookEx(hook); hook = 0; }
             ready.Set();
-            requestDone?.Set();
+            CompleteRequest();
         }
     }
 
@@ -123,15 +135,17 @@ public sealed class EscapeGuard : IDisposable
             }
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException) { requestError = ex; }
-        finally { requestDone?.Set(); }
+        finally { CompleteRequest(); }
     }
 
     private nint OnKey(int code, nint message, nint data)
     {
         // Active-only, Esc-only. No key history, text, or modifier state is recorded.
+        // Dispatch off the low-level keyboard hook thread so synchronous audio/token
+        // handlers cannot stall past LowLevelHooksTimeout.
         if (armed && code >= 0 && (message == 0x100 || message == 0x104) && Marshal.ReadInt32(data) == 0x1B)
         {
-            cancelImmediately();
+            ThreadPool.QueueUserWorkItem(static action => ((Action)action!)(), cancelImmediately);
             return 1;
         }
         return CallNextHookEx(hook, code, message, data);

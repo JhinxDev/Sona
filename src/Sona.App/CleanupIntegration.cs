@@ -39,15 +39,17 @@ public partial class MainWindow
         next.CleanupEngine = (string)((ComboBoxItem)CleanupEngineChoice.SelectedItem).Tag;
         next.CleanupIdleMinutes = int.Parse((string)((ComboBoxItem)CleanupIdleChoice.SelectedItem).Tag);
     }
+    private int cleanupExpiryInFlight;
     private void InitializeCleanup()
     {
         RefreshCleanupChoices(); RefreshCleanupStatus();
         modelIdleTimer.Tick += async (_, _) =>
         {
-            if (shutdownPending || SettingsBusy) return;
-            try { await cleanupModel.ExpireAsync(modelLifetime.Token); RefreshCleanupStatus(); }
+            if (shutdownPending || SettingsBusy || Interlocked.Exchange(ref cleanupExpiryInFlight, 1) != 0) return;
+            try { await cleanupModel.ExpireAsync(modelLifetime.Token); RefreshCleanupStatus(); RefreshSettingsActions(); }
             catch (OperationCanceledException) { }
             catch (IOException) { CleanupMemory.Text = "Cleanup memory is still releasing. Try Unload cleanup model."; }
+            finally { Interlocked.Exchange(ref cleanupExpiryInFlight, 0); }
         };
         Closed += (_, _) => cleanupInstallCancellation?.Dispose();
     }
@@ -61,15 +63,18 @@ public partial class MainWindow
             : cleanupModel.AvailableFor(preferences) ? "Installed · not loaded in memory"
             : "Set up the selected backend to download the local model and runtime.";
     }
-    private async Task WarmAllSelectedAsync()
+    private bool cleanupWarming;
+    private Task WarmAllSelectedAsync()
     {
-        await WarmSelectedAsync();
-        cleanupPreparation = WarmCleanupAsync(); await cleanupPreparation;
+        var speech = WarmSelectedAsync();
+        var cleanup = cleanupPreparation = WarmCleanupAsync();
+        return Task.WhenAll(speech, cleanup);
     }
     private async Task WarmCleanupAsync()
     {
-        if (arguments.Contains("--test-ui") || SettingsBusy || shutdownPending) return;
-        preferencesApplying = true;
+        if (arguments.Contains("--test-ui") || shutdownPending || cleanupWarming || preferencesApplying || processing || recorder != null || preparing || downloadingModel != null || cleanupInstalling) return;
+        cleanupWarming = true;
+        RefreshSettingsActions();
         try
         {
             if (preferences.CleanupEnabled && !cleanupModel.AvailableFor(preferences)) { await cleanupModel.UnloadAsync(modelLifetime.Token); CleanupResult.Text = "Set up the selected backend first. Dictation still works with basic cleanup."; return; }
@@ -79,7 +84,7 @@ public partial class MainWindow
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is IOException or TimeoutException or System.ComponentModel.Win32Exception) { CleanupResult.Text = "Cleanup model could not load. Choose CPU / RAM or check the installed GPU backend."; }
-        finally { preferencesApplying = false; if (!shutdownPending) RefreshCleanupStatus(); }
+        finally { cleanupWarming = false; if (!shutdownPending) { RefreshCleanupStatus(); RefreshSettingsActions(); } }
     }
     private async Task<PolishedText> PolishAsync(string original, CancellationToken token, string? appName = null, Preferences? settings = null)
     {
@@ -117,21 +122,23 @@ public partial class MainWindow
     {
         cleanupInstalling = true; cleanupPercent = 0; cleanupOutcome = "installing";
         cleanupInstallCancellation?.Dispose(); cleanupInstallCancellation = new(); InstallCleanupButton.IsEnabled = false;
+        RefreshSettingsActions();
         var progress = new Progress<int>(p => { cleanupPercent = p; CleanupResult.Text = $"Setting up local cleanup: {p}%"; });
         try { await CleanupAssets.RetryCleanupAsync(); await CleanupAssets.InstallAsync(engine, progress, cleanupInstallCancellation.Token); cleanupPercent = 100; cleanupOutcome = "installed"; CleanupResult.Text = "Setup verified. Enable cleanup and Save preferences to use it."; }
         catch (OperationCanceledException) { cleanupOutcome = "cancelled"; CleanupResult.Text = "Setup cancelled. Existing installed assets were preserved."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException)
         { cleanupOutcome = "failed"; CleanupResult.Text = "Setup could not finish. Existing files were preserved. Check connection and disk space."; }
-        finally { cleanupInstalling = false; InstallCleanupButton.IsEnabled = true; RefreshCleanupStatus(); }
+        finally { cleanupInstalling = false; InstallCleanupButton.IsEnabled = true; RefreshCleanupStatus(); RefreshSettingsActions(); }
     }
     private async void CancelCleanupSetup_Click(object sender, RoutedEventArgs e)
     {
         if (cleanupInstalling) { cleanupInstallCancellation?.Cancel(); return; }
         if (SettingsBusy) return;
         preferencesApplying = true;
+        RefreshSettingsActions();
         try { await CleanupAssets.RetryCleanupAsync(); CleanupResult.Text = "Setup cleanup completed."; }
         catch (IOException) { CleanupResult.Text = "A setup file is still locked. Try again shortly."; }
-        finally { preferencesApplying = false; }
+        finally { preferencesApplying = false; RefreshSettingsActions(); }
     }
     private async void LoadCleanup_Click(object sender, RoutedEventArgs e)
     {
@@ -143,8 +150,9 @@ public partial class MainWindow
     {
         if (SettingsBusy) return;
         preferencesApplying = true;
+        RefreshSettingsActions();
         try { await cleanupModel.UnloadAsync(modelLifetime.Token); CleanupResult.Text = "Cleanup model unloaded. The next dictation will load it again."; }
         catch (Exception ex) when (ex is IOException or OperationCanceledException) { CleanupResult.Text = "Cleanup memory release needs attention. Try again shortly."; }
-        finally { preferencesApplying = false; RefreshCleanupStatus(); }
+        finally { preferencesApplying = false; RefreshCleanupStatus(); RefreshSettingsActions(); }
     }
 }

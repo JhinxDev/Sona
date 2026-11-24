@@ -67,8 +67,10 @@ if(!$taskKeepsHistory -and $taskTransferCount.Recent -gt 0){
     if($RehearsalRoot){$taskSessionRecovery=Join-Path $RehearsalRoot 'recovery'}
     $taskSessionStage=Save-SonaSessionHistory $taskOld.Id $taskProfile (Join-Path $taskSessionRecovery ('session-history-'+[Guid]::NewGuid().ToString('N')+'.dpapi'))
 }
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 if($BeforeSessionQuitForTests){& $BeforeSessionQuitForTests $taskOld.Id $taskProfile}
-$taskRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskOld.MainWindowHandle)
+$taskOldHwnd=Get-SonaMainWindowHandle $taskOld.Id
+$taskRoot=if($taskOldHwnd -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($taskOldHwnd)}else{$null}
 if(!$taskRoot-or$taskRoot.Current.ProcessId-ne$taskOld.Id){throw 'Open Sona from its tray; hidden app was preserved'}
 function ById([string]$Id){return $taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))}
 function SelectTab([string]$Id){(ById $Id).GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()}
@@ -117,8 +119,9 @@ function LaunchPrivate([string]$Path,[string]$Checkpoint,[bool]$Rollback=$false)
         return $candidate -and $candidate.Path-eq$taskNewPath -and $candidate.StartTime.ToUniversalTime().Ticks-eq$taskStartupTicks
     }.GetNewClosure()
     $null=Wait-SonaOwnedStartup -ReadReply $taskStartupRead -IsExactProcess $taskStartupOwned -ExpectedVersion $taskPackageReceipt.Version -ExpectedPreferencesLoad $taskTransferState.preferencesLoad
-    for($taskTry=0;$taskTry-lt100;$taskTry++){$taskNew.Refresh();if($taskNew.MainWindowHandle-ne0){break};if($taskNew.HasExited){throw 'Candidate exited'};Start-Sleep -Milliseconds 100}
-    $taskNewRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskNew.MainWindowHandle)
+    $taskNewHwnd=[IntPtr]::Zero
+    for($taskTry=0;$taskTry-lt100;$taskTry++){if($taskNew.HasExited){throw 'Candidate exited'};$taskNewHwnd=Get-SonaMainWindowHandle $taskNew.Id;if($taskNewHwnd-ne[IntPtr]::Zero){break};Start-Sleep -Milliseconds 100}
+    $taskNewRoot=if($taskNewHwnd -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($taskNewHwnd)}else{$null}
     $taskNewField=$taskNewRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'Draft'))
     if(!$taskNewField-or$taskNewField.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value-cne$taskDraft){throw 'Draft readback differs; encrypted checkpoint retained'}
     if($taskSessionStage){$taskSessionResult=Complete-SonaSessionHistory $taskSessionStage $taskNew.Id}

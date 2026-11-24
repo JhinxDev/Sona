@@ -4,22 +4,40 @@ namespace Sona.App.Windows;
 public static class Startup
 {
     private const string RunPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private static bool Owned(string command, string product)
+    private static bool Owned(string command, string product) => Owned(command, product, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+
+    internal static bool Owned(string command, string product, string localAppData)
     {
         var suffix = "\" --start-hidden";
         if (!command.StartsWith('"') || !command.EndsWith(suffix, StringComparison.Ordinal)) return false;
         var executable = command[1..^suffix.Length];
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", product) + Path.DirectorySeparatorChar;
-        if (!Path.GetFullPath(executable).StartsWith(root, StringComparison.OrdinalIgnoreCase) || !File.Exists(executable)) return false;
-        var receipt = Path.Combine(Path.GetDirectoryName(executable)!, "installation.json");
+        if (string.IsNullOrWhiteSpace(executable)) return false;
+        string fullExecutable;
+        try { fullExecutable = Path.GetFullPath(executable); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return false; }
+        var root = Path.GetFullPath(Path.Combine(localAppData, "Programs", product)).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!fullExecutable.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!File.Exists(fullExecutable))
+            return product.Equals("Sona", StringComparison.Ordinal) &&
+                Path.GetFileName(fullExecutable).Equals("Sona.exe", StringComparison.OrdinalIgnoreCase) &&
+                !HasReparsePoint(fullExecutable);
+        var receipt = Path.Combine(Path.GetDirectoryName(fullExecutable)!, "installation.json");
         if (!File.Exists(receipt) || new FileInfo(receipt).Length > 256_000) return false;
         try
         {
             using var json = JsonDocument.Parse(File.ReadAllText(receipt));
             var installed = json.RootElement;
-            return installed.GetProperty("Path").GetString() == executable && installed.GetProperty("SHA256").GetString() == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(executable))).ToLowerInvariant();
+            return installed.GetProperty("Path").GetString() == executable && installed.GetProperty("SHA256").GetString() == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(fullExecutable))).ToLowerInvariant();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException) { return false; }
+    }
+
+    private static bool HasReparsePoint(string path)
+    {
+        for (var current = Path.GetFullPath(path); current != null; current = Path.GetDirectoryName(current))
+            if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                return true;
+        return false;
     }
     private static string InstalledRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Sona") + Path.DirectorySeparatorChar;
     // Startup registration belongs to an installed build only. A source/debug build

@@ -41,7 +41,7 @@ try{
     $taskInfo=[Diagnostics.ProcessStartInfo]::new($taskOldPath);$taskInfo.UseShellExecute=$false;$taskInfo.ArgumentList.Add('--test-ui');$taskInfo.ArgumentList.Add('--test-transfer');$taskInfo.Environment['SONA_DATA']=$taskProfile;$taskInfo.Environment['MURMUR_DATA']=$taskProfile
     $taskInfo.Environment['SONA_DRAFT_TRANSFER']=(@{Draft='Synthetic working draft';Original='Synthetic working original'}|ConvertTo-Json -Compress)
     $taskOld=[Diagnostics.Process]::Start($taskInfo)
-    for($taskAttempt=0;$taskAttempt -lt 100;$taskAttempt++){$taskOld.Refresh();if($taskOld.MainWindowHandle){break};Start-Sleep -Milliseconds 100}
+    for($taskAttempt=0;$taskAttempt -lt 100;$taskAttempt++){if((Get-SonaMainWindowHandle $taskOld.Id) -ne [IntPtr]::Zero){break};Start-Sleep -Milliseconds 100}
     $taskWindow=Get-SonaTransferWindow $taskOld.Id
     Check ($taskWindow.Current.BoundingRectangle.Right -lt 0) 'Isolated test window stays offscreen without activation'
     Check ((Get-SonaTransferCount $taskWindow).Recent -eq 4) 'Synthetic session starts with four complete History records'

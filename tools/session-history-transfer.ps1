@@ -3,15 +3,16 @@
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Security
 . (Join-Path $PSScriptRoot 'resolve-physical-file.ps1')
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 function Get-SonaTransferField($Window,[string]$Id){
     return $Window.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))
 }
 function Get-SonaTransferWindow([int]$ProcessId){
     for($attempt=0;$attempt -lt 100;$attempt++){
         $process=Get-Process -Id $ProcessId -ErrorAction Stop
-        $process.Refresh()
-        if($process.MainWindowHandle -ne [IntPtr]::Zero){
-            $window=[Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+        $hwnd=Get-SonaMainWindowHandle $ProcessId
+        if($hwnd -ne [IntPtr]::Zero){
+            $window=[Windows.Automation.AutomationElement]::FromHandle($hwnd)
             if($window -and $window.Current.ProcessId -eq $ProcessId){return $window}
         }
         Start-Sleep -Milliseconds 100

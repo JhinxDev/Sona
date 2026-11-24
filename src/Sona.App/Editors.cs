@@ -12,8 +12,12 @@ public partial class MainWindow
     {
         Vocabulary.Text = string.Join("\n", preferences.Terms.Concat(preferences.Vocabulary.Select(x => x.Spoken + " = " + x.Written)));
         Snippets.Text = SnippetRules.Format(preferences.Snippets);
-        WordList.ItemsSource = preferences.Terms.Select(x => new VocabularyRow(x, "", false)).Concat(preferences.Vocabulary.Select(x => new VocabularyRow(x.Written, x.Spoken, true))).OrderBy(x => x.Word).ToArray();
-        SnippetList.ItemsSource = preferences.Snippets.Select(x => new SnippetRow(x.Trigger, x.Expansion)).ToArray();
+        var words = preferences.Terms.Select(x => new VocabularyRow(x, "", false)).Concat(preferences.Vocabulary.Select(x => new VocabularyRow(x.Written, x.Spoken, true))).OrderBy(x => x.Word).ToArray();
+        WordList.ItemsSource = words;
+        if (WordListEmpty != null) WordListEmpty.Visibility = words.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var snippets = preferences.Snippets.Select(x => new SnippetRow(x.Trigger, x.Expansion)).ToArray();
+        SnippetList.ItemsSource = snippets;
+        if (SnippetListEmpty != null) SnippetListEmpty.Visibility = snippets.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     private bool EditorsBusy(TextBlock result)
     {

@@ -192,6 +192,13 @@
       "SHA256": "80fe839a13f5fd70d7511e6f714498de12522e59da2a5333c6efea40fe05ee51"
     },
     {
+      "Name": "whisper-server.exe",
+      "Archive": "Whisper",
+      "Member": "Release/whisper-server.exe",
+      "Bytes": 728576,
+      "SHA256": "99135fa0e14059e026eef112da991bdd7ba9b22b01259b31fb58446ca6d245e4"
+    },
+    {
       "Name": "whisper.dll",
       "Archive": "Whisper",
       "Member": "Release/whisper.dll",

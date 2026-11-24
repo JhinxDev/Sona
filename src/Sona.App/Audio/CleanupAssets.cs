@@ -214,12 +214,15 @@ internal static class CleanupAssets
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             if (File.Exists(target))
             {
-                using var existing = File.OpenRead(target); using var incoming = entry.Open();
-                if (!SHA256.HashData(existing).SequenceEqual(SHA256.HashData(incoming))) throw new IOException("Cleanup archives contain conflicting files.");
+                await using var existing = File.OpenRead(target); await using var incoming = entry.Open();
+                var existingHash = await SHA256.HashDataAsync(existing, token).ConfigureAwait(false);
+                var incomingHash = await SHA256.HashDataAsync(incoming, token).ConfigureAwait(false);
+                if (!existingHash.AsSpan().SequenceEqual(incomingHash)) throw new IOException("Cleanup archives contain conflicting files.");
                 continue;
             }
             await using var input = entry.Open(); await using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, 131072, true);
             await input.CopyToAsync(output, token).ConfigureAwait(false);
+            if (output.Length != entry.Length) throw new IOException("Cleanup extracted file size differs.");
         }
     }
     internal static string ContainedPath(string directory, string relative)
