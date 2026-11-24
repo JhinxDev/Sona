@@ -1,3 +1,17 @@
+## 0.7.0 agent and diagnostic updates
+
+- `settings.patch` and MCP `sona_settings_patch` add `cleanupMode` (`Always` or
+  `Auto`) and `copyOnInsertionFailure` (boolean) for full 27-setting parity
+  with `AgentSettings.View`.
+- `lastDelivery` and `lastRetainedDelivery` add nullable
+  `clipboardUnsupportedFormat`, recording only a sanitized format label when
+  clipboard capture rejects an unsafe format without exposing clipboard bytes.
+- `AgentServer` services up to four concurrent local current-user named-pipe
+  connections (`ListenerPoolSize = 4`).
+- Automation scripts use `tools/resolve-sona-window.ps1` to bind the visible
+  `Sona` WPF window directly when Windows 11 text-input overlay windows are
+  present on the UI thread.
+
 ## 0.6.2 delivery diagnostics
 
 `deliveryRoute` distinguishes `None`, `ClipboardPaste` and `UnicodeBatch`.
@@ -146,9 +160,9 @@ completed dictation, including when focus changes, without pressing Enter.
 It defaults off for new installations and is enabled for the owner on request.
 
 Supported settings: `language`, `engine`, `model`, `modelIdleMinutes`, `theme`,
-`recordingDisplay`, `shortcutMode`, `style`, `cleanupEnabled`, `cleanupTone`,
+`recordingDisplay`, `shortcutMode`, `style`, `cleanupEnabled`, `cleanupMode`, `cleanupTone`,
 `cleanupEngine`, `cleanupIdleMinutes`,
-`device`, `soundEffects`, `liveTranscription`, `pasteCompletedDraft`, `enterToSend`, `autoInsert`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
+`device`, `soundEffects`, `liveTranscription`, `pasteCompletedDraft`, `enterToSend`, `autoInsert`, `copyOnInsertionFailure`, `copyToClipboard`, `closeToTray`, `protectionEnabled`, `silenceIncoming`,
 `protectionReleaseDelayMs`, `protectionShortcut`, `watchedApps`. Credential setup, transcript/history
 export and microphone capture are intentionally outside this API. A same-user
 agent is trusted to make the requested local settings changes; this interface

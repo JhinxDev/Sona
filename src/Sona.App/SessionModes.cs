@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Sona.App.Windows;
 using Sona.Core;
 
@@ -26,7 +25,7 @@ public partial class MainWindow
         if (target == null || preferences.AppModes.Count == 0) return;
         var match = AppModes.Resolve(preferences.AppModes, Insertion.AppIdentities(target));
         if (match == null) return;
-        var delivery = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var delivery = preferences.Clone();
         delivery.Style = match.Style;
         delivery.CleanupTone = match.Tone;
         sessionMode = match;

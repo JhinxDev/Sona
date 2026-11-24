@@ -21,6 +21,9 @@ public partial class MainWindow
         if(!sections.TryGetValue(selected,out var current))return;
         foreach(var item in sections) item.Value.Panel.Visibility=item.Key==selected?Visibility.Visible:Visibility.Collapsed;
         SettingsSectionTitle.Text=current.Title;SettingsSectionDescription.Text=current.Description;
-        SettingsScroll.ScrollToTop();RefreshDiscordConnection();
+        SettingsScroll.ScrollToTop();
+        if(selected!="Audio") StopMicTest();
+        if(selected=="About") RefreshDiagnostics();
+        if(selected=="Discord") RefreshDiscordConnection();
     }
 }

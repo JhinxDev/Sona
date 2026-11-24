@@ -75,8 +75,12 @@ public sealed class Recorder : IDisposable
             for (var i = 0; i + 1 < length; i += 2) { var sample = BitConverter.ToInt16(pcm, i) / 32768.0; energy += sample * sample; }
             if (Math.Sqrt(energy / (length / 2)) < .002) return null;
             using var wav = new MemoryStream();
-            using (var writer = new WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(wav), new WaveFormat(16000, 16, 1))) writer.Write(pcm, 0, length);
-            return wav.ToArray();
+            try
+            {
+                using (var writer = new WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(wav), new WaveFormat(16000, 16, 1))) writer.Write(pcm, 0, length);
+                return wav.ToArray();
+            }
+            finally { if (wav.TryGetBuffer(out var buf) && buf.Array != null) Array.Clear(buf.Array); }
         }
     }
     public bool StopTimedOut { get; private set; }
@@ -121,8 +125,12 @@ public sealed class Recorder : IDisposable
             for (var i = 0; i + 1 < pcm.Length; i += 2) { var sample = BitConverter.ToInt16(pcm, i) / 32768.0; energy += sample * sample; }
             if (Math.Sqrt(energy / (pcm.Length / 2)) < 0.002) throw new IOException("The recording was silent. Check your microphone selection.");
             using var wav = new MemoryStream();
-            using (var writer = new WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(wav), new WaveFormat(16000, 16, 1))) writer.Write(pcm, 0, pcm.Length);
-            return wav.ToArray();
+            try
+            {
+                using (var writer = new WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(wav), new WaveFormat(16000, 16, 1))) writer.Write(pcm, 0, pcm.Length);
+                return wav.ToArray();
+            }
+            finally { if (wav.TryGetBuffer(out var buf) && buf.Array != null) Array.Clear(buf.Array); }
         }
         finally { Array.Clear(pcm); }
     }

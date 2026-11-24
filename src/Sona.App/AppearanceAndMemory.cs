@@ -11,6 +11,7 @@ public partial class MainWindow
     private CancellationTokenSource modelLifetime = new();
     private Task modelPreparation = Task.CompletedTask;
     private string? displayedResident;
+    private int speechExpiryInFlight;
     private void RefreshResidentStatusIfReady() { if (ResidentStatus != null) RefreshResidentStatus(); }
     private void SetIdleChoice(int minutes)
     {
@@ -28,7 +29,20 @@ public partial class MainWindow
         ThemeManager.Apply(preferences.Theme); ThemeManager.ApplyTitleBar(this);
         overlay.SetDisplay(preferences.RecordingDisplay); overlay.UpdateModel(ModelCatalog.Get(Audio.Transcriber.SelectedModel(preferences)).Name);
         appearanceInitialized = true;
-        modelIdleTimer.Tick += async (_, _) => { if (shutdownPending || SettingsBusy) return; try { await transcriber.ExpireAsync(modelLifetime.Token); if (displayedResident != transcriber.LoadedModel) { displayedResident = transcriber.LoadedModel; RefreshModelCards(); } RefreshResidentStatus(); } catch (OperationCanceledException) { } catch (Exception ex) when (ex is IOException or TimeoutException) { ResidentStatus.Text = "Memory release needs attention. Try Unload now."; } };
+        modelIdleTimer.Tick += async (_, _) =>
+        {
+            if (shutdownPending || SettingsBusy || Interlocked.Exchange(ref speechExpiryInFlight, 1) != 0) return;
+            try
+            {
+                await transcriber.ExpireAsync(modelLifetime.Token);
+                if (displayedResident != transcriber.LoadedModel) { displayedResident = transcriber.LoadedModel; RefreshModelCards(); }
+                RefreshResidentStatus();
+                RefreshSettingsActions();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) when (ex is IOException or TimeoutException) { ResidentStatus.Text = "Memory release needs attention. Try Unload now."; }
+            finally { Interlocked.Exchange(ref speechExpiryInFlight, 0); }
+        };
         Closed += (_, _) => { modelIdleTimer.Stop(); modelLifetime.Cancel(); modelLifetime.Dispose(); };
         RefreshResidentStatus();
     }
@@ -46,7 +60,7 @@ public partial class MainWindow
     {
         if (!appearanceInitialized || ThemeChoice.SelectedItem is not ThemeDefinition selected || selected.Id == preferences.Theme) return;
         if (SettingsBusy) { RestoreSavedThemeChoice(); SettingsResult.Text = "Finish the current operation before changing appearance."; return; }
-        var next = System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(preferences))!;
+        var next = preferences.Clone();
         next.Theme = selected.Id;
         try
         {
@@ -73,13 +87,16 @@ public partial class MainWindow
     {
         if (appearanceInitialized && !SettingsBusy && sender is RadioButton choice) overlay.SetDisplay((string)choice.Tag);
     }
+    private bool speechWarming;
     private async Task WarmSelectedAsync()
     {
-        if (arguments.Contains("--test-ui") || SettingsBusy || shutdownPending) return;
-        preferencesApplying = true; ResidentStatus.Text = "Loading the selected model into memory…";
+        if (arguments.Contains("--test-ui") || shutdownPending || speechWarming || preferencesApplying || processing || recorder != null || preparing || downloadingModel != null || cleanupInstalling) return;
+        speechWarming = true;
+        ResidentStatus.Text = "Loading the selected model into memory…";
+        RefreshSettingsActions();
         try { await transcriber.ReconcileAsync(preferences, modelLifetime.Token); }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException or System.ComponentModel.Win32Exception) { if (!shutdownPending) ModelResult.Text = "The model could not stay loaded. " + ex.Message; }
-        finally { preferencesApplying = false; if (!shutdownPending) { RefreshResidentStatus(); RefreshModelCards(); } }
+        finally { speechWarming = false; if (!shutdownPending) { RefreshResidentStatus(); RefreshModelCards(); RefreshSettingsActions(); } }
     }
     private async void LoadModel_Click(object sender, RoutedEventArgs e)
     {
@@ -90,8 +107,9 @@ public partial class MainWindow
     {
         if (SettingsBusy) { ModelResult.Text = "Finish the current operation first."; return; }
         preferencesApplying = true;
+        RefreshSettingsActions();
         try { await transcriber.UnloadAsync(modelLifetime.Token); ModelResult.Text = "Model unloaded. The next dictation will load it again."; }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException) { ModelResult.Text = "Memory release could not be confirmed."; }
-        finally { preferencesApplying = false; RefreshResidentStatus(); RefreshModelCards(); }
+        finally { preferencesApplying = false; RefreshResidentStatus(); RefreshModelCards(); RefreshSettingsActions(); }
     }
 }

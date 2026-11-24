@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 $taskRepo=Split-Path $PSScriptRoot -Parent
 $taskExe=Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 $taskAgent=Join-Path $taskRepo 'src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Use a fresh evidence directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $taskPriorData=$env:SONA_DATA
@@ -79,6 +80,6 @@ try
 catch{$_|Out-String|Set-Content -LiteralPath (Join-Path $OutputDirectory 'failure.txt');throw}
 finally
 {
-    if(-not $taskProcess.HasExited){$taskProcess.Refresh();$null=$taskProcess.CloseMainWindow();if(-not $taskProcess.WaitForExit(10000)){throw 'Isolated app did not quit; 180 second test deadline remains active.'}}
+    if(-not $taskProcess.HasExited){$null=Close-SonaMainWindow $taskProcess.Id;if(-not $taskProcess.WaitForExit(10000)){throw 'Isolated app did not quit; 180 second test deadline remains active.'}}
     $env:SONA_DATA=$taskPriorData
 }

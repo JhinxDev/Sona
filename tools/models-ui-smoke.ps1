@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop';$env:WINAPP_CLI_TELEMETRY_OPTOUT='1'
 $taskRepo=Split-Path $PSScriptRoot -Parent
 $taskExe=Join-Path $taskRepo 'src\Sona.App\bin\Release\net8.0-windows\Sona.exe'
 $taskAgent=Join-Path $taskRepo 'src\Sona.Agent\bin\Release\net8.0-windows\sona-agent.exe'
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Choose a fresh evidence directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
@@ -11,8 +12,9 @@ $taskPrior=$env:SONA_DATA;$env:SONA_DATA=Join-Path $OutputDirectory 'data'
 $taskChecks=[Collections.Generic.List[string]]::new()
 function Check([bool]$Value,[string]$Name){if(!$Value){throw $Name};$taskChecks.Add($Name)}
 function Agent([string[]]$Arguments){return ((& $taskAgent @Arguments)-join "`n" | ConvertFrom-Json)}
+function SonaHwnd{ $h=Get-SonaMainWindowHandle $taskProcess.Id; if($h -eq [IntPtr]::Zero){throw 'Sona main window unavailable.'}; return $h }
 function Element([string]$Id){
-    $taskRoot=[System.Windows.Automation.AutomationElement]::FromHandle($taskProcess.MainWindowHandle)
+    $taskRoot=[System.Windows.Automation.AutomationElement]::FromHandle((SonaHwnd))
     if($taskRoot.Current.ProcessId-ne$taskProcess.Id){throw 'Owned fixture identity changed.'}
     $taskResult=$taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$Id))
     if(!$taskResult){throw "Missing owned control $Id"};return $taskResult
@@ -28,7 +30,7 @@ function Native([string[]]$Arguments){$taskRaw=winapp @Arguments --json;if($LAST
 $taskLaunch=if($Compact){@('--test-ui','--compact')}else{@('--test-ui')}
 $taskProcess=Start-Process -FilePath $taskExe -ArgumentList $taskLaunch -WindowStyle Hidden -PassThru
 try{
-    for($taskTry=0;$taskTry-lt60;$taskTry++){if((Agent @('status')).ok){break};Start-Sleep -Milliseconds 100}
+    for($taskTry=0;$taskTry-lt60;$taskTry++){if((Agent @('status')).ok -and (Get-SonaMainWindowHandle $taskProcess.Id) -ne [IntPtr]::Zero){break};Start-Sleep -Milliseconds 100}
     Check (!(Element 'RecordButton').Current.IsEnabled) 'Native model fixture disables microphone capture'
     $taskPatch=Agent @('settings','patch','{"model":"parakeet-v3","theme":"amethyst","engine":"Auto","copyToClipboard":true}')
     Check ($taskPatch.ok-and$taskPatch.data.model-eq'parakeet-v3') 'Native model picker uses the same persisted Parakeet selection as agents'
@@ -45,16 +47,18 @@ try{
     if(!$taskScroll){throw 'Models scroll container unavailable.'}
     $taskScroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll,100);Start-Sleep -Milliseconds 200
     $taskInitialBottom=(Element 'ModelRow-parakeet-v3').Current.BoundingRectangle.Top
-    $taskInitialWindow=[System.Windows.Automation.AutomationElement]::FromHandle($taskProcess.MainWindowHandle).Current.BoundingRectangle
-    $taskInitialScale=[SonaModelDpi]::GetDpiForWindow($taskProcess.MainWindowHandle)/96.0
+    $taskHwnd = SonaHwnd
+    $taskInitialWindow=[System.Windows.Automation.AutomationElement]::FromHandle($taskHwnd).Current.BoundingRectangle
+    $taskInitialScale=[SonaModelDpi]::GetDpiForWindow($taskHwnd)/96.0
     $taskScroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll,0);Start-Sleep -Milliseconds 100
     $taskInitialTop=(Element 'ModelRow-parakeet-v3').Current.BoundingRectangle.Top
     $taskInitialPercent=[math]::Clamp(100*($taskInitialTop-($taskInitialWindow.Top+70*$taskInitialScale))/($taskInitialTop-$taskInitialBottom),0,100)
     $taskScroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll,$taskInitialPercent);Start-Sleep -Milliseconds 150
     $taskRow=Element 'ModelRow-parakeet-v3';$taskBounds=$taskRow.Current.BoundingRectangle
     $taskAction=(Element 'ModelAction-parakeet-v3').Current.BoundingRectangle
-    $taskWindow=[System.Windows.Automation.AutomationElement]::FromHandle($taskProcess.MainWindowHandle).Current.BoundingRectangle
-    $taskScale=[SonaModelDpi]::GetDpiForWindow($taskProcess.MainWindowHandle)/96.0
+    $taskHwnd = SonaHwnd
+    $taskWindow=[System.Windows.Automation.AutomationElement]::FromHandle($taskHwnd).Current.BoundingRectangle
+    $taskScale=[SonaModelDpi]::GetDpiForWindow($taskHwnd)/96.0
     Check ($taskBounds.Width-gt0-and$taskAction.Width/$taskScale-le96-and$taskAction.Height/$taskScale-le40-and$taskAction.Top-ge$taskWindow.Top+38-and$taskAction.Bottom-le$taskWindow.Bottom) 'Parakeet action stays compact and inside the native window at this size'
     $taskDetails=$taskRow.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Parakeet v3 details and measured benchmarks'))
     Check ($null-ne$taskDetails) 'Parakeet details and measurements can be expanded accessibly'
@@ -68,16 +72,16 @@ try{
     $taskTargetTop=$taskWindow.Top+$(if($Compact){70}else{300})*$taskScale
     $taskPercent=[math]::Clamp(100*($taskTop-$taskTargetTop)/($taskTop-$taskBottomTop),0,100)
     $taskScroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll,$taskPercent);Start-Sleep -Milliseconds 150
-    Native @('ui','screenshot','-a',"$($taskProcess.Id)",'--output',(Join-Path $OutputDirectory 'models-parakeet.png'))|Out-Null
+    Native @('ui','screenshot','-w',"$((SonaHwnd).ToInt64())",'--output',(Join-Path $OutputDirectory 'models-parakeet.png'))|Out-Null
     $taskDetails.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse()
     SelectModel 'turbo'
     Check ((Agent @('settings','get')).data.model-eq'turbo') 'Whisper remains selectable through its actual native Use model action'
     SelectModel 'parakeet-v3'
     Check ((Agent @('settings','get')).data.model-eq'parakeet-v3'-and(Agent @('settings','get')).data.theme-eq'amethyst') 'Native Use model returns to Parakeet while preserving saved Amethyst'
-    $null=$taskProcess.CloseMainWindow();Check ($taskProcess.WaitForExit(10000)) 'Native model fixture quits with no hidden worker or microphone'
+    $null=Close-SonaMainWindow $taskProcess.Id;Check ($taskProcess.WaitForExit(10000)) 'Native model fixture quits with no hidden worker or microphone'
     [pscustomobject]@{Passed=$taskChecks.Count;Checks=$taskChecks;Compact=[bool]$Compact;MicrophoneOpened=$false;GlobalInputSent=$false}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $OutputDirectory 'models-ui-smoke.json')
 }catch{$_|Out-String|Set-Content -LiteralPath (Join-Path $OutputDirectory 'failure.txt');throw}
 finally{
-    if(!$taskProcess.HasExited){$null=$taskProcess.CloseMainWindow();$taskProcess.WaitForExit(10000)|Out-Null}
+    if(!$taskProcess.HasExited){$null=Close-SonaMainWindow $taskProcess.Id;$taskProcess.WaitForExit(10000)|Out-Null}
     $env:SONA_DATA=$taskPrior;$taskProcess.Dispose()
 }

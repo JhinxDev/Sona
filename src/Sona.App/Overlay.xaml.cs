@@ -1,12 +1,25 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Shapes;
 using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace Sona.App;
+
+internal sealed class ShellBorder : Border
+{
+    protected override AutomationPeer OnCreateAutomationPeer() => new ShellBorderPeer(this);
+
+    private sealed class ShellBorderPeer(ShellBorder owner) : FrameworkElementAutomationPeer(owner)
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Custom;
+        protected override string GetClassNameCore() => nameof(ShellBorder);
+    }
+}
 
 public partial class Overlay : Window
 {
@@ -59,7 +72,7 @@ public partial class Overlay : Window
         for (var i = 0; i < SampleCount; i++)
         {
             panelBars[i] = MakeBar(4, 2);
-            capsuleBars[i] = MakeBar(2, 1);
+            capsuleBars[i] = MakeBar(3, 1);
             PanelWave.Children.Add(panelBars[i]);
             CapsuleWave.Children.Add(capsuleBars[i]);
         }
@@ -153,11 +166,11 @@ public partial class Overlay : Window
     {
         if (!IsVisible || targetScreen is null) return;
         var hwnd = new WindowInteropHelper(this).Handle;
-        if (!GetWindowRect(hwnd, out var rect)) throw new IOException("The recording display could not be positioned.");
+        if (hwnd == 0 || !GetWindowRect(hwnd, out var rect)) return;
         var area = targetScreen.WorkingArea;
         var x = area.Left + Math.Max(0, (area.Width - (rect.Right - rect.Left)) / 2);
         var y = Math.Max(area.Top, area.Bottom - (rect.Bottom - rect.Top) - 24);
-        if (!SetWindowPos(hwnd, (nint)(-1), x, y, 0, 0, 0x0011)) throw new IOException("The recording display could not be shown safely.");
+        SetWindowPos(hwnd, (nint)(-1), x, y, 0, 0, 0x0011);
     }
 
     public void Update(string label, string hint, double seconds = 0, double level = 0, bool showRecordingHint = false)
@@ -266,10 +279,12 @@ public partial class Overlay : Window
         var typeface = new Typeface(LiveTranscript.FontFamily, LiveTranscript.FontStyle, LiveTranscript.FontWeight, LiveTranscript.FontStretch);
         LiveTranscript.Text = RecentTranscriptTail.Fit(transcriptText, width, typeface, LiveTranscript.FontSize, LiveTranscript.Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
-    private void UpdateCapsuleWidth()
+    private bool UpdateCapsuleWidth()
     {
         var next = !retainedNotice && (display == "Panel" || TranscriptArea.Visibility == Visibility.Visible) ? 320 : 228;
-        if (Width != next) Width = next;
+        if (Width == next) return false;
+        Width = next;
+        return true;
     }
     public void SetReviewAction(bool visible)
     { TranscriptArea.Visibility = !retainedNotice && visible && (display == "Panel" || !string.IsNullOrEmpty(transcriptText)) ? Visibility.Visible : Visibility.Collapsed; UpdateCapsuleWidth(); }

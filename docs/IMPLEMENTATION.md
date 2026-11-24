@@ -1,3 +1,34 @@
+# Changelog & Architecture Notes
+
+## November 24 overhaul, 0.7.0
+
+Sona 0.7.0 completes a full reliability, security, performance, UX, and CI
+overhaul while preserving single-writer profile ownership and existing safety
+guarantees:
+
+- **Clipboard ownership and diagnostics**: `OwnedClipboard` captures portable
+  non-control `HGLOBAL`-backed registered formats within 64 MiB while explicitly
+  blocking unsafe OLE/COM/object/pointer/GDI/metafile and serialized `.NET`/`WPF`
+  formats (`System.*`, `Windows.*`, `Microsoft.VisualStudio.*`). `ClipboardRecovery`
+  returns cleanly on `CaptureFailed`, and `DeliveryDiagnostics` records any
+  content-free rejected format label in `ClipboardUnsupportedFormat`.
+- **Concurrency, worker integrity, and warm-up**: `LiveTranscription` synchronizes
+  in-flight cancellation (`liveInferenceGate`), `EscapeGuard` dispatches `cancelImmediately`
+  via `ThreadPool` off the `WH_KEYBOARD_LL` hook thread, `Recorder` zeroes
+  temporary WAV arrays in `finally`, `WhisperAssets` verifies both CPU and CUDA
+  `whisper-server.exe` hashes against pinned manifests, `WorkerBranding` maps
+  `nemo-speech.exe` to `Sona Speech Engine.exe` with reparse-point and SHA-256
+  validation, `WarmAllSelectedAsync` warms speech and cleanup workers in
+  parallel, `AgentServer` serves four concurrent pipe instances, and `Mcp.cs`
+  reaches 27/27 `settings.patch` schema parity with `AgentSettings`.
+- **Event-driven UI and new capabilities**: `Preferences.Clone()` and
+  `GeneralSettingsEqual()` replace JSON cloning/polling (`settingsActionTimer`
+  removed), `DiagnosticsUi` surfaces content-free health telemetry, `MicTestUi`
+  provides an opt-in auto-stopping 30-second microphone level test, `HistoryPage`
+  adds per-row `Copy`, double-click/`Enter` opening, search clear (`×`), and
+  Markdown export, `DraftReview` exports `.md`/`.txt`/`.json`, and `AppModesUi`
+  tracks up to eight recent foreground apps as quick-pick chips.
+
 ## November 13 reliability rework, 0.6.0
 
 RecordingWindow owns the stop gesture independently of DraftTarget, which owns
@@ -48,7 +79,7 @@ The primary owner integrates the app changes and a scoped independent review. Ex
 6. Freeze the candidate, obtain one integrated correctness/security review, fix actual findings, audit dependencies, install the exact private candidate and compare artifact/source identities. Startup remains opt in.
 7. Keep reviewed source history, compare local/remote heads, update `Projects/local-dictation/current-state.json`, generate/validate projections, and coordinate the shared documentation packet through Tool Shed. Report any actual enforcement blocker.
 
-The current source candidate identity is Sona 0.6.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
+The current source candidate identity is Sona 0.7.0; source projects and namespaces use Sona. Existing private profiles and single-instance signals have narrow compatibility handling. Ordinary private installation follows qualified source/package identity and a current-user encrypted pre-quit draft checkpoint with verified recovery.
 
 0.5.0 adds native per-app modes (ordered app identity to draft style and cleanup
 tone rules applied only to the captured session) and first-run Home guidance with
@@ -148,12 +179,12 @@ changes, pending edits, explicit History pause or identity drift refuse safely.
 No setting or input changes occur during this wait. It does not relax ordinary
 preflight, native-Save or final transfer checks.
 
-The wait allows at most300polls and uses a30-second soft readiness deadline.
+The wait allows at most 300 polls and uses a 30-second soft readiness deadline.
 The deadline is checked around synchronous status polls; each of the two local
-CLI calls has its own16-second cancellation limit, so an in-flight poll can
-extend return beyond30seconds. A late ready reply is rejected. This is not a
-hard30-second completion bound. `tools/owned-startup-checks.ps1` covers22synthetic
-cases, alongside15existing ordinary/native-Save checks. The offscreen18-check
+CLI calls has its own 16-second cancellation limit, so an in-flight poll can
+extend return beyond 30 seconds. A late ready reply is rejected. This is not a
+hard 30-second completion bound. `tools/owned-startup-checks.ps1` covers 22 synthetic
+cases, alongside 15 existing ordinary/native-Save checks. The offscreen 18-check
 upgrade rehearsal passed with the actual package version preserved in synthetic
 receipts. This tool-only repair reuses accepted app binaries without another
 production restart.

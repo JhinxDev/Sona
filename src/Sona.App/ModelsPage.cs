@@ -16,9 +16,11 @@ public partial class MainWindow
     private int downloadPercent;
     private string downloadOutcome = "idle";
     private bool preferencesApplying;
-    private bool SettingsBusy => !preferencesLoad.CanSave || processing || recorder != null || shutdownPending || cleanupInstalling || preferencesApplying || preparing || session?.State == SessionState.Recording;
+    private bool SettingsBusy => !preferencesLoad.CanSave || processing || recorder != null || shutdownPending || cleanupInstalling || preferencesApplying || speechWarming || cleanupWarming || preparing || session?.State == SessionState.Recording;
     private readonly Dictionary<string, TextBlock> modelStateLabels = new();
     private string? viewedModelFamily;
+    private static readonly Geometry ModelWaveGeometry = FreezeGeometry("M2,9 L2,15 M7.5,5 L7.5,19 M13,2 L13,22 M18.5,6 L18.5,18 M24,10 L24,14");
+    private static Geometry FreezeGeometry(string data) { var geometry = Geometry.Parse(data); geometry.Freeze(); return geometry; }
 
     private void RefreshModelCards()
     {
@@ -64,7 +66,7 @@ public partial class MainWindow
             {
                 Width = 24, Height = 24, Stretch = Stretch.None,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                Data = Geometry.Parse("M2,9 L2,15 M7.5,5 L7.5,19 M13,2 L13,22 M18.5,6 L18.5,18 M24,10 L24,14"),
+                Data = ModelWaveGeometry,
                 StrokeThickness = 2.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
             };
             waveform.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "Ink"); mark.Child = waveform;
@@ -133,7 +135,7 @@ public partial class MainWindow
 
     private async Task VerifyAndUseModelAsync(string id)
     {
-        preferencesApplying = true; RefreshModelCards();
+        preferencesApplying = true; RefreshModelCards(); RefreshSettingsActions();
         var saved = false;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(modelLifetime.Token); deadline.CancelAfter(TimeSpan.FromSeconds(90));
         try
@@ -153,14 +155,14 @@ public partial class MainWindow
         catch (OperationCanceledException) { ModelResult.Text = saved ? "The model is active for next use, but preparation reached its time limit. Try Verify again." : "Model verification reached its time limit. The selected model was preserved."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Net.Http.HttpRequestException)
         { ModelResult.Text = saved ? "The model is active for next use, but could not be loaded. Check the local engine and try Verify again." : "The model could not be verified or selected. Existing files were preserved."; }
-        finally { preferencesApplying = false; RefreshModelCards(); RefreshResidentStatus(); }
+        finally { preferencesApplying = false; RefreshModelCards(); RefreshResidentStatus(); RefreshSettingsActions(); }
     }
 
     private async Task DownloadModelAsync(string id)
     {
         if (SettingsBusy) { ModelResult.Text = "Finish the current operation before downloading a model."; return; }
         if (downloadingModel != null) throw new IOException("Another model download is running.");
-        downloadingModel = id; downloadPercent = 0; downloadOutcome = "downloading"; modelDownloadCancellation?.Dispose(); modelDownloadCancellation = new(); RefreshModelCards();
+        downloadingModel = id; downloadPercent = 0; downloadOutcome = "downloading"; modelDownloadCancellation?.Dispose(); modelDownloadCancellation = new(); RefreshModelCards(); RefreshSettingsActions();
         var model = ModelCatalog.Get(id);
         var progress = new Progress<long>(bytes =>
         {
@@ -172,7 +174,7 @@ public partial class MainWindow
         try { await modelStore.RetryCleanupAsync(); await ParakeetAssets.RetryCleanupAsync(); await modelStore.InstallAsync(id, progress, modelDownloadCancellation.Token); await PrepareModelRuntimeAsync(id, modelDownloadCancellation.Token); downloadOutcome = "verified"; downloadPercent = 100; ModelResult.Text = "Download verified. Choose Use model to make it active."; }
         catch (OperationCanceledException) { downloadOutcome = "cancelled"; ModelResult.Text = "Download cancelled. Partial data was removed."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Net.Http.HttpRequestException) { downloadOutcome = modelStore.CleanupPending || ParakeetAssets.CleanupPending ? "cleanup-pending" : "failed"; ModelResult.Text = "Download failed. Existing model files were preserved; check connectivity and disk space. Cancel / retry download releases partial files."; }
-        finally { downloadingModel = null; RefreshModelCards(); }
+        finally { downloadingModel = null; RefreshModelCards(); RefreshSettingsActions(); }
     }
     private async Task PrepareModelRuntimeAsync(string id, CancellationToken token)
     {
@@ -186,8 +188,9 @@ public partial class MainWindow
         if (downloadingModel != null) { modelDownloadCancellation?.Cancel(); return; }
         if (SettingsBusy) return;
         preferencesApplying = true;
+        RefreshSettingsActions();
         try { await modelStore.RetryCleanupAsync(); await ParakeetAssets.RetryCleanupAsync(); ModelResult.Text = "Partial download cleanup completed."; }
         catch (IOException) { ModelResult.Text = "A partial download is still locked. Try Cancel / retry download again shortly."; }
-        finally { preferencesApplying = false; }
+        finally { preferencesApplying = false; RefreshSettingsActions(); }
     }
 }

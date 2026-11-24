@@ -18,7 +18,15 @@ public partial class MainWindow
     private Task liveOperation = Task.CompletedTask;
     private CancellationTokenSource? livePolling;
     private CancellationTokenSource? liveInference;
+    private readonly object liveInferenceGate = new();
     private bool liveVisible;
+    private void CancelLiveInference()
+    {
+        CancellationTokenSource? active;
+        lock (liveInferenceGate) active = liveInference;
+        try { active?.Cancel(); }
+        catch (ObjectDisposedException) { }
+    }
     private long previewAudioBytes = -1;
     private string? previewOriginal;
     private long liveRevision;
@@ -58,7 +66,7 @@ public partial class MainWindow
                 if (wav == null) continue;
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
                 deadline.CancelAfter(TimeSpan.FromSeconds(12));
-                liveInference = deadline;
+                lock (liveInferenceGate) liveInference = deadline;
                 try
                 {
                     var raw = await RecognizeAsync(wav, deadline.Token);
@@ -75,7 +83,7 @@ public partial class MainWindow
                         overlay.UpdateTranscript(raw, "Provisional · final recognition may change these words");
                     }
                 }
-                finally { if (ReferenceEquals(liveInference, deadline)) liveInference = null; Array.Clear(wav); }
+                finally { lock (liveInferenceGate) { if (ReferenceEquals(liveInference, deadline)) liveInference = null; } Array.Clear(wav); }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested || polling.IsCancellationRequested) { }

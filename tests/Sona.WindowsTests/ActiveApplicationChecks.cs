@@ -37,7 +37,7 @@ public static class ActiveApplicationChecks
         context.End(); context.Begin(target, "Codex"); context.Observe(new ActiveApplication((nint)1, 11, "Other app", 0));
         Check(context.DestinationChanged && context.Label.Contains("Codex → Other app"), "A reused foreground window with a different process is flagged as destination drift");
         context.End(); context.Begin(null, "No focused text field"); context.Observe(discord);
-        Check(context.Destination == null && context.Label == "Discord", "Active-app identity outside an editable field never creates an insertion destination");
+        Check(context.Destination == null && context.Label == "Draft only · Discord", "Active-app identity outside an editable field never creates an insertion destination");
         var sends = 0;
         using var insertion = new Insertion(() => target, () => false, text => { sends++; return (uint)text.Length * 2; });
         Check((await insertion.InsertAsync(target, "Hello Codex.")).Inserted && sends == 1, "Stable single-line destination still reaches the injected input sink once");

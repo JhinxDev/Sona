@@ -29,8 +29,9 @@ internal static class PreferenceRecoveryChecks
                 var locked = Preferences.LoadWithStatus(path);
                 check(locked.Status == PreferencesLoadStatus.Unavailable && !locked.CanSave && !string.IsNullOrWhiteSpace(locked.Message),
                     "An unreadable existing profile is distinct from a new profile and has an actionable warning");
-                var clone = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(locked.Value))!;
+                var clone = locked.Value.Clone();
                 check(SaveBlocked(clone), "Cloned defaults cannot overwrite a profile whose load failed");
+                check(clone.GeneralSettingsEqual(locked.Value) && !clone.GeneralSettingsEqual(saved), "Preferences Clone and GeneralSettingsEqual reflect exact general settings state");
             }
             check(SaveBlocked(new Preferences()) && File.ReadAllBytes(path).SequenceEqual(original),
                 "Releasing a temporary read lock alone cannot allow fallback defaults to replace saved settings");

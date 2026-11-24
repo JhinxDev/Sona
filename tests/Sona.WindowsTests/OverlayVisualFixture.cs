@@ -47,7 +47,7 @@ internal static class OverlayVisualFixture
                                 overlay.SetDisplay(display);
                                 var untargeted = new RecordingDestinationContext();
                                 untargeted.Observe(new((nint)1, 10, "Discord", 0)); untargeted.Begin(null, "No focused text field");
-                                Check(untargeted.Destination == null && untargeted.Label == "Discord", display + " can identify the active app outside an editable field without inventing an insertion target");
+                                Check(untargeted.Destination == null && untargeted.Label == "Draft only · Discord", display + " can identify the active app outside an editable field without inventing an insertion target");
                                 overlay.UpdateTarget("No focused text field"); overlay.UpdateAppIcon(ApplicationIconCache.DefaultIcon); Layout((Border)overlay.FindName("Shell"), overlay.Width);
                                 var neutral = (TextBlock)overlay.FindName(display == "Panel" ? "PanelTarget" : "CapsuleTarget");
                                 Check(neutral.Text == "" && neutral.Visibility == Visibility.Collapsed && ReferenceEquals(overlay.ActiveAppIcon, ApplicationIconCache.DefaultIcon), display + " unknown or non-editable destination is visually quiet with a neutral icon");
@@ -75,6 +75,7 @@ internal static class OverlayVisualFixture
                                 Check(stopCount == 1, display + " square Stop invokes stop exactly once");
                                 overlay.UpdateTranscript("", "");
                                 var shell = (Border)overlay.FindName("Shell");
+                                Check(System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(shell) != null, display + " shell provides a UI Automation peer");
                                 Layout(shell, overlay.Width);
                                 Check(overlay.Width <= (display == "Panel" ? 330 : 280), display + " uses the requested smaller footprint");
                                 Check(shell.ActualHeight <= (display == "Panel" ? 170 : 84), display + " remains compact without a live transcript");

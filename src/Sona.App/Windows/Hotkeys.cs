@@ -130,50 +130,56 @@ public sealed class Hotkeys : IDisposable
     {
         if (change.Action == HoldAction.None) return;
         var epoch = Interlocked.Read(ref admissionEpoch);
-        dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(async () =>
+        dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => _ = ObserveDispatchAsync(DispatchCoreAsync(change, epoch, submitFocusEpoch))));
+    }
+    private static async Task ObserveDispatchAsync(Task operation)
+    {
+        try { await operation; }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or InvalidOperationException) { }
+    }
+    private async Task DispatchCoreAsync(HoldChange change, long epoch, long? submitFocusEpoch)
+    {
+        if (Volatile.Read(ref disposed) != 0) return;
+        if (change.Action == HoldAction.Begin)
         {
-            if (Volatile.Read(ref disposed) != 0) return;
-            if (change.Action == HoldAction.Begin)
+            if (epoch != Interlocked.Read(ref admissionEpoch) || Volatile.Read(ref admitsHold) == 0 || (change.Toggle ? gesture.PendingToggle != change.Generation : gesture.Current != change.Generation || !PhysicalChord())) return;
+            if (startingGeneration != 0) return;
+            startingGeneration = change.Generation;
+            startingTerminal = null;
+            try
             {
-                if (epoch != Interlocked.Read(ref admissionEpoch) || Volatile.Read(ref admitsHold) == 0 || (change.Toggle ? gesture.PendingToggle != change.Generation : gesture.Current != change.Generation || !PhysicalChord())) return;
-                if (startingGeneration != 0) return;
-                startingGeneration = change.Generation;
-                startingTerminal = null;
-                try
+                var began = await begin(!change.Toggle);
+                if (began && epoch == Interlocked.Read(ref admissionEpoch) && Volatile.Read(ref disposed) == 0)
                 {
-                    var began = await begin(!change.Toggle);
-                    if (began && epoch == Interlocked.Read(ref admissionEpoch) && Volatile.Read(ref disposed) == 0)
+                    if (startingTerminal is { } terminal)
                     {
-                        if (startingTerminal is { } terminal)
-                        {
-                            if (terminal.Action == HoldAction.Finish) finish(); else cancel();
-                        }
-                        else
-                        {
-                            activeGeneration = change.Generation; activeIsHold = !change.Toggle;
-                            if (change.Toggle) gesture.ConsumeToggle(change.Generation);
-                            watchdog.Start();
-                        }
+                        if (terminal.Action == HoldAction.Finish) finish(); else cancel();
                     }
-                    else { if (began && !change.Toggle) cancel(); Reset(); }
+                    else
+                    {
+                        activeGeneration = change.Generation; activeIsHold = !change.Toggle;
+                        if (change.Toggle) gesture.ConsumeToggle(change.Generation);
+                        watchdog.Start();
+                    }
                 }
-                finally { startingGeneration = 0; startingTerminal = null; }
+                else { if (began && !change.Toggle) cancel(); Reset(); }
             }
-            // Legacy Toggle releases are informational; only an explicit handsfree
-            // stop or a physical Hold release is a terminal Finish.
-            else if (change.Action == HoldAction.Finish && change.Toggle && !change.HandsFree) return;
-            else if (startingGeneration == change.Generation) startingTerminal = change;
-            else if (activeGeneration == change.Generation)
+            finally { startingGeneration = 0; startingTerminal = null; }
+        }
+        // Legacy Toggle releases are informational; only an explicit handsfree
+        // stop or a physical Hold release is a terminal Finish.
+        else if (change.Action == HoldAction.Finish && change.Toggle && !change.HandsFree) return;
+        else if (startingGeneration == change.Generation) startingTerminal = change;
+        else if (activeGeneration == change.Generation)
+        {
+            activeGeneration = 0; watchdog.Stop();
+            if (change.Action == HoldAction.Finish)
             {
-                activeGeneration = 0; watchdog.Stop();
-                if (change.Action == HoldAction.Finish)
-                {
-                    if (change.Submit && submitFocusEpoch is { } focusEpoch) finishAndSend?.Invoke(focusEpoch);
-                    else finish();
-                }
-                else cancel();
+                if (change.Submit && submitFocusEpoch is { } focusEpoch) finishAndSend?.Invoke(focusEpoch);
+                else finish();
             }
-        }));
+            else cancel();
+        }
     }
     private nint WindowHook(nint hwnd, int msg, nint wparam, nint lparam, ref bool handled)
     {

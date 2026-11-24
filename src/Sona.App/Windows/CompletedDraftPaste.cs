@@ -8,6 +8,7 @@ namespace Sona.App.Windows;
 internal interface ICompletedDraftTransport
 {
     object? SaveClipboard();
+    string? LastClipboardUnsupportedFormat => null;
     uint SavedClipboardSequence(object? previous) => ClipboardSequence;
     uint SavedClipboardInitialSequence(object? previous) => SavedClipboardSequence(previous);
     ClipboardChange SetClipboard(object? previous, string text);
@@ -36,6 +37,7 @@ public sealed partial class Insertion
     internal bool LastUnicodeAttempted { get; private set; }
     internal bool LastUnicodeConfirmed { get; private set; }
     internal string? LastClipboardFailureCode { get; private set; }
+    internal string? LastClipboardUnsupportedFormat { get; private set; }
     internal bool LastDraftOnClipboard { get; private set; }
     internal bool LastClipboardRestorationFailed { get; private set; }
     internal string LastClipboardStatus { get; private set; } = "NotUsed";
@@ -49,6 +51,7 @@ public sealed partial class Insertion
         LastDeliveryRoute = "None";
         LastUnicodeAttempted = LastUnicodeConfirmed = false;
         LastClipboardFailureCode = null;
+        LastClipboardUnsupportedFormat = null;
         LastPasteCaptureRejection = null;
         LastPasteCaptureGaps = 0;
         if (target == null || string.IsNullOrWhiteSpace(text) || text.Length > DraftLimits.MaximumCharacters || text.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
@@ -78,6 +81,7 @@ public sealed partial class Insertion
                 // Capture has not performed EmptyClipboard, SetClipboardData or
                 // any paste gesture. Only this boundary may choose direct input.
                 LastClipboardFailureCode = ClassifyClipboardCaptureFailure(error);
+                LastClipboardUnsupportedFormat = transport.LastClipboardUnsupportedFormat;
                 LastClipboardStatus = "CaptureFailed";
                 if (!CanSendUnicodeBatch(text)) return (false, "The clipboard is unavailable and this draft needs clipboard paste. Your complete draft stays in Sona.");
                 unicode = true;
@@ -306,6 +310,7 @@ public sealed partial class Insertion
         private readonly OwnedClipboard clipboard = new(() => Application.Current?.MainWindow is { } window
             ? new System.Windows.Interop.WindowInteropHelper(window).Handle : 0);
         public object SaveClipboard() => clipboard.Capture();
+        public string? LastClipboardUnsupportedFormat => clipboard.LastUnsupportedFormat;
         public uint SavedClipboardSequence(object? previous) => ((OwnedClipboard.Snapshot)previous!).Sequence;
         public uint SavedClipboardInitialSequence(object? previous) => ((OwnedClipboard.Snapshot)previous!).InitialSequence;
         public ClipboardChange SetClipboard(object? previous, string text) => clipboard.TrySetText((OwnedClipboard.Snapshot)previous!, text);

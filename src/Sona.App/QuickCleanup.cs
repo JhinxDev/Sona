@@ -1,18 +1,17 @@
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 namespace Sona.App;
 
 public partial class MainWindow
 {
-    private void RefreshQuickCleanup() => overlay.SetQuickCleanup(preferences.CleanupEnabled ? preferences.CleanupMode : "Off", preferencesLoad.CanSave && !shutdownPending && !processing && !preferencesApplying && !cleanupInstalling);
+    private void RefreshQuickCleanup() => overlay.SetQuickCleanup(preferences.CleanupEnabled ? preferences.CleanupMode : "Off", preferencesLoad.CanSave && !shutdownPending && !processing && !preferencesApplying && !speechWarming && !cleanupWarming && !cleanupInstalling);
     private void CycleQuickCleanup()
     {
-        if (!preferencesLoad.CanSave || shutdownPending || processing || preferencesApplying || cleanupInstalling) return;
+        if (!preferencesLoad.CanSave || shutdownPending || processing || preferencesApplying || speechWarming || cleanupWarming || cleanupInstalling) return;
         var mode = !preferences.CleanupEnabled ? "Auto" : preferences.CleanupMode == "Auto" ? "Always" : "Off";
         try
         {
-            var next = JsonSerializer.Deserialize<Sona.Core.Preferences>(JsonSerializer.Serialize(preferences))!;
+            var next = preferences.Clone();
             next.CleanupEnabled = mode != "Off"; if (mode != "Off") next.CleanupMode = mode;
             next.Save(preferencesPath);
             preferences.CleanupEnabled = next.CleanupEnabled; preferences.CleanupMode = next.CleanupMode;

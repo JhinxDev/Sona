@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Sona.App;
 
 /// <summary>
@@ -11,6 +13,7 @@ internal static class WorkerBranding
     internal static readonly IReadOnlyDictionary<string, string> FriendlyNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["whisper-server.exe"] = "Sona Speech Engine.exe",
+        ["nemo-speech.exe"] = "Sona Speech Engine.exe",
         ["whisper-cli.exe"] = "Sona Transcription.exe",
         ["llama-server.exe"] = "Sona Text Polish.exe"
     };
@@ -20,21 +23,24 @@ internal static class WorkerBranding
 
     /// <summary>
     /// Returns a clearly named copy of a worker executable, or the original path if
-    /// branding is not possible. Copies refresh when the upstream file changes and
-    /// are written outside hash-verified runtime directories when one is supplied.
+    /// branding is not possible. Copies refresh when the upstream file changes or
+    /// its SHA-256 differs and are written outside hash-verified runtime directories
+    /// when one is supplied.
     /// </summary>
     internal static string PathFor(string executable, string? copyDirectory = null)
     {
         try
         {
-            if (!File.Exists(executable) || FriendlyName(executable) is not { } name) return executable;
+            if (!File.Exists(executable) || HasReparsePoint(executable) || FriendlyName(executable) is not { } name) return executable;
             var directory = copyDirectory ?? Path.GetDirectoryName(executable);
             if (string.IsNullOrWhiteSpace(directory)) return executable;
             Directory.CreateDirectory(directory);
+            if (HasReparsePoint(directory)) return executable;
             var target = Path.Combine(directory, name);
             if (IsCurrent(executable, target)) return target;
+            if (File.Exists(target) && HasReparsePoint(target)) return executable;
             File.Copy(executable, target, true);
-            return File.Exists(target) ? target : executable;
+            return File.Exists(target) && IsCurrent(executable, target) ? target : executable;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
@@ -50,11 +56,20 @@ internal static class WorkerBranding
         {
             var sourceInfo = new FileInfo(source);
             var targetInfo = new FileInfo(target);
-            // File.Copy preserves the source timestamp, so an unchanged engine stays
-            // a no-op and an updated engine refreshes the copy.
-            return targetInfo.Exists && targetInfo.Length == sourceInfo.Length && targetInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc;
+            if (!targetInfo.Exists || HasReparsePoint(target) || targetInfo.Length != sourceInfo.Length) return false;
+            using var sourceStream = File.OpenRead(source);
+            using var targetStream = File.OpenRead(target);
+            return SHA256.HashData(sourceStream).AsSpan().SequenceEqual(SHA256.HashData(targetStream));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { return false; }
+    }
+
+    private static bool HasReparsePoint(string path)
+    {
+        for (var current = Path.GetFullPath(path); current != null; current = Path.GetDirectoryName(current))
+            if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                return true;
+        return false;
     }
 }

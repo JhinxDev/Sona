@@ -6,10 +6,10 @@ the CLI ships beside it. The installer is part of the early, unsigned preview.
 
 ## Download
 
-[Download Sona-Setup-0.6.2.exe](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/Sona-Setup-0.6.2.exe)
-from the [v0.6.2 release](https://github.com/JhinxDev/Sona/releases/tag/v0.6.2).
+[Download Sona-Setup-0.7.0.exe](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/Sona-Setup-0.7.0.exe)
+from the [v0.7.0 release](https://github.com/JhinxDev/Sona/releases/tag/v0.7.0).
 This Windows x64 installer is an unsigned pre-release.
-[Published SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/SHA256SUMS.txt).
+[Published SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/SHA256SUMS.txt).
 
 ## Requirements
 
@@ -104,7 +104,8 @@ source is not cross-platform.
 ## Building the installer
 
 The maintained build is reproducible from a source checkout on Windows x64 with
-the pinned SDK and Inno Setup 7:
+the pinned SDK (or `SONA_RUNTIME` / `NUGET_PACKAGES` / `dotnet` on `PATH`) and
+Inno Setup 7:
 
 ```powershell
 pwsh -File .\tools\installer\build-installer.ps1 -Rehearsal

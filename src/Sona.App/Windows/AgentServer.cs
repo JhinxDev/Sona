@@ -5,14 +5,15 @@ namespace Sona.App.Windows;
 
 public sealed class AgentServer(Func<AgentRequest, CancellationToken, Task<AgentReply>> handle) : IAsyncDisposable
 {
+    private const int ListenerPoolSize = 4;
     private readonly CancellationTokenSource stop = new();
     private Task? loop;
-    public void Start() => loop = RunAsync();
+    public void Start() => loop = Task.WhenAll(Enumerable.Range(0, ListenerPoolSize).Select(_ => RunAsync()));
     private async Task RunAsync()
     {
         while (!stop.IsCancellationRequested)
         {
-            await using var pipe = new NamedPipeServerStream(AgentProtocol.PipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            await using var pipe = new NamedPipeServerStream(AgentProtocol.PipeName, PipeDirection.InOut, ListenerPoolSize, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             try
             {
                 await pipe.WaitForConnectionAsync(stop.Token);
@@ -26,5 +27,14 @@ public sealed class AgentServer(Func<AgentRequest, CancellationToken, Task<Agent
             catch (Exception ex) when (ex is IOException or OperationCanceledException or JsonException) { /* Malformed/disconnected clients cannot stop the local service or expose their input. */ }
         }
     }
-    public async ValueTask DisposeAsync() { stop.Cancel(); if (loop != null) await loop; stop.Dispose(); }
+    public async ValueTask DisposeAsync()
+    {
+        stop.Cancel();
+        if (loop != null)
+        {
+            try { await loop; }
+            catch (OperationCanceledException) { }
+        }
+        stop.Dispose();
+    }
 }

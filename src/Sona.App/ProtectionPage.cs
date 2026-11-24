@@ -15,6 +15,10 @@ public partial class MainWindow
     private ProtectionHotkey? protectionHotkey;
     private Task protectionReleaseOperation = Task.CompletedTask;
     private readonly DispatcherTimer protectionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private static readonly SolidColorBrush DiscordConnectedBackground = FreezeBrush(Color.FromRgb(0x20, 0x65, 0x42));
+    private static readonly SolidColorBrush DiscordConnectedBorder = FreezeBrush(Color.FromRgb(0x66, 0xC2, 0x91));
+    private (bool Connected, bool HighContrast)? lastDiscordVisualState;
+    private static SolidColorBrush FreezeBrush(Color color) { var brush = new SolidColorBrush(color); brush.Freeze(); return brush; }
     private void InitializeProtection()
     {
         RefreshProtectionFields();
@@ -22,7 +26,8 @@ public partial class MainWindow
         protection = new(credentialVault); protection.Start();
         UpdateProtectionHotkey();
         _ = ConfigureProtectionAsync();
-        protectionTimer.Tick += (_, _) => RefreshDiscordConnection(); protectionTimer.Start();
+        protectionTimer.Tick += (_, _) => { if (IsVisible) RefreshDiscordConnection(); };
+        protectionTimer.Start();
         RefreshDiscordConnection();
     }
     private void UpdateProtectionHotkey()
@@ -51,7 +56,7 @@ public partial class MainWindow
         var apps = WatchedApps.Text.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (apps.Length > 50 || apps.Any(a => a.Length > 160 || a.Any(char.IsControl) || a.Contains('\\') || a.Contains('/'))) { ProtectionResult.Text = "Use at most 50 executable names or package IDs, without paths."; return; }
         if (!ProtectionShortcut.TryParse(ProtectionShortcutInput.Text, out _, out _)) { ProtectionResult.Text = "Use Ctrl, Alt or Win with a letter, digit, Space or F1-F24, optionally Shift."; return; }
-        var candidate = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var candidate = preferences.Clone();
         candidate.ProtectionEnabled = ProtectionEnabled.IsChecked == true; candidate.SilenceIncoming = SilenceIncoming.IsChecked == true; candidate.ProtectionReleaseDelayMs = delay; candidate.WatchedApps = apps.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         candidate.ProtectionShortcut = ProtectionShortcutInput.Text.Trim();
         await SaveProtectionPreferencesAsync(candidate);
@@ -67,7 +72,7 @@ public partial class MainWindow
             RefreshProtectionToggles(); ProtectionToggleResult.Text = "Finish the current operation before changing protection."; return;
         }
         // Switches commit only their own choice, leaving advanced/general edits pending.
-        var candidate = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var candidate = preferences.Clone();
         if (master) candidate.ProtectionEnabled = requested; else candidate.SilenceIncoming = requested;
         await SaveProtectionPreferencesAsync(candidate);
     }
@@ -174,7 +179,7 @@ public partial class MainWindow
     }
     private bool PersistDiscordConnectionChoice(bool disconnected)
     {
-        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(preferences))!;
+        var next = preferences.Clone();
         next.DiscordDisconnected = disconnected;
         try { next.Save(preferencesPath); preferences.DiscordDisconnected = disconnected; return true; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
@@ -204,18 +209,23 @@ public partial class MainWindow
         DisconnectDiscordButton.Content = protection?.ConnectionSuppressed == true && !preferences.DiscordDisconnected ? "Retry disconnect" : "Disconnect";
         PauseProtectionButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && connected && (preferences.ProtectionEnabled || protection!.Paused || protection.OwnsChanges);
         SaveDiscordSetupButton.IsEnabled = !SettingsBusy && !discordConnectionBusy && !connected;
-        if (connected && !SystemParameters.HighContrast)
+        var highContrast = SystemParameters.HighContrast;
+        if (lastDiscordVisualState != (connected, highContrast))
         {
-            DiscordConnectionBadge.Background = new SolidColorBrush(Color.FromRgb(0x20,0x65,0x42));
-            DiscordConnectionBadge.BorderBrush = new SolidColorBrush(Color.FromRgb(0x66,0xC2,0x91));
-            HushStatus.Foreground = DiscordConnectionDetail.Foreground = Brushes.White;
-        }
-        else
-        {
-            DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "Inset");
-            DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "Line");
-            HushStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Ink");
-            DiscordConnectionDetail.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Muted");
+            lastDiscordVisualState = (connected, highContrast);
+            if (connected && !highContrast)
+            {
+                DiscordConnectionBadge.Background = DiscordConnectedBackground;
+                DiscordConnectionBadge.BorderBrush = DiscordConnectedBorder;
+                HushStatus.Foreground = DiscordConnectionDetail.Foreground = Brushes.White;
+            }
+            else
+            {
+                DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "Inset");
+                DiscordConnectionBadge.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "Line");
+                HushStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Ink");
+                DiscordConnectionDetail.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Muted");
+            }
         }
     }
     private async void PauseProtection_Click(object sender, RoutedEventArgs e)

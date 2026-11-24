@@ -7,11 +7,12 @@ your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/Sona-Setup-0.6.2.exe)**
+**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/Sona-Setup-0.7.0.exe)**
 
-The published Windows installer is **v0.6.2**, an unsigned early preview.
-[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.6.2) ·
-[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.6.2/SHA256SUMS.txt)
+The published Windows installer is **v0.7.0**, an unsigned early preview.
+[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.7.0) ·
+[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/SHA256SUMS.txt) ·
+[Changelog](CHANGELOG.md)
 
 See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
 instructions. Build-from-source instructions are below.
@@ -19,14 +20,14 @@ instructions. Build-from-source instructions are below.
 [![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
 
 The updated 4K trailer on [Jhinx Dev](https://www.youtube.com/watch?v=Xyz4TkNP58w)
-shows Sona 0.4.2 with actual app captures and a prerecorded local recognition
+shows Sona with actual app captures and a prerecorded local recognition
 demonstration. The recording display replays measured speech and transcript
 events; the receiving field illustrates insertion. It includes AI-assisted
 narration, music and background art. [Capture details](docs/images/README.md).
 
 ## Install on Windows
 
-Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.6.2),
+Use the [published Windows installer](https://github.com/JhinxDev/Sona/releases/tag/v0.7.0),
 or compile the current source with `tools/installer/build-installer.ps1`. See
 [installing Sona](docs/INSTALL.md) for requirements, first-run model steps,
 uninstall behavior and the unsigned-preview warning. The installer is
@@ -38,27 +39,29 @@ platform would be a separate native app rather than a repackage.
 
 ## The app
 
-![Sona home with the first-run welcome card, local model status and an editable draft](docs/images/sona-welcome-050.png)
+![Sona 0.7.0 Home with an editable draft, word count, original transcript expander and export actions](docs/images/home-070.png)
 
-The welcome card appears for a new profile and links directly to model, settings
-and recording-display setup. Captures in this repository use isolated profiles
-with synthetic text and no live microphone.
+Home keeps both your edited draft and original transcript ready to copy,
+save locally, teach corrections from, or export as Markdown, plain text or JSON.
+Captures in this repository use isolated profiles with synthetic text and no live
+microphone.
 
-![Sona Modes page with a default mode and a per-app rule](docs/images/sona-modes-050.png)
+![Sona 0.7.0 Modes page with recent app quick-pick chips and per-app rules](docs/images/modes-070.png)
 
-Per-app rules combine a draft style with a cleanup tone for one captured app
-identity. Voice, audio and transcripts stay on this PC.
+Per-app rules combine a draft style with a cleanup tone for a captured app, with
+recent foreground app chips for one-click rule creation. Voice, audio and
+transcripts stay on this PC.
 
 <details>
-<summary>More interface captures</summary>
+<summary>More 0.7.0 interface captures</summary>
 
-![Sona 0.4.2 Home with an editable draft](docs/images/sona-home-042.png)
+![History grouped by local day with Copy, Open draft, Delete draft and Markdown export](docs/images/history-070.png)
 
-![Seven settings sections and optional sound feedback](docs/images/sona-settings-042.png)
+![Settings About and content-free local diagnostics summary](docs/images/settings-diagnostics-070.png)
+
+![Dictation Models showing Whisper cards, Memory controls and GPU/CPU runtime selector](docs/images/models-070.png)
 
 ![Compact recording capsule with a measured waveform](docs/images/sona-capsule-glass-042.png)
-
-![Compact Whisper cards with a separate Parakeet family](docs/images/sona-models-polished-042.png)
 
 </details>
 
@@ -71,21 +74,25 @@ identity. Voice, audio and transcripts stay on this PC.
   complete draft, inserts once, verifies the inserted text in the same composer,
   and only then submits. Focus, field identity and readback guard every step.
 - **A reviewable draft by default.** Home keeps the original transcript and an
-  editable result. A focus change preserves the draft instead of inserting it
-  into a different field. A retained-draft notice opens review or copy, and
-  optional clipboard recovery enables normal Ctrl+V when no insertion could be attempted.
-  Successful delivery preserves the earlier clipboard by default. If Windows cannot
-  capture it, bounded single-line dictation can be inserted directly instead.
+  editable result, with one-click Copy, Use original, Clear draft, local save,
+  correction learning and export (`.md`, `.txt` or `.json`). A focus change
+  preserves the draft instead of inserting it into a different field, and a
+  retained-draft notice opens review or copy. Successful delivery preserves the
+  previous clipboard (including safe HGLOBAL-backed app formats while excluding
+  unsafe OLE/serialized framework objects) and falls back to bounded single-line
+  direct Unicode insertion when Windows cannot capture the clipboard.
 - **Per-app modes.** Ordered rules map a captured app name, executable or package
   identity to a draft style (Clean, Verbatim, Notes) and a cleanup tone
-  (Polished, Casual, Lowercase). Unmatched apps use the default mode.
+  (Polished, Casual, Lowercase). Recent foreground apps appear as quick-pick chips
+  when creating a rule; unmatched apps use the default mode.
 - **Live transcription** (optional). Local audio snapshots update provisional
   text every few seconds. Final recognition and cleanup still run after stopping.
   Partial text is never typed into another app.
 - **Local recognition choices.** NVIDIA Parakeet v3 and six Whisper models offer
-  CPU or NVIDIA CUDA options. Downloads use pinned sizes and hashes. Selected and
-  actually loaded models are shown separately, and one worker stays resident for
-  the configured idle timeout.
+  CPU or NVIDIA CUDA options with pinned SHA-256 verification for both engines.
+  Selected and actually loaded models are shown separately, parallel warm-up
+  loads speech and cleanup workers together, and idle timers release inactive
+  workers on your schedule.
 - **Optional local cleanup.** Spokenly Cleanup 1 handles punctuation, fillers,
   repetition and spoken corrections with Polished, Casual or Lowercase styles.
   Verbatim and exact snippets bypass it, and the original transcript remains
@@ -93,19 +100,26 @@ identity. Voice, audio and transcripts stay on this PC.
 - **Vocabulary and snippets.** Recognition hints, explicit spelling corrections
   and whole-utterance snippet expansion help with names, terminology and
   recurring text.
-- **History and saved drafts.** Grouped by local day with search, date ranges,
-  pause, clear and per-row delete. Saving history is opt-in, capped at 200 text
-  entries, and stores no audio. Explicitly saved drafts stay separate.
+- **History and saved drafts.** Grouped by local day with search and quick clear,
+  date ranges, pause, per-row Copy, double-click/Enter or button Open draft,
+  per-row Delete, filtered Markdown export and bulk clear. Saving history is
+  opt-in, capped at 200 text entries, and stores no audio. Explicitly saved drafts
+  stay separate.
+- **Microphone check and local diagnostics.** Test your selected microphone with
+  an opt-in 30-second level meter in Settings → Audio & typing, and inspect or
+  copy a content-free local diagnostics summary in Settings → About.
 - **Discord call protection** (optional). Mute your microphone while Sona or a
   watched app records, and optionally silence incoming audio. A call where you
   are already deafened counts as protected and is left untouched. Sona ships no
   shared credentials; you connect your own Discord application.
 - **Workspace fit.** Eight light/dark glass themes, Inter typography, Panel or
   Capsule recording displays, a microphone picker and local WAV transcription.
-- **Recognizable background workers.** Task Manager shows **Sona Speech Engine**,
-  **Sona Transcription** and **Sona Text Polish** rather than upstream binary names.
-- **Connect your tools.** A JSON CLI and stdio MCP interface expose status,
-  validated settings, models and call protection, with no remote microphone
+- **Recognizable background workers.** Task Manager shows **Sona Speech Engine**
+  (for both Whisper and Parakeet) and **Sona Text Polish** rather than upstream
+  binary names.
+- **Connect your tools.** A concurrent current-user JSON CLI and stdio MCP
+  interface expose status, validated settings (including `cleanupMode` and
+  `copyOnInsertionFailure`), models and call protection, with no remote microphone
   control.
 
 ## Build and run
@@ -219,19 +233,20 @@ also crashed in a mixed English/French resident sequence.
 ## Roadmap
 
 Planned work, not current behavior: code signing, a stable installer release and
-portable build with checksums, a guided first-run flow with microphone test, voice
-command mode for editing selected text, saved-draft export and reprocessing, a
-local diagnostics page, and broader language coverage. No cloud model, account or
-telemetry plans.
+portable build with checksums, a guided first-run onboarding tour, voice
+command mode for editing selected text, saved-draft reprocessing, and broader
+language coverage. No cloud model, account or telemetry plans.
 
 ## Contributing
 
 Try it on your hardware and tell us what works, what fails, and what would make
-dictation more useful. Include your Windows version, selected model/backend and
-steps to reproduce a bug. Keep private transcripts and credentials out of
-reports. Security reports: see [SECURITY.md](SECURITY.md).
+dictation more useful. Copy your content-free summary from **Settings → About →
+Diagnostics** and include steps to reproduce a bug. Keep private transcripts and
+credentials out of reports. Security reports: see [SECURITY.md](SECURITY.md).
 
-For the maintained regression checks, from the same PowerShell session:
+For the maintained regression checks, from the same PowerShell session (`tools/build.ps1`,
+`tools/prepare-release.ps1` and `tools/installer/build-installer.ps1` also honor
+`SONA_RUNTIME`, `NUGET_PACKAGES` and `dotnet` on `PATH`):
 
 ```powershell
 & $sonaDotnet run --project .\tests\Sona.Tests -c Release --disable-build-servers -p:UseSharedCompilation=false
@@ -241,16 +256,16 @@ For the maintained regression checks, from the same PowerShell session:
 
 `tools/build.ps1` runs the consolidated local gate: warning-free Release builds,
 Core and Windows regression checks, isolated native fixtures (including
-model-loading, professional polish, setup guidance and residency checks) and the
-updater checks. The
+model-loading, professional polish, setup guidance and residency checks),
+updater checks, and NuGet vulnerability auditing. The
 owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2 build on
 October 15, 2026. That is one target-app smoke test; the automated checks do not
 establish broad microphone, other-app or live-call acceptance.
 
-GitHub reports a `clipboard` check on every pull request into `main`. The job
-runs the Windows clipboard tests when code, build inputs, or other files outside
-the Markdown documentation change. Documentation-only pull requests complete
-after the scope check. Use the preview validation guide for target-app acceptance.
+GitHub runs two workflows on pull requests into `main`: `clipboard` (Windows
+clipboard regression coverage) and `build-and-test` (full Release build,
+`Sona.Tests`, deterministic `Sona.WindowsTests` suites, and NuGet vulnerability
+audit). Use the preview validation guide for target-app acceptance.
 
 [Preview validation](docs/PREVIEW-VALIDATION.md) · [Contributing](CONTRIBUTING.md)
 · [Verification](docs/VERIFICATION.md) · [Design](docs/DESIGN.md) ·

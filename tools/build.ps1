@@ -1,17 +1,24 @@
 $ErrorActionPreference = 'Stop'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
-$taskRuntime = 'E:\DevelopmentTools\local-dictation'
-$env:DOTNET_CLI_HOME = "$taskRuntime\dotnet-home"
-$env:NUGET_PACKAGES = "$taskRuntime\nuget"
+$taskRuntime = if ($env:SONA_RUNTIME) { $env:SONA_RUNTIME } else { 'E:\DevelopmentTools\local-dictation' }
+$sdkDotnet = Join-Path $taskRuntime 'sdk\dotnet.exe'
+if (Test-Path -LiteralPath $sdkDotnet) {
+    if (-not $env:DOTNET_ROOT) { $env:DOTNET_ROOT = Join-Path $taskRuntime 'sdk' }
+    if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = Join-Path $taskRuntime 'dotnet-home' }
+    if (-not $env:NUGET_PACKAGES) { $env:NUGET_PACKAGES = Join-Path $taskRuntime 'nuget' }
+    $dotnet = $sdkDotnet
+} else {
+    $dotnet = 'dotnet'
+}
 $taskRepo = Split-Path $PSScriptRoot -Parent
-& "$taskRuntime\sdk\dotnet.exe" build "$taskRepo\src\Sona.App\Sona.App.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
+& $dotnet build "$taskRepo\src\Sona.App\Sona.App.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
 if ($LASTEXITCODE -ne 0) { throw 'App build failed' }
-& "$taskRuntime\sdk\dotnet.exe" build "$taskRepo\src\Sona.Agent\Sona.Agent.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
+& $dotnet build "$taskRepo\src\Sona.Agent\Sona.Agent.csproj" -c Release --disable-build-servers -p:UseSharedCompilation=false -p:RestorePackagesWithLockFile=true
 if ($LASTEXITCODE -ne 0) { throw 'Agent interface build failed' }
-& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Sona.Tests" -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $dotnet run --project "$taskRepo\tests\Sona.Tests" -c Release --disable-build-servers -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Safety regressions failed' }
-& "$taskRuntime\sdk\dotnet.exe" run --project "$taskRepo\tests\Sona.WindowsTests" -c Release --disable-build-servers -p:UseSharedCompilation=false
+& $dotnet run --project "$taskRepo\tests\Sona.WindowsTests" -c Release --disable-build-servers -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Windows lifecycle regressions failed' }
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --capture-policy-checks
 if ($LASTEXITCODE -ne 0) { throw 'Capture policy regressions failed' }
@@ -64,11 +71,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Model loading feedback regressions failed' }
 $taskLiveEvidence = Join-Path ([IO.Path]::GetTempPath()) ('sona-live-draft-' + [Guid]::NewGuid().ToString('N'))
 & "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --live-draft-fixture $taskLiveEvidence
 if ($LASTEXITCODE -ne 0) { throw 'Live preview completion regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --active-app-state-fixture
+if ($LASTEXITCODE -ne 0) { throw 'Active app state regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --theme-material-fixture
+if ($LASTEXITCODE -ne 0) { throw 'Theme material regressions failed' }
+& "$taskRepo\tests\Sona.WindowsTests\bin\Release\net8.0-windows\Sona.WindowsTests.exe" --presentation-fixture
+if ($LASTEXITCODE -ne 0) { throw 'Presentation regressions failed' }
 & (Join-Path $taskRepo 'tools\install-staging-checks.ps1') -OutputRoot (Join-Path ([IO.Path]::GetTempPath()) ('sona-upgrade-rehearsal-' + [Guid]::NewGuid().ToString('N')))
 if (!$?) { throw 'Installer staging regressions failed' }
 & (Join-Path $taskRepo 'tools\session-readiness-checks.ps1')
 if (!$?) { throw 'Updater status regressions failed' }
 & (Join-Path $taskRepo 'tools\owned-startup-checks.ps1')
 if (!$?) { throw 'Owned startup readiness regressions failed' }
-& "$taskRuntime\sdk\dotnet.exe" list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
+& $dotnet list "$taskRepo\src\Sona.App\Sona.App.csproj" package --vulnerable --include-transitive
 if ($LASTEXITCODE -ne 0) { throw 'Dependency audit command failed' }

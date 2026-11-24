@@ -2,6 +2,7 @@ param([Parameter(Mandatory)][string]$PackageDirectory,[Parameter(Mandatory)][str
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
+. (Join-Path $PSScriptRoot 'resolve-sona-window.ps1')
 $OutputRoot=[IO.Path]::GetFullPath($OutputRoot);$PackageDirectory=[IO.Path]::GetFullPath($PackageDirectory)
 if((Split-Path $OutputRoot -Leaf)-notmatch'^sona-upgrade-rehearsal-[a-f0-9]{32}$' -or (Test-Path -LiteralPath $OutputRoot)){throw 'Fresh guarded rehearsal root required.'}
 $productionRoot=Join-Path $env:LOCALAPPDATA 'Programs\Sona'
@@ -11,7 +12,7 @@ $profileHash=if(Test-Path -LiteralPath $profile){(Get-FileHash -LiteralPath $pro
 $checks=[Collections.Generic.List[string]]::new()
 function Proof([bool]$ok,[string]$label){if(!$ok){throw $label};$checks.Add($label)}
 function TestApps{return @(Get-Process Sona -ErrorAction SilentlyContinue|Where-Object {$_.Path -and $_.Path.StartsWith($OutputRoot+'\',[StringComparison]::OrdinalIgnoreCase)})}
-function Window($process){$process.Refresh();return [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)}
+function Window($process){for($try=0;$try -lt 40;$try++){$hwnd=Get-SonaMainWindowHandle $process.Id;if($hwnd -ne [IntPtr]::Zero){return [Windows.Automation.AutomationElement]::FromHandle($hwnd)};Start-Sleep -Milliseconds 50};throw 'Isolated Sona window unavailable.'}
 function Field($window,[string]$id){return $window.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,$id))}
 function Quit($process){$window=Window $process;(Field $window 'SettingsTab').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select();(Field $window 'SettingsAboutNav').GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select();$button=$window.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'Quit Sona'));$button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();if(!$process.WaitForExit(10000)){throw 'Exact fixture did not quit.'}}
 try {

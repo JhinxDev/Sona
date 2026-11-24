@@ -16,6 +16,7 @@ internal sealed class ResidentModel
     private readonly HttpClient http = new(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = 1024 * 1024 };
     private readonly TimeProvider clock;
     private readonly Func<string, CancellationToken, Task<bool>> verifyModel;
+    private readonly Func<bool, CancellationToken, Task<bool>> verifyWhisper;
     private readonly TimeSpan startupTimeout;
     private BoundedProcess? worker;
     private Uri? endpoint;
@@ -40,10 +41,11 @@ internal sealed class ResidentModel
     public bool CleanupPending => Volatile.Read(ref cleanupPending);
     public string? LoadedModel => Volatile.Read(ref loaded);
     public int? ProcessId => Volatile.Read(ref processId) is var id && id > 0 ? id : null;
-    public ResidentModel(TimeProvider? clock = null, Func<string, CancellationToken, Task<bool>>? verifyModel = null, TimeSpan? startupTimeout = null)
+    public ResidentModel(TimeProvider? clock = null, Func<string, CancellationToken, Task<bool>>? verifyModel = null, TimeSpan? startupTimeout = null, Func<bool, CancellationToken, Task<bool>>? verifyWhisper = null)
     {
         this.clock = clock ?? TimeProvider.System;
         this.verifyModel = verifyModel ?? ((model, token) => Transcriber.Models.VerifyAsync(model, token));
+        this.verifyWhisper = verifyWhisper ?? WhisperAssets.VerifyAsync;
         this.startupTimeout = startupTimeout ?? TimeSpan.FromSeconds(60);
     }
     public async Task WarmAsync(Preferences p, CancellationToken cancellation)
@@ -141,15 +143,27 @@ internal sealed class ResidentModel
             var verified = await verifyModel(model, deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();
             if (!verified) throw new IOException("Install and verify the selected local model first.");
-            var executable = isParakeet ? ParakeetAssets.Executable(cuda) : WorkerBranding.PathFor(Path.Combine(Transcriber.RuntimeRoot, cuda ? "whisper-cuda" : "whisper", "Release", "whisper-server.exe"));
-            if (!File.Exists(executable)) throw new IOException("The resident local engine is missing. Repair the local runtime.");
-            if (isParakeet && !await ParakeetAssets.VerifyAsync(cuda, deadline.Token).ConfigureAwait(false)) throw new IOException("The Parakeet runtime failed integrity verification. Existing files were preserved.");
+            var originalExecutable = isParakeet ? ParakeetAssets.Executable(cuda) : Path.Combine(WhisperAssets.RuntimePath(cuda), "whisper-server.exe");
+            if (!File.Exists(originalExecutable)) throw new IOException("The resident local engine is missing. Repair the local runtime.");
+            if (isParakeet)
+            {
+                if (!await ParakeetAssets.VerifyAsync(cuda, deadline.Token).ConfigureAwait(false)) throw new IOException("The Parakeet runtime failed integrity verification. Existing files were preserved.");
+            }
+            else if (!await verifyWhisper(cuda, deadline.Token).ConfigureAwait(false))
+            {
+                throw new IOException("The local Whisper runtime failed integrity verification. Existing files were preserved.");
+            }
             deadline.Token.ThrowIfCancellationRequested();
+            var originalDir = Path.GetDirectoryName(originalExecutable)!;
+            var workerDir = Path.Combine(AppPaths.DataRoot, "workers", isParakeet ? (cuda ? "parakeet-cuda" : "parakeet-cpu") : (cuda ? "whisper-cuda" : "whisper-cpu"));
+            var executable = WorkerBranding.PathFor(originalExecutable, workerDir);
             var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
             var capability = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             parakeet = isParakeet; apiKey = isParakeet ? capability : null;
             endpoint = new Uri(isParakeet ? $"http://127.0.0.1:{port}/" : $"http://127.0.0.1:{port}/{capability}/");
-            var info = new ProcessStartInfo(executable);
+            var info = new ProcessStartInfo(executable) { WorkingDirectory = originalDir };
+            var existingPath = Environment.GetEnvironmentVariable("PATH");
+            info.Environment["PATH"] = string.IsNullOrEmpty(existingPath) ? originalDir : originalDir + ";" + existingPath;
             if (isParakeet)
             {
                 foreach (var name in info.Environment.Keys.Where(n => n.StartsWith("NEMO_SPEECH_", StringComparison.OrdinalIgnoreCase)).ToArray()) info.Environment.Remove(name);

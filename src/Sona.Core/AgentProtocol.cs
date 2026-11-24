@@ -51,7 +51,7 @@ public static class AgentSettings
     public static Preferences Apply(Preferences current, JsonElement patch)
     {
         if (patch.ValueKind != JsonValueKind.Object || patch.EnumerateObject().Count() > 27) throw new ArgumentException("Settings must be a bounded JSON object.");
-        var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
+        var next = current.Clone();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in patch.EnumerateObject())
         {

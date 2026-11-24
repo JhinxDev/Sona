@@ -12,8 +12,11 @@ namespace Sona.App;
 /// <summary>Applies semantic brushes on the UI thread without recreating the window or disturbing focus.</summary>
 public static class ThemeManager
 {
-    private static readonly ConditionalWeakTable<Window, object> TrackedWindows = new();
+    private sealed class WindowHookState { public HwndSource? Source; public HwndSourceHook? Hook; }
+    private static readonly ConditionalWeakTable<Window, WindowHookState> TrackedWindows = new();
+    private static readonly SolidColorBrush DarkAppIconPlate = FreezeSolid(Color.FromRgb(32, 30, 36));
     public static ThemeDefinition Current { get; private set; } = ThemeCatalog.Resolve(ThemeCatalog.DefaultId);
+    private static SolidColorBrush FreezeSolid(Color color) { var brush = new SolidColorBrush(color); brush.Freeze(); return brush; }
 
     public static void Apply(string id)
     {
@@ -33,19 +36,27 @@ public static class ThemeManager
     public static void ApplyTitleBar(Window window, bool allowNative = true)
     {
         if (!window.Dispatcher.CheckAccess()) { window.Dispatcher.Invoke(() => ApplyTitleBar(window, allowNative)); return; }
-        if (!TrackedWindows.TryGetValue(window, out _))
+        if (!TrackedWindows.TryGetValue(window, out var state))
         {
-            TrackedWindows.Add(window, new object());
-            window.SourceInitialized += (_, _) => ApplyTitleBar(window);
+            state = new WindowHookState();
+            TrackedWindows.Add(window, state);
             window.SourceInitialized += (_, _) =>
             {
-                var source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-                source?.AddHook((nint hwnd, int message, nint wParam, nint lParam, ref bool handled) =>
+                ApplyTitleBar(window);
+                if (state.Hook != null) return;
+                state.Source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
+                state.Hook = (nint hwnd, int message, nint wParam, nint lParam, ref bool handled) =>
                 {
-                    if (window is MainWindow && message is 0x001A or 0x031E)
+                    if (window is MainWindow && ShouldReapplyTheme(message, lParam))
                         window.Dispatcher.BeginInvoke(() => Apply(Current.Id));
                     return 0;
-                });
+                };
+                state.Source?.AddHook(state.Hook);
+            };
+            window.Closed += (_, _) =>
+            {
+                if (state.Source != null && state.Hook != null) state.Source.RemoveHook(state.Hook);
+                state.Source = null; state.Hook = null;
             };
         }
         var handle = new WindowInteropHelper(window).Handle;
@@ -98,10 +109,10 @@ public static class ThemeManager
             : Brushes.Transparent;
         resources["MaterialEdge"] = highContrast ? SystemColors.WindowTextBrush : translucent
             ? EdgeGradient(line, accent)
-            : new SolidColorBrush(edge);
+            : FreezeSolid(edge);
         resources["MaterialNavEdge"] = highContrast ? SystemColors.WindowTextBrush : translucent
             ? Gradient(WithAlpha(Mix(line, accent, .72), 0xC8), WithAlpha(accent, 0xA0), WithAlpha(Mix(line, accent, .5), 0xB8), new Point(0, 0), new Point(1, 1))
-            : new SolidColorBrush(accent);
+            : FreezeSolid(accent);
         resources["MaterialNavThickness"] = new Thickness(1);
         resources["MaterialPanelRadius"] = new CornerRadius(14);
         resources["MaterialPanelEffect"] = !highContrast && (RenderCapability.Tier >> 16) > 0
@@ -113,7 +124,7 @@ public static class ThemeManager
 
         // Protected surfaces remain almost opaque over native backdrops. These aliases
         // also give the overlay a stable material contract without theme-specific hues.
-        resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(32, 30, 36));
+        resources["AppIconPlate"] = Current.IsDark && !highContrast ? Brushes.Transparent : DarkAppIconPlate;
         resources["OverlaySurface"] = CreateOverlaySurface(WindowBackdrop.TransparencyEnabled(), highContrast);
         resources["OverlayEdge"] = resources["MaterialEdge"];
     }
@@ -217,6 +228,19 @@ public static class ThemeManager
             (byte)Math.Clamp(Math.Round(left.R + (right.R - left.R) * amount), 0, 255),
             (byte)Math.Clamp(Math.Round(left.G + (right.G - left.G) * amount), 0, 255),
             (byte)Math.Clamp(Math.Round(left.B + (right.B - left.B) * amount), 0, 255));
+    }
+
+    private static bool ShouldReapplyTheme(int message, nint lParam)
+    {
+        if (message == 0x031E) return true;
+        if (message != 0x001A) return false;
+        if (lParam == nint.Zero) return true;
+        var area = Marshal.PtrToStringUni(lParam);
+        return string.IsNullOrEmpty(area) ||
+            area.Equals("ImmersiveColorSet", StringComparison.OrdinalIgnoreCase) ||
+            area.Equals("WindowsThemeElement", StringComparison.OrdinalIgnoreCase) ||
+            area.Equals("WindowMetrics", StringComparison.OrdinalIgnoreCase) ||
+            area.Equals("HighContrast", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int ColorRef(Color color)

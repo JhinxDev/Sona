@@ -400,3 +400,28 @@ preserved. Confirmed paste takes precedence over later focus-change classificati
 for recovery guidance; the destination-change flag remains recorded. One memory-only
 last-delivery snapshot exposes classifications and flags without text or new focus
 inspection. [Behavior and evidence](ENTER-DELIVERY.md).
+
+## UI polish and v0.7.0 additions (2026-11-24)
+
+- **Shared controls (`App.xaml`)**: `TextBox` and `PasswordBox` bind `Padding`
+  through `PART_ContentHost`, `CheckBox` uses a transparent hit `Grid` and
+  consistent `Focus` border on keyboard focus, `QuietButton` uses a subtle
+  `Hover` surface without a hard box border, `TabItem` and `SettingsCategory`
+  place `IsChecked`/`IsSelected` after `IsMouseOver`, horizontal `ScrollBar`s use
+  matching themed thumbs, and `DatePicker`/`Calendar`/`DatePickerTextBox` inherit
+  the active theme palette.
+- **Recording overlay (`Overlay.xaml` / `Overlay.xaml.cs`)**: `ShellBorder` gives
+  the translucent overlay shell a `FrameworkElementAutomationPeer` (`Custom`),
+  `BusyLine` uses a self-contained pill `ControlTemplate` so reduced-motion and
+  high-contrast modes never fall back to Aero chrome, and `CapsuleWave` renders
+  3 px bars directly in a 148 px strip without `Viewbox` vertical scaling.
+- **Workflow and diagnostics views (`MainWindow.xaml`)**: Home disables
+  `Use original` and `Clear draft` when inactive and supports `.md`/`.txt`/`.json`
+  draft export; `Settings → Audio & typing` adds an opt-in 30-second
+  `Test microphone` level bar while keeping the `Microphone` label aligned in
+  Row 0; `Settings → About` adds a content-free `DIAGNOSTICS` card; `Modes`
+  adds recent foreground app chips (`RecentAppsList`) and defaults `Draft style`
+  and `Cleanup tone` selectors cleanly; `History` replaces accidental
+  single-click navigation with double-click/`Enter`, `Copy`, `Open draft`,
+  `Delete draft`, inline search clear (`×`), and filtered `.md` export; and
+  `Vocabulary` and `Snippets` show empty-state descriptions until populated.

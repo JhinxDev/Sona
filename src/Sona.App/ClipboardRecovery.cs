@@ -33,6 +33,11 @@ public partial class MainWindow
             StatusDetail.Text += " The finished draft stays on the clipboard." + guidance;
             return;
         }
+        if (usedPaste && insertion.LastClipboardStatus == "CaptureFailed")
+        {
+            StatusDetail.Text += " Clipboard could not be safely preserved; use Copy draft if needed.";
+            return;
+        }
         // A deliberate newer owner copy wins over automatic recovery.
         if (ClipboardSequence() != expected) { StatusDetail.Text += " The clipboard changed; use Copy draft if you still need this text."; return; }
         try

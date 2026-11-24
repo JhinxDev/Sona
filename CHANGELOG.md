@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.7.0 - reliability, UX polish, integrity, performance and CI overhaul
+
+- **Portable clipboard restoration**: allow safe non-control `HGLOBAL`
+  registered formats up to 64 MiB while explicitly blocking unsafe
+  OLE/COM/pointer/GDI/metafile and serialized `.NET`/`WPF` formats, avoid
+  redundant fallback captures on `CaptureFailed`, and record the sanitized
+  rejected format name in `clipboardUnsupportedFormat`.
+- **Concurrency and handle lifecycle**: synchronize live-inference cancellation on
+  Stop timeout, offload synchronous Esc cancellation off `WH_KEYBOARD_LL`, add
+  process-tree kill fallback on worker disposal timeout, contain `Hotkeys`
+  dispatch faults, replace recursive Discord auth refresh with a bounded loop,
+  zero temporary WAV `MemoryStream` buffers on exit, and dispose `AgentServer`
+  and `protectionTimer` on window close.
+- **Engine integrity and worker branding**: add pinned SHA-256 verification for
+  both CPU and CUDA `whisper-server.exe` runtimes (`WhisperAssets` and
+  `tools/cuda-manifest.json`), map `nemo-speech.exe` to
+  `Sona Speech Engine.exe`, harden `WorkerBranding` with reparse-point and
+  SHA-256 checks, run both speech backends via clean staged paths, asynchronously
+  hash cleanup Zip updates while validating entry lengths, warm speech and
+  cleanup models in parallel, serve 4 concurrent `AgentServer` pipe listeners,
+  and add `cleanupMode` and `copyOnInsertionFailure` to MCP `settings.patch`.
+- **Frontend performance and WPF polish**: replace periodic 500 ms settings
+  polling and JSON diffing with native `Preferences.Clone()` and
+  `GeneralSettingsEqual()` plus event-driven button refreshes, cache Discord
+  badges and `ModelWaveGeometry`, skip hidden `protectionTimer` UI work, clean up
+  merged `ThemeManager` hooks and filter `WM_SETTINGCHANGE`, add `ShellBorder`
+  UIA peer and `BusyLine` template, fix capsule waveform aspect ratio, theme
+  `PasswordBox`, `DatePicker`/`Calendar` and horizontal `ScrollBar`, and fix
+  `TabItem`/`SettingsCategory` hover vs selected trigger priority.
+- **New user capabilities**: add a content-free local diagnostics summary and
+  copy action in Settings → About, an opt-in 30-second microphone input level
+  test in Settings → Audio & typing, per-row Copy plus clear-search (`×`),
+  filtered Markdown export (`Export (.md)`), and non-hijacking double-click /
+  Enter open in History, multi-format draft export (`.md`, `.txt`, `.json`) on
+  Home, recent-app quick-pick chips on Modes, and empty-state hints in
+  Vocabulary and Snippets.
+- **Build, release and CI tooling**: make `tools/build.ps1`,
+  `tools/prepare-release.ps1` and `tools/installer/build-installer.ps1` honor
+  `SONA_RUNTIME`, `NUGET_PACKAGES` and `PATH` `dotnet`, add
+  `tools/resolve-sona-window.ps1` so Windows 11 text-input overlay windows never
+  hijack UI/upgrade window discovery, and add `.github/workflows/ci.yml` plus
+  `.github/dependabot.yml`.
+
 ## 0.6.2 - insert and send when the clipboard cannot be captured
 
 - When clipboard capture fails before any write or paste, insert a bounded
