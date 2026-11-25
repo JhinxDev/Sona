@@ -2,7 +2,7 @@
 
 Sona original source is licensed under MIT and is published as an early source preview. Its original interface and code were developed independently. Installed Wispr Flow and Spokenly were owner-authorized interface references; none of their proprietary implementation or artwork is distributed here. Spokenly's separately published, openly licensed cleanup model is used with attribution below. The MIT license does not relicense the third-party components or separately downloaded model weights listed here.
 
-- [NAudio 2.2.1](https://github.com/naudio/NAudio/tree/v2.2.1): MIT, copyright Mark Heath and contributors. The license text is under `licenses/NAudio.txt` and copied into the application package.
+- [NAudio 2.4.0](https://github.com/naudio/NAudio/tree/v2.4.0): MIT, copyright Mark Heath and contributors. The license text is under `licenses/NAudio.txt` and copied into the application package.
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp): MIT, copyright Georgi Gerganov and contributors. Its pinned official engine is a separate local runtime download; `licenses/whisper.cpp.txt` retains the license.
 - [OpenAI Whisper](https://github.com/openai/whisper): model/code MIT, copyright OpenAI. The quantized model comes from the [ggerganov whisper.cpp model repository](https://huggingface.co/ggerganov/whisper.cpp). License retained in `licenses/Whisper.txt`.
 - [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3): CC-BY-4.0, NVIDIA. The official Q8_0 GGUF is a separately downloaded model. Immutable revision, file size and SHA256 are pinned in ModelCatalog and docs/PARAKEET.md. Sona executes the model locally and does not relicense its weights.
