@@ -1,5 +1,10 @@
 # Sona
 
+[![CI](https://github.com/JhinxDev/Sona/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JhinxDev/Sona/actions/workflows/ci.yml)
+[![Clipboard CI](https://github.com/JhinxDev/Sona/actions/workflows/windows-clipboard.yml/badge.svg?branch=main)](https://github.com/JhinxDev/Sona/actions/workflows/windows-clipboard.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D4.svg)
+
 **Local voice dictation for Windows. Your voice, your words, on your PC.**
 
 Sona turns speech into text in your focused app using Parakeet or Whisper on
@@ -257,10 +262,9 @@ For the maintained regression checks, from the same PowerShell session (`tools/b
 `tools/build.ps1` runs the consolidated local gate: warning-free Release builds,
 Core and Windows regression checks, isolated native fixtures (including
 model-loading, professional polish, setup guidance and residency checks),
-updater checks, and NuGet vulnerability auditing. The
-owner confirmed real hands-free Enter-to-send in Codex on the final 0.4.2 build on
-October 15, 2026. That is one target-app smoke test; the automated checks do not
-establish broad microphone, other-app or live-call acceptance.
+updater checks, and NuGet vulnerability auditing. Hands-free Enter-to-send has
+been smoke-tested in real desktop editing; automated checks do not establish
+broad microphone, target-app, or live-call acceptance.
 
 GitHub runs two workflows on pull requests into `main`: `clipboard` (Windows
 clipboard regression coverage) and `build-and-test` (full Release build,

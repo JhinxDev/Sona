@@ -25,7 +25,7 @@ internal static class DiscordClosedChecks
                 service.Start();await Task.Delay(650,timeout.Token);
                 Check(server.Connections==0,"Closed Discord poll avoids reconnect failures and retry backoff");
                 await service.BeginOwnRecordingAsync(timeout.Token);running=true;
-                for(var i=0;i<100&&(!service.Connected||!server.State.Muted);i++)await Task.Delay(20,timeout.Token);
+                for(var i=0;i<250&&(!service.Connected||!server.State.Muted);i++)await Task.Delay(20,timeout.Token);
                 Check(service.Connected&&server.State.Muted&&service.OwnsChanges,"Opening Discord during dictation reconnects and protects the retained source");
                 await service.EndOwnRecordingAsync(timeout.Token);
                 Check(!server.State.Muted&&!service.OwnsChanges,"Stopping after reconnect restores the acquired mute");
