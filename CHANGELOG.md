@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.1 - CI stability, NAudio 2.4.0, and automated installer releases
+
+- **CI and test stability**: fix a timing race in `DiscordClosedChecks` where
+  polling exited once the fake Discord server muted before `ProtectionService`
+  finished recording `OwnsChanges`, and make cross-thread process state reads
+  volatile.
+- **Dependencies**: upgrade `NAudio` to `2.4.0` and refresh third-party notices.
+- **Automated release packaging**: add `.github/workflows/release.yml` and
+  `tools/release-notes.ps1` so every `vX.Y.Z` tag validates `Directory.Build.props`
+  and `CHANGELOG.md`, builds and rehearses the self-contained Windows x64 Inno
+  Setup installer, generates `SHA256SUMS.txt`, and publishes the GitHub
+  Release automatically.
+- **Documentation**: add CI and platform status badges in `README.md`.
+
 ## 0.7.0 - reliability, UX polish, integrity, performance and CI overhaul
 
 - **Portable clipboard restoration**: allow safe non-control `HGLOBAL`

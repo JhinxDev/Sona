@@ -37,3 +37,12 @@ launcher. Preserve busy recording, owned voice changes and unsaved edits until
 activation is safe. Verify the running version/build, exact EXE and installed
 receipt hashes, restored draft and original, and settings readback before calling
 delivery complete. Follow [the live upgrade contract](docs/IMPLEMENTATION.md#live-upgrade-delivery-rule).
+
+## Releases and installer publishing
+
+Every user-facing feature, bug fix, or packaging change on `main` must bump `<Version>`
+in `Directory.Build.props`, record notes under `## <version>` in `CHANGELOG.md`, update
+release links in `README.md` and `docs/INSTALL.md`, pass CI on a PR, and push an
+annotated `vX.Y.Z` tag on the merged `main` commit. `.github/workflows/release.yml`
+validates version metadata with `tools/release-notes.ps1`, builds and rehearses the
+Windows x64 installer, generates `SHA256SUMS.txt`, and publishes the GitHub Release.

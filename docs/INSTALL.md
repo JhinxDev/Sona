@@ -6,10 +6,10 @@ the CLI ships beside it. The installer is part of the early, unsigned preview.
 
 ## Download
 
-[Download Sona-Setup-0.7.0.exe](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/Sona-Setup-0.7.0.exe)
-from the [v0.7.0 release](https://github.com/JhinxDev/Sona/releases/tag/v0.7.0).
-This Windows x64 installer is an unsigned pre-release.
-[Published SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.0/SHA256SUMS.txt).
+[Download Sona-Setup-0.7.1.exe](https://github.com/JhinxDev/Sona/releases/download/v0.7.1/Sona-Setup-0.7.1.exe)
+from the [v0.7.1 release](https://github.com/JhinxDev/Sona/releases/tag/v0.7.1).
+This Windows x64 installer is an unsigned preview build.
+[Published SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.1/SHA256SUMS.txt).
 
 ## Requirements
 

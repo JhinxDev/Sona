@@ -6,7 +6,7 @@ internal static class DiscordClosedChecks
 {
     public static async Task<int> RunAsync()
     {
-        var running=false;var count=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);count++;Console.WriteLine("PASS "+label);}
+        var running=0;var count=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);count++;Console.WriteLine("PASS "+label);}
         var root=Path.Combine(Path.GetTempPath(),"sona-discord-closed-"+Guid.NewGuid().ToString("N"));
         var file=Path.Combine(root,"fixture.dpapi");var vault=new ProtectedCredentials(file);
         vault.Save(new(){ClientId="123456789",ClientSecret="fixture",AccessToken="fixture",ExpiresAt=DateTimeOffset.UtcNow.ToUnixTimeSeconds()+3600});
@@ -14,7 +14,7 @@ internal static class DiscordClosedChecks
         try
         {
             await using(var server=new DiscordFixtureServer())
-            await using(var service=new ProtectionService(vault,server.Prefix,_=>[],()=>running))
+            await using(var service=new ProtectionService(vault,server.Prefix,_=>[],()=>Volatile.Read(ref running)!=0))
             {
                 await service.ConfigureAsync(new(){ProtectionEnabled=true,ProtectionReleaseDelayMs=0},timeout.Token);
                 await service.BeginOwnRecordingAsync(timeout.Token);
@@ -24,8 +24,8 @@ internal static class DiscordClosedChecks
                 Check(!service.Connected&&!service.OwnsChanges,"Stopping while Discord is closed needs no transport");
                 service.Start();await Task.Delay(650,timeout.Token);
                 Check(server.Connections==0,"Closed Discord poll avoids reconnect failures and retry backoff");
-                await service.BeginOwnRecordingAsync(timeout.Token);running=true;
-                for(var i=0;i<250&&(!service.Connected||!server.State.Muted);i++)await Task.Delay(20,timeout.Token);
+                await service.BeginOwnRecordingAsync(timeout.Token);Volatile.Write(ref running,1);
+                for(var i=0;i<250&&(!service.Connected||!server.State.Muted||!service.OwnsChanges);i++)await Task.Delay(20,timeout.Token);
                 Check(service.Connected&&server.State.Muted&&service.OwnsChanges,"Opening Discord during dictation reconnects and protects the retained source");
                 await service.EndOwnRecordingAsync(timeout.Token);
                 Check(!server.State.Muted&&!service.OwnsChanges,"Stopping after reconnect restores the acquired mute");
