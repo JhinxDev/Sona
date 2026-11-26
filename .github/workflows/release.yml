@@ -1,0 +1,139 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish or update (e.g. v0.7.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish-release:
+    name: Build Windows installer and publish release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Resolve release tag
+        id: tag
+        shell: pwsh
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $releaseTag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:REF_NAME }
+          if ($releaseTag -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "Release tag must match vMAJOR.MINOR.PATCH (got '$releaseTag')."
+          }
+          "name=$releaseTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+          persist-credentials: false
+
+      - name: Validate tag against Directory.Build.props and CHANGELOG.md
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          pwsh -NoProfile -File tools/release-notes.ps1 -Tag $env:RELEASE_TAG | Out-Null
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Ensure Inno Setup compiler is available
+        id: inno
+        shell: pwsh
+        run: |
+          $candidates = @(
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 7\ISCC.exe'
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            Write-Host 'Installing Inno Setup via Chocolatey...'
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to install Inno Setup.' }
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            throw 'ISCC.exe was not found after installation.'
+          }
+          Write-Host "Using ISCC: $iscc"
+          "iscc=$iscc" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build and rehearse Windows installer
+        shell: pwsh
+        env:
+          ISCC_PATH: ${{ steps.inno.outputs.iscc }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'sona-release'
+          pwsh -NoProfile -File tools/installer/build-installer.ps1 `
+            -Rehearsal `
+            -OutputRoot $out `
+            -IsccPath $env:ISCC_PATH
+
+      - name: Generate SHA256SUMS.txt and release notes
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'sona-release'
+          $infoPath = Join-Path $out 'installer-build-info.json'
+          $info = Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
+          $sumsPath = Join-Path $out 'SHA256SUMS.txt'
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText($sumsPath, "$($info.InstallerSHA256)  $($info.Installer)`n", $utf8NoBom)
+          pwsh -NoProfile -File tools/release-notes.ps1 `
+            -Tag $env:RELEASE_TAG `
+            -BuildInfoPath $infoPath `
+            -OutputPath (Join-Path $env:RUNNER_TEMP 'release-notes.md')
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'sona-release'
+          $info = Get-Content -LiteralPath (Join-Path $out 'installer-build-info.json') -Raw | ConvertFrom-Json
+          $installerPath = Join-Path $out $info.Installer
+          $sumsPath = Join-Path $out 'SHA256SUMS.txt'
+          $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          $title = "Sona $($env:RELEASE_TAG)"
+
+          $exists = $false
+          & gh release view $env:RELEASE_TAG 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { $exists = $true }
+
+          if ($exists) {
+            gh release upload $env:RELEASE_TAG $installerPath $sumsPath --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'gh release upload failed.' }
+            gh release edit $env:RELEASE_TAG --title $title --notes-file $notesPath --prerelease=false --latest
+            if ($LASTEXITCODE -ne 0) { throw 'gh release edit failed.' }
+          } else {
+            gh release create $env:RELEASE_TAG $installerPath $sumsPath `
+              --verify-tag `
+              --title $title `
+              --notes-file $notesPath `
+              --latest
+            if ($LASTEXITCODE -ne 0) { throw 'gh release create failed.' }
+          }

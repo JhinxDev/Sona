@@ -80,6 +80,15 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: Validate release version and changelog metadata
+        shell: pwsh
+        run: |
+          $versionMatch = Select-String -LiteralPath 'Directory.Build.props' -Pattern '<Version>([0-9]+\.[0-9]+\.[0-9]+)</Version>'
+          if (-not $versionMatch) { throw 'Missing Version in Directory.Build.props' }
+          $tag = 'v' + $versionMatch.Matches[0].Groups[1].Value
+          pwsh -NoProfile -File tools/release-notes.ps1 -Tag $tag | Out-Null
+          Write-Host "Verified release notes metadata for $tag"
+
       - name: Audit NuGet dependencies for vulnerabilities
         shell: pwsh
         run: |
