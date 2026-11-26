@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2 - CI installer portability fix
+
+- **Installer build portability**: use drive-safe `[IO.Path]::Combine` checks in
+  `tools/installer/build-installer.ps1` so builds on runners without an `E:`
+  drive fall back cleanly to `dotnet` on `PATH`.
+
 ## 0.7.1 - CI stability, NAudio 2.4.0, and automated installer releases
 
 - **CI and test stability**: fix a timing race in `DiscordClosedChecks` where
