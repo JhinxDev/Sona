@@ -20,13 +20,13 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $runtimeRoot = if ($env:SONA_RUNTIME) { $env:SONA_RUNTIME } else { 'E:\DevelopmentTools\local-dictation' }
-$sdk = Join-Path $runtimeRoot 'sdk'
-if (Test-Path (Join-Path $sdk 'dotnet.exe')) {
+$sdk = if ($runtimeRoot) { [IO.Path]::Combine($runtimeRoot, 'sdk') } else { '' }
+if ($sdk -and (Test-Path -LiteralPath ([IO.Path]::Combine($sdk, 'dotnet.exe')))) {
     if (-not $env:DOTNET_ROOT) { $env:DOTNET_ROOT = $sdk }
-    if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = Join-Path $runtimeRoot 'dotnet-home' }
-    if (-not $env:NUGET_PACKAGES) { $env:NUGET_PACKAGES = Join-Path $runtimeRoot 'nuget' }
+    if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = [IO.Path]::Combine($runtimeRoot, 'dotnet-home') }
+    if (-not $env:NUGET_PACKAGES) { $env:NUGET_PACKAGES = [IO.Path]::Combine($runtimeRoot, 'nuget') }
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-    $dotnet = Join-Path $sdk 'dotnet.exe'
+    $dotnet = [IO.Path]::Combine($sdk, 'dotnet.exe')
 } else {
     $dotnet = 'dotnet'
 }
