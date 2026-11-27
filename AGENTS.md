@@ -16,7 +16,7 @@ dotnet test tests/Sona.Tests --disable-build-servers -p:UseSharedCompilation=fal
 
 ## Active Skills & Tools
 
-- **Windows UI & Automation:** `control-windows-apps`, `screenshot`.
+- **.NET & Windows UI:** `dotnet-csharp` (`csharp-expert`, `csharp-refactoring`, `msbuild`, `dotnet-pinvoke`, `analyzing-dotnet-performance`, `run-tests`), `control-windows-apps`, `screenshot`.
 - **Security & CI:** `security-audit`, `gh-fix-ci`, `gh-address-comments`, `humanizer`.
 
 ## Guardrails & Security
