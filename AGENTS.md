@@ -1,48 +1,32 @@
-# Working on Sona
+# Sona — Agent & Contributor Instructions
 
-Sona is an early native Windows dictation app. Read README.md, docs/DESIGN.md,
-docs/IMPLEMENTATION.md and docs/PREVIEW-VALIDATION.md before substantial changes.
-Respect the active user's model choices, working changes and explicit scope.
+Sona is a local-first native Windows voice dictation app. Read `README.md`, `docs/DESIGN.md`, `docs/IMPLEMENTATION.md`, and `docs/PREVIEW-VALIDATION.md` before substantial changes.
 
-- Keep microphone recording behind an intentional user gesture. Never start a
-  live microphone, inject global keys, submit a message or connect a call as part
-  of an unattended test.
-- Preserve the owner's profile, draft, clipboard and enabled preferences. Native
-  UI tests use a separate test profile; fixture replay does not prove live input.
-- Speech and optional cleanup stay local. New profiles start without saved
-  history, startup, clipboard backup, cleanup, call protection or update checks.
-- Keep SDKs, NuGet caches, model weights, recordings and renders outside this
-  repository. Use the documented SONA_RUNTIME and isolated SDK settings. Do not
-  change a user's global SDK, driver, startup registration or font installation.
-- Build with --disable-build-servers -p:UseSharedCompilation=false. Run the
-  relevant checks from tests/Sona.Tests and affected native tools after source
-  changes. A documentation-only change does not need an unchanged full replay.
-- Preserve upstream licenses and notices, pinned sizes/hashes and local download
-  boundaries. Review dependency changes and every scoped Git diff before syncing.
-- Distinguish builds, fake-system tests, file replay and real microphone/target-app
-  acceptance. Keep missing personal or physical-device proof explicit.
-- Stage only owned paths and preserve concurrent work. Public source does not
-  authorize uploading videos, publishing binary releases or messaging others.
+## Stack & Layout
 
-## Qualified updates must reach the running app
+- **App & Runtime:** .NET / C# native Windows desktop app (`src/`), `tests/Sona.Tests/`, `tools/`.
+- **Local Privacy:** Speech recognition and optional cleanup stay local; new profiles start without saved history, startup entries, clipboard backup, call protection, or update checks.
 
-Owner standing instruction, October 16, 2026: every qualified new app version or
-functional update must update the live installed and running Sona. Routine
-private live upgrades are already authorized without renewed permission.
-Source-only delivery and `-NextLaunch` staging do not fulfill this requirement.
-Documentation-only commits do not trigger app activation. Separately qualified
-tooling changes may reuse unchanged accepted app binaries.
-Use guarded normal Quit, current-user encrypted recovery and the desktop-owned
-launcher. Preserve busy recording, owned voice changes and unsaved edits until
-activation is safe. Verify the running version/build, exact EXE and installed
-receipt hashes, restored draft and original, and settings readback before calling
-delivery complete. Follow [the live upgrade contract](docs/IMPLEMENTATION.md#live-upgrade-delivery-rule).
+## Verify & Run Commands
 
-## Releases and installer publishing
+```powershell
+dotnet build --disable-build-servers -p:UseSharedCompilation=false
+dotnet test tests/Sona.Tests --disable-build-servers -p:UseSharedCompilation=false
+```
 
-Every user-facing feature, bug fix, or packaging change on `main` must bump `<Version>`
-in `Directory.Build.props`, record notes under `## <version>` in `CHANGELOG.md`, update
-release links in `README.md` and `docs/INSTALL.md`, pass CI on a PR, and push an
-annotated `vX.Y.Z` tag on the merged `main` commit. `.github/workflows/release.yml`
-validates version metadata with `tools/release-notes.ps1`, builds and rehearses the
-Windows x64 installer, generates `SHA256SUMS.txt`, and publishes the GitHub Release.
+## Active Skills & Tools
+
+- **Windows UI & Automation:** `control-windows-apps`, `screenshot`.
+- **Security & CI:** `security-audit`, `gh-fix-ci`, `gh-address-comments`, `humanizer`.
+
+## Guardrails & Security
+
+- Keep microphone recording behind an intentional user gesture. Never start a live microphone, inject global keys, submit messages, or connect calls in unattended tests.
+- Preserve the owner's profile, draft, clipboard, and preferences; native UI tests use an isolated test profile.
+- Keep SDKs, NuGet caches, model weights, recordings, and renders outside this repository (`SONA_RUNTIME`). Do not alter global SDKs, drivers, startup entries, or system fonts.
+- Preserve upstream licenses, pinned hashes, and download boundaries. Distinguish builds, mocked tests, file replay, and live microphone/target-app acceptance.
+
+## Release & Live App Activation
+
+- **Live upgrade rule:** Every qualified new app version or functional update must update the installed running Sona via guarded Quit, encrypted state recovery, and verified EXE/hash readback (`docs/IMPLEMENTATION.md#live-upgrade-delivery-rule`). Docs-only commits do not require activation.
+- **Releases:** Bump `<Version>` in `Directory.Build.props`, move notes under `## <version>` in `CHANGELOG.md`, update release links in `README.md` and `docs/INSTALL.md`, pass PR CI, and push an annotated `vX.Y.Z` tag so `.github/workflows/release.yml` builds the Windows x64 installer, generates `SHA256SUMS.txt`, and publishes the GitHub Latest Release.
