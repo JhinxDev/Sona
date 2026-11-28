@@ -1,26 +1,29 @@
+<div align="center">
+
+<img src="src/Sona.App/Assets/Sona.png" width="96" height="96" alt="Sona icon" />
+
 # Sona
 
+**Local voice dictation for Windows. Your voice, your words, on your PC.**
+
+[![MIT License](https://img.shields.io/badge/license-MIT-FF3B5C?style=flat-square)](LICENSE)
+![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078D4?style=flat-square)
+[![Latest Release](https://img.shields.io/github/v/release/JhinxDev/Sona?style=flat-square&color=7C5CFF)](https://github.com/JhinxDev/Sona/releases/latest)
 [![CI](https://github.com/JhinxDev/Sona/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JhinxDev/Sona/actions/workflows/ci.yml)
 [![Clipboard CI](https://github.com/JhinxDev/Sona/actions/workflows/windows-clipboard.yml/badge.svg?branch=main)](https://github.com/JhinxDev/Sona/actions/workflows/windows-clipboard.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D4.svg)
 
-**Local voice dictation for Windows. Your voice, your words, on your PC.**
+[Download Windows Installer (v0.7.2)](https://github.com/JhinxDev/Sona/releases/download/v0.7.2/Sona-Setup-0.7.2.exe) · [Install Guide](docs/INSTALL.md) · [Release Notes](https://github.com/JhinxDev/Sona/releases/tag/v0.7.2) · [SHA-256 Checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.2/SHA256SUMS.txt) · [Changelog](CHANGELOG.md)
+
+</div>
+
+---
 
 Sona turns speech into text in your focused app using Parakeet or Whisper on
 your own computer. Keep a model warm for quick reuse, polish wording locally,
 add your vocabulary, keep a reviewable draft, and mute your Discord microphone
 while you dictate. No Sona account, no subscription and no cloud speech service.
 
-**[Download Sona for Windows x64](https://github.com/JhinxDev/Sona/releases/download/v0.7.2/Sona-Setup-0.7.2.exe)**
-
-The published Windows installer is **v0.7.2**, an unsigned early preview.
-[Release notes](https://github.com/JhinxDev/Sona/releases/tag/v0.7.2) ·
-[SHA-256 checksums](https://github.com/JhinxDev/Sona/releases/download/v0.7.2/SHA256SUMS.txt) ·
-[Changelog](CHANGELOG.md)
-
-See the [install guide](docs/INSTALL.md) for first-run setup and uninstall
-instructions. Build-from-source instructions are below.
+The published Windows installer is **v0.7.2**, an unsigned early preview. See the [install guide](docs/INSTALL.md) for first-run setup and uninstall instructions. Build-from-source instructions are below.
 
 [![Watch the Sona trailer: dictation with no subscription](docs/images/sona-trailer-r11b.jpg)](https://www.youtube.com/watch?v=Xyz4TkNP58w)
 
